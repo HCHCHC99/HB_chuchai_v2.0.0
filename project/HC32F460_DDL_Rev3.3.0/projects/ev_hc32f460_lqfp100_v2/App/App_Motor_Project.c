@@ -387,8 +387,8 @@ static void RegisterAllDevices(void) {
         .u8MotorArbiterDevId = ID_MOTOR,                        //        ??   ?             
         .u8SensorDevId = ID_SENSOR_CURRENT,                     //  ??          υτ
         .fReductionRatio = (float)g_AppParam.rturn_reduction_ratio / 10.0f,  //   Flash  ?    ? 
-        .fMaxAngle = RTURN_MAX_ANGLE,                           //    ? 
-        .fMinAngle = RTURN_MIN_ANGLE,                           //   §³ ? 
+        .fMaxAngle = (float)g_AppParam.open_limit_angle / 10.0f,                           //    ? 
+        .fMinAngle = (float)g_AppParam.close_limit_angle / 10.0f,                           //   §³ ? 
         .u8ReverseOutput = RTURN_REVERSE_OUTPUT,                //           ?
         .u8DeviceId = ID_RTURN,
         .u16UpdateIntervalMs = RTURN_UPDATE_INTERVAL_MS         //    ?  
@@ -707,8 +707,14 @@ void App_ReloadConfig(void)
     {
         g_rturn_dev->stcConfig.fReductionRatio =
             (float)g_AppParam.rturn_reduction_ratio / 10.0f;
-        MAIN_D("[RELOAD] Reduction ratio: %.1f\r\n",
-               (double)g_rturn_dev->stcConfig.fReductionRatio);
+        g_rturn_dev->stcConfig.fMaxAngle =
+            (float)g_AppParam.open_limit_angle / 10.0f;
+        g_rturn_dev->stcConfig.fMinAngle =
+            (float)g_AppParam.close_limit_angle / 10.0f;
+        MAIN_D("[RELOAD] Reduction ratio: %.1f, MaxAngle: %.1f, MinAngle: %.1f\r\n",
+               (double)g_rturn_dev->stcConfig.fReductionRatio,
+               (double)g_rturn_dev->stcConfig.fMaxAngle,
+               (double)g_rturn_dev->stcConfig.fMinAngle);
     }
 
     /* ---          :     MotorHall υτ --- */
