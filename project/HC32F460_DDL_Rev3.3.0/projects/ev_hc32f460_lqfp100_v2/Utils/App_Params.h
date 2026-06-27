@@ -104,7 +104,7 @@
 #define PARAM_DEFAULT_RTURN_REDUCTION_RATIO   (11830)  /* 减速比 x0.1 */
 #define PARAM_DEFAULT_MOTOR_HALL_POLE_PAIRS  (3)       /* 电机极对数 */
 #define PARAM_DEFAULT_CLOSE_LIMIT_ANGLE         (-20)       /* 关闭极限角度 0.1度 */
-#define PARAM_DEFAULT_OPEN_LIMIT_ANGLE          (880)       /* 打开极限角度 0.1度 */
+#define PARAM_DEFAULT_OPEN_LIMIT_ANGLE          (580)       /* 打开极限角度 0.1度 */
 #define PARAM_DEFAULT_BAUD_RATE                 (9600UL)    /* 默认波特率 */
 
 /* --- 内部参数（不暴露给 Modbus，仅 Flash 存储，上电加载） --- */
