@@ -853,6 +853,11 @@
               <FileType>1</FileType>
               <FilePath>..\..\Utils\param_validator.c</FilePath>
             </File>
+            <File>
+              <FileName>App_RunAngle.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Utils\App_RunAngle.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>
@@ -1703,6 +1708,11 @@
               <FileName>param_validator.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\Utils\param_validator.c</FilePath>
+            </File>
+            <File>
+              <FileName>App_RunAngle.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Utils\App_RunAngle.c</FilePath>
             </File>
           </Files>
         </Group>

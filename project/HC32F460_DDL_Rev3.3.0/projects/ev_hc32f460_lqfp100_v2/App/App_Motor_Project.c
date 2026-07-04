@@ -5,8 +5,8 @@
 #include <stdint.h>
 #include "rtt_log.h"
 #include "dev_rturn.h"          //         
-#include "App_Params.h"         //      g_AppParam   ? Modbus  ?       
-// ==========   ???  ?  ??    ? ==========
+#include "App_Params.h"         //      g_AppParam   ? Modbus  ?
+#include "App_RunAngle.h"
 SystemSim_t g_sim = {
     .sim_pwr_pos = 0,
     .sim_pwr_neg = 0,
@@ -114,12 +114,12 @@ static void RegisterAllDevices(void) {
 
 
 
-    // ?   ?    õô?  
+    // ?   ?    ï¿½ï¿½?  
     
     // Hall_Config_t upCfg = {
     //     .port = GPIO_PORT_B,
     //     .pin = GPIO_PIN_02,
-    //     .active_level = 0,           //  ?   ???  DD  ? ?   ò    - ?   ?
+    //     .active_level = 0,           //  ?   ???  DD  ? ?   ï¿½    - ?   ?
     //     .bind_dir = DIR_FWD,
     //     .is_soft_limit = 0,
     //     .debounce_ms = 20,
@@ -135,7 +135,7 @@ static void RegisterAllDevices(void) {
     // Hall_Config_t downCfg = {
     //     .port = GPIO_PORT_B,
     //     .pin = GPIO_PIN_10,
-    //     .active_level = 0,           //  ?   ???  DD  ? ?   ò    - ?   ?
+    //     .active_level = 0,           //  ?   ???  DD  ? ?   ï¿½    - ?   ?
     //     .bind_dir = DIR_REV,
     //     .is_soft_limit = 0,
     //     .debounce_ms = 20,
@@ -190,7 +190,7 @@ static void RegisterAllDevices(void) {
     // Keil Watch    ?   ?  ?  ?     ?   ?  
     g_pMotorDevWatch = &g_motor_dev;
 
-    // ?         õô
+    // ?         ï¿½ï¿½
     motor_hall_config_t motorHallCfg = {
         .hall_a_port = GPIO_PORT_A,
         .hall_a_pin = GPIO_PIN_10,
@@ -203,7 +203,7 @@ static void RegisterAllDevices(void) {
         .irq_src_a = INT_SRC_PORT_EIRQ10,
         .irq_src_b = INT_SRC_PORT_EIRQ9,
         .irq_priority = 2,
-        .pole_pairs = (uint8_t)g_AppParam.motor_hall_pole_pairs,  // ´ÓFlash¶ÁÈ¡
+        .pole_pairs = (uint8_t)g_AppParam.motor_hall_pole_pairs,  // ï¿½ï¿½Flashï¿½ï¿½È¡
         .hall_count = 2,
         .custom_pulses_per_rev = 0
     };
@@ -230,48 +230,48 @@ static void RegisterAllDevices(void) {
     }                    
 
     // ============================================================
-    // ADC  õô?  
+    // ADC  ï¿½ï¿½?  
     // ? ?ADC  ? ?    ?     dev_adc.c    ADC_AdpLayerInit()  ?    
-    //   ?   ADC  õô  ?  ?   ?      Adc_Create/Adc_Init/Adc_Start
+    //   ?   ADC  ï¿½ï¿½  ?  ?   ?      Adc_Create/Adc_Init/Adc_Start
     // ============================================================
 
-    // ?        ADC õô (PA5, CH5) -  §Ø ??
+    // ?        ADC ï¿½ï¿½ (PA5, CH5) -  ï¿½ï¿½ ??
     ADC_Config_t adcCurrentCfg = {
         .u8AdcId = 0,                       //    ADC_AdpLayerInit  ?     
         .u8Channel = 5,                     // ADC_CH5 = PA5
         .u8Port = GPIO_PORT_A,
         .u16Pin = GPIO_PIN_05,
-        .enAcqMode = ADC_ACQ_MODE_INTERRUPT, //  §Ø ??
-        .u16DmaBufferSize = 0,              //  §Ø ??    ?DMA      
-        .u8DmaChannel = 0                   //  §Ø ??    ?DMA?  
+        .enAcqMode = ADC_ACQ_MODE_INTERRUPT, //  ï¿½ï¿½ ??
+        .u16DmaBufferSize = 0,              //  ï¿½ï¿½ ??    ?DMA      
+        .u8DmaChannel = 0                   //  ï¿½ï¿½ ??    ?DMA?  
     };
 
     ADC_Device_t* adc_current_dev = ADC_Device_Create(&adcCurrentCfg);
     DeviceManager_Register(ID_ADC_CURRENT, "ADC_Current", DEVICE_TYPE_ADC, 
                         adc_current_dev, g_adc_ops);
 
-    // ?   ?   ADC õô
+    // ?   ?   ADC ï¿½ï¿½
     //   HB_chuchai ??   ? PA04, CH4
-    //      ?‰Í   HandB ? ¡ê   PA06, CH6
+    //      ?ï¿½ï¿½   HandB ? ï¿½ï¿½   PA06, CH6
     //   ?  ? ?? ?? PA04 + CH4
     ADC_Config_t adcVoltageCfg = {
         .u8AdcId = 1,                       //    ADC_AdpLayerInit  ?     
         .u8Channel = PIN_ADC_VOLTAGE_CH,                     // ADC_CH6 = PA06 (   ? ); ? HB_chuchai: CH4 = PA04
         .u8Port = PIN_ADC_VOLTAGE_PORT,
         .u16Pin = PIN_ADC_VOLTAGE_PIN,              // PA06 (   ? ); ? HB_chuchai: GPIO_PIN_04
-        .enAcqMode = ADC_ACQ_MODE_INTERRUPT, //  §Ø ??
-        .u16DmaBufferSize = 0,              //  §Ø ??    ?DMA      
-        .u8DmaChannel = 0                   //  §Ø ??    ?DMA?  
+        .enAcqMode = ADC_ACQ_MODE_INTERRUPT, //  ï¿½ï¿½ ??
+        .u16DmaBufferSize = 0,              //  ï¿½ï¿½ ??    ?DMA      
+        .u8DmaChannel = 0                   //  ï¿½ï¿½ ??    ?DMA?  
     };
 
     ADC_Device_t* adc_voltage_dev = ADC_Device_Create(&adcVoltageCfg);
     DeviceManager_Register(ID_ADC_VOLTAGE, "ADC_Voltage", DEVICE_TYPE_ADC, 
                         adc_voltage_dev, g_adc_ops);
 
-    // ?   ??   õô      ADC_VOLTAGE    ?  ? ? ?  
-    //  Ó  ?   g_AppParam   ?  ?   Flash    ? 
+    // ?   ??   ï¿½ï¿½      ADC_VOLTAGE    ?  ? ? ?  
+    //  ï¿½ï¿½  ?   g_AppParam   ?  ?   Flash    ? 
     {
-        //    Flash   ?  ?   ?   ¦Ë?    0.1V -> mV
+        //    Flash   ?  ?   ?   ï¿½ï¿½?    0.1V -> mV
         uint32_t u32OvervoltageThresholdMv = (uint32_t)g_AppParam.voltage_upper_limit * 100UL;
         uint32_t u32UndervoltageThresholdMv = (uint32_t)g_AppParam.voltage_lower_limit * 100UL;
         uint32_t u32OvervoltageHysteresisMv = (uint32_t)g_AppParam.voltage_upper_hysteresis * 100UL;
@@ -279,7 +279,7 @@ static void RegisterAllDevices(void) {
         uint8_t u8OvervoltageTriggerCount = g_AppParam.overvoltage_trigger_count;
         uint8_t u8UndervoltageTriggerCount = g_AppParam.undervoltage_trigger_count;
         
-        //     Flash  §Ö ?? 0     ? ?  ?    ? õô            
+        //     Flash  ï¿½ï¿½ ?? 0     ? ?  ?    ? ï¿½ï¿½            
         if (u32OvervoltageThresholdMv == 0) {
             u32OvervoltageThresholdMv = PARAM_DEFAULT_VOLTAGE_UPPER_LIMIT * 100UL;
             PARAMS_DBG("[VOLTAGE] Overvoltage threshold is 0, using default: %lu mV", u32OvervoltageThresholdMv);
@@ -326,7 +326,7 @@ static void RegisterAllDevices(void) {
                             g_voltage_bus_dev, g_voltage_ops);
     }
 
-    // ?            õô
+    // ?            ï¿½ï¿½
     //    Modbus  ?     ?      ? ? ? ? ?      ?  ?    
     {
         int32_t s32ThresholdMa = (int32_t)g_AppParam.current_upper_limit;
@@ -335,10 +335,10 @@ static void RegisterAllDevices(void) {
         int32_t s32HysteresisMa = (int32_t)g_AppParam.current_hysteresis_ma;
         uint8_t u8TriggerCount = g_AppParam.overcurrent_trigger_count;
         
-        //     ?   ?? 0  ¦Ä   ?      ? ?  ?
-        // ? ?0     §¹?     ?  ?             2 ?  ? 0
-        //     Flash ¦Ä  ?    ? 0xFF    g_AppParam.current_upper_limit      0xFFFFFFFF  int32_t    -1  
-        //          §Ø  < 0   ?¦Ä  ?    = 0   ? ?       ? 0
+        //     ?   ?? 0  ï¿½ï¿½   ?      ? ?  ?
+        // ? ?0     ï¿½ï¿½?     ?  ?             2 ?  ? 0
+        //     Flash ï¿½ï¿½  ?    ? 0xFF    g_AppParam.current_upper_limit      0xFFFFFFFF  int32_t    -1  
+        //          ï¿½ï¿½  < 0   ?ï¿½ï¿½  ?    = 0   ? ?       ? 0
         if (s32ThresholdMa < 0) {
             s32ThresholdMa = PARAM_DEFAULT_CURRENT_UPPER_LIMIT;
             PARAMS_DBG("[CURRENT] Threshold is invalid (%ld), using default: %ld mA", 
@@ -381,14 +381,14 @@ static void RegisterAllDevices(void) {
                             g_sensor_current_dev, g_sensor_ops);
     }
 
-    // ?  ?  ?       õô
+    // ?  ?  ?       ï¿½ï¿½
     RTurn_Config_t rturnCfg = {
-        .u8MotorHallDevId = ID_MOTOR_HALL,                      //  ??       õô
+        .u8MotorHallDevId = ID_MOTOR_HALL,                      //  ??       ï¿½ï¿½
         .u8MotorArbiterDevId = ID_MOTOR,                        //        ??   ?             
-        .u8SensorDevId = ID_SENSOR_CURRENT,                     //  ??          õô
+        .u8SensorDevId = ID_SENSOR_CURRENT,                     //  ??          ï¿½ï¿½
         .fReductionRatio = (float)g_AppParam.rturn_reduction_ratio / 10.0f,  //   Flash  ?    ? 
         .fMaxAngle = (float)g_AppParam.open_limit_angle / 10.0f,                           //    ? 
-        .fMinAngle = (float)g_AppParam.close_limit_angle / 10.0f,                           //   §³ ? 
+        .fMinAngle = (float)g_AppParam.close_limit_angle / 10.0f,                           //   ï¿½ï¿½ ? 
         .u8ReverseOutput = RTURN_REVERSE_OUTPUT,                //           ?
         .u8DeviceId = ID_RTURN,
         .u16UpdateIntervalMs = RTURN_UPDATE_INTERVAL_MS         //    ?  
@@ -405,20 +405,20 @@ static void RegisterAllDevices(void) {
 
 // ========== EventBus ???????? ==========
 static void SetupEventBusSubscriptions(void) {
-    //     õô   ?    ??  ?     ? 0       ?     ?      
+    //     ï¿½ï¿½   ?    ??  ?     ? 0       ?     ?      
     EventBus_Subscribe(TOPIC_POWER, Motor_OnPowerEvent, 0);
     EventBus_Subscribe(TOPIC_LIMIT_HARD, Motor_OnHardLimit, 0);
     EventBus_Subscribe(TOPIC_LIMIT_SOFT, Motor_OnHardLimit, 0);
     EventBus_Subscribe(TOPIC_MANUAL_IO, Motor_OnManualIO, 0);
     EventBus_Subscribe(TOPIC_MOTOR_SPEED_FEEDBACK, Motor_OnSpeedFeedback, 0);    
-    //        õô   ?    ? 
+    //        ï¿½ï¿½   ?    ? 
     EventBus_Subscribe(TOPIC_ALARM, Motor_OnOvercurrent, 0);
     EventBus_Subscribe(TOPIC_VOLTAGE_ALARM, Motor_OnVoltageAlarm, 0);
     // ?  ?         ?    ? 
     EventBus_Subscribe(TOPIC_CURRENT_ALARM, RTurn_OnCurrentAlarm, 1);	
     EventBus_Subscribe(TOPIC_CURRENT_ALARM, Motor_OnCurrentAlarm, 1);
 
-    //     ?       ?  ?        ¦Ë ? 
+    //     ?       ?  ?        ï¿½ï¿½ ? 
     EventBus_Subscribe(TOPIC_RTURN_LIMIT, Motor_OnRTurnLimit, 0);
     // RS485  ?    ? ?   Modbus REG_CTRL_CMD       
     EventBus_Subscribe(TOPIC_MANUAL_RS485, Motor_OnManualIO, 0);
@@ -440,10 +440,10 @@ static void SetDeviceUpdateIntervals(void) {
     DeviceManager_SetUpdateInterval(ID_ADC_CURRENT, 1);   // ADC        
     DeviceManager_SetUpdateInterval(ID_ADC_VOLTAGE, 1);   // ADC  ?    
     
-    //   ?? ??          õô - ?10ms  ADC  ?      ?  
+    //   ?? ??          ï¿½ï¿½ - ?10ms  ADC  ?      ?  
     DeviceManager_SetUpdateInterval(ID_VOLTAGE_BUS, 10);   // ?10ms    ?  ? ? ?
-    DeviceManager_SetUpdateInterval(ID_SENSOR_CURRENT, 1); // ?10ms    ? ¦Å   ?
-    DeviceManager_SetUpdateInterval(ID_RTURN, 1);  // ?10ms    ? ¦Í? 
+    DeviceManager_SetUpdateInterval(ID_SENSOR_CURRENT, 1); // ?10ms    ? ï¿½ï¿½   ?
+    DeviceManager_SetUpdateInterval(ID_RTURN, 1);  // ?10ms    ? ï¿½ï¿½? 
 }
 
 // ========== ?  ?a? ? |     ==========
@@ -459,7 +459,7 @@ void Sim_ProcessInput(void) {
 
 void Sim_PublishEvents(void) {
     uint32_t now = tickTimer_GetCount();
-    (void)now;  //     ¦Ä? t   
+    (void)now;  //     ï¿½ï¿½? t   
     
     //   ? ? 
     static uint8_t last_pwr_pos = 0;
@@ -479,7 +479,7 @@ void Sim_PublishEvents(void) {
         last_pwr_neg = g_sim.sim_pwr_neg;
     }
     
-    //   ¦Ë ? 
+    //   ï¿½ï¿½ ? 
     static uint8_t last_hall_up = 0;
     static uint8_t last_hall_down = 0;
     
@@ -497,11 +497,11 @@ void Sim_PublishEvents(void) {
         last_hall_down = g_sim.sim_hall_down;
     }
     
-    // IO ?  - ?   §Ò£?  ?
+    // IO ?  - ?   ï¿½Òï¿½?  ?
     static uint8_t last_io_fwd = 0;
     static uint8_t last_io_rev = 0;
     
-    //   ?IO £   
+    //   ?IO ï¿½ï¿½   
     if (g_sim.sim_io_fwd != last_io_fwd) {
         MAIN_D("[SIM] IO_FWD changed: %d -> %d\r\n", last_io_fwd, g_sim.sim_io_fwd);
         
@@ -527,7 +527,7 @@ void Sim_PublishEvents(void) {
         last_io_fwd = g_sim.sim_io_fwd;
     }
     
-    //   ?IO £   
+    //   ?IO ï¿½ï¿½   
     if (g_sim.sim_io_rev != last_io_rev) {
         MAIN_D("[SIM] IO_REV changed: %d -> %d\r\n", last_io_rev, g_sim.sim_io_rev);
         
@@ -565,7 +565,7 @@ static void UpdateStatusIndicators(void) {
     if (now - last_update < 50) return;
     last_update = now;
     
-    // ??  ?  ??   ?¡§ ?D??  
+    // ??  ?  ??   ?ï¿½ï¿½ ?D??  
     const MotorDebugInfo_t* dbg = Motor_GetDebugInfo(&g_motor_dev);
     if (dbg) {
         if (dbg->state == MS_IDLE) {
@@ -609,7 +609,7 @@ static void ProcessDeviceUpdates(void) {
 
 // ========== ? ? 33?  ??   ==========
 void ESystem_Init(void) {
-    // 1.  ? ?   EventBus  ?  ?  ? ¦² 
+    // 1.  ? ?   EventBus  ?  ?  ? ï¿½ï¿½ 
     EventBus_Init();
     
     // 2.   ?   DeviceManager       ?   ?   EventBus  
@@ -620,46 +620,49 @@ void ESystem_Init(void) {
     };
     DeviceManager_Init(&config);
     
-    // 3. ?       õô
+    // 3. ?       ï¿½ï¿½
     RegisterAllDevices();
     
-    // 4.        ? ?    ?    ? ? õô  ?  ??  ?   
+    // 4.        ? ?    ?    ? ? ï¿½ï¿½  ?  ??  ?   
     SetupEventBusSubscriptions();
     
 
     
-    // 6.  ??¦Ã ?   õô?     ? ?      ?      ? ?    ?  
+    // 6.  ??ï¿½ï¿½ ?   ï¿½ï¿½?     ? ?      ?      ? ?    ?  
     //  ? ?      ?   
     MAIN_D("[APP] Initializing motor arbiter first...\r\n");
     Device_Init(ID_MOTOR);
     
-    //  ? ?       õô        ?  
+    //  ? ?       ï¿½ï¿½        ?  
     MAIN_D("[APP] Initializing remaining devices...\r\n");
     for (uint8_t i = 0; i < MAX_DEVICES; i++) {
         if (i == ID_MOTOR) continue;  //  ? ?  
         Device_Init(i);
     }
     
-    // 6.      õô    ?  
+    // 6.      ï¿½ï¿½    ?  
     SetDeviceUpdateIntervals();
     
-    // 7.          õô    
+    // 7.          ï¿½ï¿½    
     DeviceManager_EnableAllUpdate();
-    
+
+    // 8. Initialize absolute angle module (after param_manager is ready)
+    RunAngle_Init();
+
     memset(&g_status, 0, sizeof(SystemStatus_t));
 }
 
 // ========== ? ? 3?  ?-?   ==========
-// ==========          ?          ¦Ë   ==========
+// ==========          ?          ï¿½ï¿½   ==========
 /**
- * @brief    g_AppParam       ?   ?      õô?  
- *        Modbus §Õ       ¨²   ?           ¦Ë
+ * @brief    g_AppParam       ?   ?      ï¿½ï¿½?  
+ *        Modbus ï¿½ï¿½       ï¿½ï¿½   ?           ï¿½ï¿½
  */
 void App_ReloadConfig(void)
 {
     MAIN_D("[RELOAD] Reloading config from g_AppParam...\r\n");
 
-    /* ---   ??   õô     1 ?/??  ? --- */
+    /* ---   ??   ï¿½ï¿½     1 ?/??  ? --- */
     if (g_voltage_bus_dev != NULL)
     {
         g_voltage_bus_dev->stcConfig.u32OvervoltageThresholdMv =
@@ -680,7 +683,7 @@ void App_ReloadConfig(void)
                g_voltage_bus_dev->stcConfig.u32UndervoltageThresholdMv);
     }
 
-    /* ---            õô     1     ? --- */
+    /* ---            ï¿½ï¿½     1     ? --- */
     if (g_sensor_current_dev != NULL)
     {
         g_sensor_current_dev->stcConfig.s32OvercurrentThresholdMa =
@@ -699,10 +702,10 @@ void App_ReloadConfig(void)
     }
 
     /* --- ?  / ? ?  ?? ?  g_AppParam   ?           --- */
-    /* ---  õô  ? (node_id)   §Õ   Flash   ¡ä  Param_Init ?  §¹ --- */
+    /* ---  ï¿½ï¿½  ? (node_id)   ï¿½ï¿½   Flash   ï¿½ï¿½  Param_Init ?  ï¿½ï¿½ --- */
 
 
-    /* ---    ? :     RTurn õô --- */
+    /* ---    ? :     RTurn ï¿½ï¿½ --- */
     if (g_rturn_dev != NULL)
     {
         g_rturn_dev->stcConfig.fReductionRatio =
@@ -717,7 +720,7 @@ void App_ReloadConfig(void)
                (double)g_rturn_dev->stcConfig.fMinAngle);
     }
 
-    /* ---          :     MotorHall õô --- */
+    /* ---          :     MotorHall ï¿½ï¿½ --- */
     if (g_motor_hall_dev != NULL && g_motor_hall_dev->handle != NULL)
     {
         motor_hall_set_pole_pairs(g_motor_hall_dev->handle,
@@ -745,5 +748,6 @@ void ESystem_MainLoop(void) {
 #endif
     
     ProcessDeviceUpdates();
+    RunAngle_Update();         /* Track absolute angle from Hall pulse delta */
     UpdateStatusIndicators();
 }

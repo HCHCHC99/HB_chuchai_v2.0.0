@@ -10,85 +10,97 @@
 #include "rtt_manager.h"
 
 /*=============================================================================
- * µ÷ÊÔºê¶¨Òå£¨¾ÉÃû³Æ¼æÈİ£©
- * ¿ª¹ØÔÚ rtt_manager.h ÖĞÍ³Ò»¹ÜÀí£ºPARAM_DEBUG
+ * è°ƒè¯•å®å®šä¹‰ï¼ˆæ§åˆ¶è°ƒè¯•è¾“å‡ºï¼‰
+ * ç»Ÿä¸€åœ¨ rtt_manager.h ä¸­ç»Ÿä¸€æ§åˆ¶PARAM_DEBUG
  *============================================================================*/
 #ifdef PARAM_DEBUG
-    #define PARAM_DEBUG(fmt, ...)    MAIN_D("[PARAM] " fmt, ##__VA_ARGS__)
+    #define PARAM_DBG(fmt, ...)    MAIN_D("[PARAM] " fmt, ##__VA_ARGS__)
 #else
-    #define PARAM_DEBUG(fmt, ...)    ((void)0)
+    #define PARAM_DBG(fmt, ...)    ((void)0)
 #endif
 
 /*=============================================================================
- * Ä§Êı¶¨Òå
+ * é­”æ•°å®šä¹‰
  *============================================================================*/
-#define PARAM_MAGIC_HEAD    0x55AA55AA  /* ²ÎÊı´æ´¢Í·²¿Ä§Êı */
-#define PARAM_MAGIC_TAIL    0xAA44AA44  /* ²ÎÊı´æ´¢Î²²¿Ä§Êı */
+#define PARAM_MAGIC_HEAD    0x55AA55AA  /* å‚æ•°å­˜å‚¨å¤´éƒ¨é­”æ•° */
+#define PARAM_MAGIC_TAIL    0xAA44AA44  /* å‚æ•°å­˜å‚¨å°¾éƒ¨é­”æ•° */
 
 /*=============================================================================
- * ·µ»ØÖµ¶¨Òå
+ * è¿”å›å€¼å®šä¹‰
  *============================================================================*/
-#define PARAM_OK            0    /* ²Ù×÷³É¹¦ */
-#define PARAM_ERR           -1   /* ²Ù×÷Ê§°Ü */
-#define PARAM_ERR_INVD_PARAM -3  /* ÎŞĞ§²ÎÊı */
-#define PARAM_ERR_NOT_RDY   -5   /* Î´¾ÍĞ÷ */
+#define PARAM_OK            0    /* æ“ä½œæˆåŠŸ */
+#define PARAM_ERR           -1   /* æ“ä½œå¤±è´¥ */
+#define PARAM_ERR_INVD_PARAM -3  /* æ— æ•ˆå‚æ•° */
+#define PARAM_ERR_NOT_RDY   -5   /* æœªåˆå§‹åŒ– */
 
 /*=============================================================================
- * µ÷ÊÔ¼à¿Ø½á¹¹Ìå
+ * è¿è¡Œæ—¶çŠ¶æ€ç»“æ„ä½“ï¼ˆæ¯ä¸ªå®ä¾‹ç‹¬ç«‹ä¸€ä»½ï¼‰
  *============================================================================*/
 typedef struct {
-    uint16_t    curr_sec;      /* µ±Ç°ÕıÔÚÓÃµÄÉÈÇø±àºÅ (62-56) */
-    uint32_t    curr_addr;     /* µ±Ç°ÓĞĞ§Êı¾İµÄÎïÀíµØÖ· (Ïà¶ÔFlash»ùÖ·) */
-    uint32_t    next_addr;     /* ÏÂ´Î±£´æ½«Ğ´ÈëµÄµØÖ· */
-    uint32_t    save_count;    /* ±¾´ÎÉÏµçºóµÄ³É¹¦±£´æ´ÎÊı */
-    int32_t     last_res;      /* ×îºóÒ»´Î²Ù×÷½á¹û (Ê¹ÓÃPARAM_OK/PARAM_ERR) */
-} Param_Debug_t;
-
-/* È«¾Ö±äÁ¿ÉùÃ÷ */
-extern Param_Debug_t    g_ParamDebug;   /* ²ÎÊıµ÷ÊÔĞÅÏ¢ */
+    uint16_t    curr_sec;      /* å½“å‰å†™åˆ°çš„æ‰‡åŒºå· */
+    uint32_t    curr_addr;     /* å½“å‰å†™åˆ°çš„åœ°å€ï¼ˆç»å¯¹Flashåœ°å€ï¼‰ */
+    uint32_t    save_count;    /* æˆåŠŸä¿å­˜æ¬¡æ•° */
+    int32_t     last_res;      /* æœ€åä¸€æ¬¡æ“ä½œç»“æœ (PARAM_OK/PARAM_ERR) */
+} Param_Runtime_t;
 
 /*=============================================================================
- * ²ÎÊı¹ÜÀíÆ÷³õÊ¼»¯ÅäÖÃ½á¹¹Ìå
+ * å‚æ•°é…ç½®ç»“æ„ä½“ï¼ˆåˆå§‹åŒ–åä¸å¯å˜ï¼‰
  *============================================================================*/
 typedef struct {
-    void       *pParamBuf;     /* ²ÎÊı»º³åÇøÖ¸Õë£¨Ö¸ÏòÈ«¾Ö²ÎÊı½á¹¹Ìå£© */
-    uint32_t    paramSize;     /* ²ÎÊı½á¹¹Ìå´óĞ¡£¨×Ö½Ú£© */
-    uint32_t    magicHead;     /* Í·²¿Ä§Êı */
-    uint32_t    magicTail;     /* Î²²¿Ä§Êı */
-    uint32_t    checksumOffset;/* checksum ×Ö¶ÎÔÚ½á¹¹ÌåÖĞµÄ×Ö½ÚÆ«ÒÆ */
-    uint32_t    seqOffset;     /* sequence_id ×Ö¶ÎÔÚ½á¹¹ÌåÖĞµÄ×Ö½ÚÆ«ÒÆ */
-    uint32_t    eraseCntOffset;/* erase_count ×Ö¶ÎÔÚ½á¹¹ÌåÖĞµÄ×Ö½ÚÆ«ÒÆ */
+    void       *pParamBuf;     /* å‚æ•°ç¼“å†²åŒºæŒ‡é’ˆï¼ˆæŒ‡å‘å…¨å±€å‚æ•°ç»“æ„ä½“ï¼‰ */
+    uint32_t    paramSize;     /* å‚æ•°ç»“æ„ä½“å¤§å°ï¼ˆå­—èŠ‚ï¼‰ */
+    uint32_t    magicHead;     /* å¤´éƒ¨é­”æ•° */
+    uint32_t    magicTail;     /* å°¾éƒ¨é­”æ•° */
+    uint32_t    checksumOffset;/* checksum å­—æ®µåœ¨ç»“æ„ä½“ä¸­çš„å­—èŠ‚åç§» */
+    uint32_t    seqOffset;     /* sequence_id å­—æ®µåœ¨ç»“æ„ä½“ä¸­çš„å­—èŠ‚åç§» */
+    uint32_t    eraseCntOffset;/* erase_count å­—æ®µåœ¨ç»“æ„ä½“ä¸­çš„å­—èŠ‚åç§» */
+    uint8_t     secStart;      /* èµ·å§‹æ‰‡åŒºå·ï¼ˆç£¨æŸå‡è¡¡åŒºåŸŸä¸Šç•Œï¼‰ */
+    uint8_t     secEnd;        /* ç»“æŸæ‰‡åŒºå·ï¼ˆç£¨æŸå‡è¡¡åŒºåŸŸä¸‹ç•Œï¼‰ */
 } Param_Config_t;
 
 /*=============================================================================
- * º¯ÊıÉùÃ÷
+ * å¤–éƒ¨æ¥å£å‡½æ•°
  *============================================================================*/
 
 /**
- * @brief  ²ÎÊı¹ÜÀíÆ÷³õÊ¼»¯
- * @param  pConfig  ³õÊ¼»¯ÅäÖÃ£¨²ÎÊı»º³åÇøÖ¸Õë¡¢´óĞ¡¡¢Ä§ÊıµÈ£©
- * @return PARAM_OK ³É¹¦£¬PARAM_ERR Ê§°Ü
- * @note   ´Ó Flash ÖĞÉ¨ÃèÓĞĞ§²ÎÊı¿é²¢¼ÓÔØµ½ pConfig->pParamBuf
- *         Èç¹ûÎ´ÕÒµ½ÓĞĞ§¿é£¬Ôòµ÷ÓÃ pSetDefaults ÉèÖÃÄ¬ÈÏÖµ²¢Ğ´Èë Flash
+ * @brief  å‚æ•°æ¨¡å—åˆå§‹åŒ–
+ * @param  pConfig  åˆå§‹åŒ–é…ç½®ï¼ˆå«ç¼“å†²åŒºæŒ‡é’ˆã€å¤§å°ã€é­”æ•°ã€æ‰‡åŒºèŒƒå›´ç­‰ï¼‰
+ * @param  pRuntime è¿è¡Œæ—¶çŠ¶æ€ï¼ˆè°ƒç”¨è€…è‡ªè¡Œåˆ†é…ï¼ŒæŒä¹…åŒ–å½“å‰å†™å…¥ä½ç½®ï¼‰
+ * @param  pSetDefaults è®¾ç½®é»˜è®¤å€¼çš„å›è°ƒå‡½æ•°
+ * @return PARAM_OK æˆåŠŸï¼›PARAM_ERR å¤±è´¥
+ * @note   ä» Flash æ‰«ææœ‰æ•ˆå‚æ•°å—å¹¶åŠ è½½åˆ° pConfig->pParamBuf
+ *         å¦‚æœæœªæ‰¾åˆ°æœ‰æ•ˆå—ï¼Œåˆ™è°ƒç”¨ pSetDefaults å†™é»˜è®¤å€¼å¹¶å†™å…¥ Flash
  */
-int32_t Param_Init(const Param_Config_t *pConfig, void (*pSetDefaults)(void));
+int32_t Param_Init(const Param_Config_t *pConfig,
+                   Param_Runtime_t *pRuntime,
+                   void (*pSetDefaults)(void));
 
 /**
- * @brief  ²ÎÊı±£´æµ½ Flash
- * @param  pConfig  ³õÊ¼»¯ÅäÖÃ
- * @return PARAM_OK ³É¹¦£¬PARAM_ERR Ê§°Ü
+ * @brief  ä¿å­˜å‚æ•°åˆ° Flash
+ * @param  pConfig  åˆå§‹åŒ–é…ç½®
+ * @param  pRuntime è¿è¡Œæ—¶çŠ¶æ€ï¼ˆè°ƒç”¨åè‡ªåŠ¨æ›´æ–° curr_sec/curr_addrï¼‰
+ * @return PARAM_OK æˆåŠŸï¼›PARAM_ERR å¤±è´¥
  */
-int32_t Param_Save(const Param_Config_t *pConfig);
+int32_t Param_Save(const Param_Config_t *pConfig, Param_Runtime_t *pRuntime);
 
 /**
- * @brief  µ÷ÊÔ¹¦ÄÜ£º²Á³ıËùÓĞ²ÎÊıÉÈÇø
- * @param  pConfig  ³õÊ¼»¯ÅäÖÃ
+ * @brief  è°ƒè¯•åŠŸèƒ½ï¼šæ“¦é™¤æ‰€æœ‰å‚æ•°æ‰‡åŒº
+ * @param  pConfig  åˆå§‹åŒ–é…ç½®
+ * @param  pRuntime è¿è¡Œæ—¶çŠ¶æ€
+ * @param  pSetDefaults è®¾ç½®é»˜è®¤å€¼çš„å›è°ƒå‡½æ•°
  */
-void Param_Debug_EraseAll(const Param_Config_t *pConfig, void (*pSetDefaults)(void));
+void Param_Debug_EraseAll(const Param_Config_t *pConfig,
+                          Param_Runtime_t *pRuntime,
+                          void (*pSetDefaults)(void));
 
 /**
- * @brief  µ÷ÊÔÓÃ£ºµ¼³ö²Á³ıº¯Êı
+ * @brief  å…¬å…±æ¥å£ï¼šæ“¦é™¤æŒ‡å®šæ‰‡åŒº
  */
 int32_t Param_EraseSector(uint32_t address);
+
+/*=============================================================================
+ * Keil Watch å…¼å®¹ï¼šä¸»å®ä¾‹è¿è¡Œæ—¶æŒ‡é’ˆ
+ *============================================================================*/
+extern Param_Runtime_t g_ParamRuntime;
 
 #endif /* PARAM_MANAGER_H_ */

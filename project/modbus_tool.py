@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Modbus RTU 指令生成器 v4.0 """
+""" Modbus RTU 指令生成器 v4.1 (含绝对角度) """
 
 def modbus_crc16(data):
     crc = 0xFFFF
@@ -81,6 +81,8 @@ REALTIME_REGS = [
     (0x2732, "实时电压",   "0.1V"),
     (0x2733, "实时电流",   "mA"),
     (0x2737, "实时方向",   ""),
+    (0x3716, "绝对角度(RAM)", "0.1°"),
+    (0x3718, "绝对角度(Flash)","0.1°"),
 ]
 
 DEV_REGS = [
@@ -159,7 +161,8 @@ def menu_read_realtime():
 
     node = ask_node()
     u = f" ({unit})" if unit else ""
-    req_data = [node, 0x03, (addr>>8)&0xFF, addr&0xFF, 0x00, 0x01]
+    nreg = 2 if addr in (0x3716, 0x3718) else 1  # int32 needs 2 registers
+    req_data = [node, 0x03, (addr>>8)&0xFF, addr&0xFF, 0x00, nreg]
 
     print(f"\n  ▎{name}{u}")
     if addr == 0x2737:
@@ -338,6 +341,9 @@ def menu_dev_options():
         print("  4. 读霍尔脉冲")
         print("  5. 重置霍尔脉冲")
         print("  6. 计算实时角度")
+        print("  7. 设定绝对零点")
+        print("  8. 保存绝对位置")
+        print("  9. 回到绝对零点")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0': return
@@ -353,6 +359,12 @@ def menu_dev_options():
             menu_reset_hall_pulse()
         elif c == '6':
             menu_calc_realtime_angle()
+        elif c == '7':
+            menu_set_abs_zero()
+        elif c == '8':
+            menu_save_abs_position()
+        elif c == '9':
+            menu_goto_zero()
         else:
             print("无效")
 
@@ -568,6 +580,31 @@ def menu_calc_hall_pulse():
     print(f"  一圈脉冲: {pulses_per_rev}")
     print(f"  转动角度: {angle:.2f}°")
     print(f"  {'='*42}")
+
+# ===== 绝对角度 =====
+def menu_set_abs_zero():
+    """设定绝对零点: 写 0x371A=0"""
+    print("\n====== 设定绝对零点 =====")
+    print("  将当前位置设为绝对0度 (写 0x371A=0)")
+    node = ask_node()
+    req_data = [node, 0x06, 0x37, 0x1A, 0x00, 0x00]
+    print_cmd(req_data, node)
+
+def menu_save_abs_position():
+    """保存绝对位置: 写 0x371A=1"""
+    print("\n====== 保存绝对位置 =====")
+    print("  固化RAM偏移到Flash (写 0x371A=1)")
+    node = ask_node()
+    req_data = [node, 0x06, 0x37, 0x1A, 0x00, 0x01]
+    print_cmd(req_data, node)
+
+def menu_goto_zero():
+    """回到绝对零点: 写 0x371A=2"""
+    print("\n====== 回到绝对零点 =====")
+    print("  电机自动转动到绝对0度 (写 0x371A=2)")
+    node = ask_node()
+    req_data = [node, 0x06, 0x37, 0x1A, 0x00, 0x02]
+    print_cmd(req_data, node)
 
 # ===== 主菜单 =====
 MENU = [
