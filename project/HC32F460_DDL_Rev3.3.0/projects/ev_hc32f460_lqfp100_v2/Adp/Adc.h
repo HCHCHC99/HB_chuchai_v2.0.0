@@ -34,23 +34,23 @@ extern "C" {
  * Global pre-processor symbols/macros ('#define')
  ******************************************************************************/
 
-/* DMA»º³åÇø´óÐ¡¶¨Òå */
-#define ADC_DMA_BUFFER_SIZE              (8U)  /* Ã¿´Î´¥·¢²É¼¯8´Î */
+/* DMAï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½ */
+#define ADC_DMA_BUFFER_SIZE              (8U)  /* Ã¿ï¿½Î´ï¿½ï¿½ï¿½ï¿½É¼ï¿½8ï¿½ï¿½ */
 
-/* ADCÓ²¼þÅäÖÃºê */
+/* ADCÓ²ï¿½ï¿½ï¿½ï¿½ï¿½Ãºï¿½ */
 #define ADC_UNIT                        (CM_ADC1)
 #define ADC_PERIPH_CLK                  (FCG3_PERIPH_ADC1)
 
-/* ===== ÐòÁÐA´¥·¢ÅäÖÃ£¨µÚÒ»¼¶£ºTMR0 ¡ú ADC£©===== */
-#define ADC_SEQA_HARDTRIG               (ADC_HARDTRIG_EVT0)        /* Ê¹ÓÃÊÂ¼þ´¥·¢ */
-#define ADC_SEQA_AOS_TRIG_SEL           (AOS_ADC1_0)               /* ADC1µÄÊÂ¼þÊäÈë */
-#define ADC_SEQA_TRIG_EVT               (EVT_SRC_TMR0_1_CMP_B)     /* ¶¨Ê±Æ÷±È½ÏÊÂ¼þ */
+/* ===== ï¿½ï¿½ï¿½ï¿½Aï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½TMR0 ï¿½ï¿½ ADCï¿½ï¿½===== */
+#define ADC_SEQA_HARDTRIG               (ADC_HARDTRIG_EVT0)        /* Ê¹ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ */
+#define ADC_SEQA_AOS_TRIG_SEL           (AOS_ADC1_0)               /* ADC1ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ */
+#define ADC_SEQA_TRIG_EVT               (EVT_SRC_TMR0_1_CMP_B)     /* ï¿½ï¿½Ê±ï¿½ï¿½ï¿½È½ï¿½ï¿½Â¼ï¿½ */
 
-/* ===== DMA´¥·¢ÅäÖÃ£¨µÚ¶þ¼¶£ºADC ¡ú DMA£©===== */
+/* ===== DMAï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½Ú¶ï¿½ï¿½ï¿½ï¿½ï¿½ADC ï¿½ï¿½ DMAï¿½ï¿½===== */
 #define DMA_UNIT                        (CM_DMA1)
 #define DMA_PERIPH_CLK                  (FCG0_PERIPH_DMA1)
-#define DMA_DATA_WIDTH                  (DMA_DATAWIDTH_16BIT)      /* 16Î»Êý¾Ý */
-#define DMA_TRANS_CNT                   (0U)                        /* 0:ÎÞÏÞ´«Êä */
+#define DMA_DATA_WIDTH                  (DMA_DATAWIDTH_16BIT)      /* 16Î»ï¿½ï¿½ï¿½ï¿½ */
+#define DMA_TRANS_CNT                   (0U)                        /* 0:ï¿½ï¿½ï¿½Þ´ï¿½ï¿½ï¿½ */
 #define DMA_INT_PRIO                    (DDL_IRQ_PRIO_03)
 
 /* Timer0 for sequence A */
@@ -59,23 +59,23 @@ extern "C" {
 #define TMR0_PERIPH_CLK                 (FCG2_PERIPH_TMR0_1)
 #define TMR0_CLK_DIV                    (TMR0_CLK_DIV256)
 
-/* ADCÐòÁÐAÖÐ¶ÏÅäÖÃ */
-#define ADC_SEQA_INT_PRIO               (DDL_IRQ_PRIO_04)
+/* ADCï¿½ï¿½ï¿½ï¿½Aï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ */
+#define ADC_SEQA_INT_PRIO               (DDL_IRQ_PRIO_06)
 #define ADC_SEQA_INT_SRC                (INT_SRC_ADC1_EOCA)
 #define ADC_SEQA_INT_IRQn               (INT116_IRQn)
 
-/* ADC²Î¿¼µçÑ¹ */
+/* ADCï¿½Î¿ï¿½ï¿½ï¿½Ñ¹ */
 #define ADC_VREF                        (3.3F)
 #define ADC_ACCURACY                    (1UL << 12U)
 #define ADC_CAL_VOL(adcVal)             (uint16_t)((((float32_t)(adcVal) * ADC_VREF) / ((float32_t)ADC_ACCURACY)) * 1000.F)
 
-/* ×î´óADCÊµÀýÊýÁ¿ */
+/* ï¿½ï¿½ï¿½ADCÊµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 #define ADC_MAX_INSTANCES               (8U)
 
-/* ×î´óADCÍ¨µÀºÅ */
+/* ï¿½ï¿½ï¿½ADCÍ¨ï¿½ï¿½ï¿½ï¿½ */
 #define ADC_MAX_CHANNEL                 (32U)
 
-/* ×î´óDMAÍ¨µÀÊý */
+/* ï¿½ï¿½ï¿½DMAÍ¨ï¿½ï¿½ï¿½ï¿½ */
 #define ADC_MAX_DMA_CH                  (8U)
 
 /*******************************************************************************
@@ -83,52 +83,52 @@ extern "C" {
  ******************************************************************************/
 
 /**
- * @brief  ADCÍ¨µÀ´¦ÀíÄ£Ê½¶¨Òå
+ * @brief  ADCÍ¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£Ê½ï¿½ï¿½ï¿½ï¿½
  */
 typedef enum {
-    ADC_MODE_INTERRUPT = 0,    /* ÖÐ¶ÏÄ£Ê½ */
+    ADC_MODE_INTERRUPT = 0,    /* ï¿½Ð¶ï¿½Ä£Ê½ */
     ADC_MODE_DMA = 1,          /* DMAÄ£Ê½ */
 } en_adc_mode_t;
 
 /**
- * @brief  ADCÒý½ÅÓ³Éä½á¹¹Ìå
+ * @brief  ADCï¿½ï¿½ï¿½ï¿½Ó³ï¿½ï¿½á¹¹ï¿½ï¿½
  */
 typedef struct {
-    uint8_t u8Port;      /* GPIO¶Ë¿Ú (Èç GPIO_PORT_A) */
-    uint8_t u8Pin;       /* GPIOÒý½Å (Èç GPIO_PIN_01) */
+    uint8_t u8Port;      /* GPIOï¿½Ë¿ï¿½ (ï¿½ï¿½ GPIO_PORT_A) */
+    uint8_t u8Pin;       /* GPIOï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ GPIO_PIN_01) */
 } stc_adc_pin_t;
 
 /**
- * @brief  ADCÍ¨µÀÅäÖÃ½á¹¹Ìå (ÓÃ»§´´½¨Ê±ÌîÐ´)
+ * @brief  ADCÍ¨ï¿½ï¿½ï¿½ï¿½ï¿½Ã½á¹¹ï¿½ï¿½ (ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Ð´)
  */
 typedef struct {
-    uint8_t u8Channel;              /* ADCÍ¨µÀºÅ (Èç ADC_CH1, ADC_CH4 µÈ) */
-    en_adc_mode_t enMode;           /* ´¦ÀíÄ£Ê½ */
-    stc_adc_pin_t stcPin;           /* Òý½ÅÅäÖÃ */
-    void (*pfnCallback)(uint16_t u16AdcValue);  /* ÖÐ¶ÏÄ£Ê½»Øµ÷º¯Êý */
-    /* DMAÏà¹ØÅäÖÃ - Ö»ÓÐÄ£Ê½ÎªDMAÊ±²ÅÓÐÐ§ */
+    uint8_t u8Channel;              /* ADCÍ¨ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ ADC_CH1, ADC_CH4 ï¿½ï¿½) */
+    en_adc_mode_t enMode;           /* ï¿½ï¿½ï¿½ï¿½Ä£Ê½ */
+    stc_adc_pin_t stcPin;           /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+    void (*pfnCallback)(uint16_t u16AdcValue);  /* ï¿½Ð¶ï¿½Ä£Ê½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ */
+    /* DMAï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ - Ö»ï¿½ï¿½Ä£Ê½ÎªDMAÊ±ï¿½ï¿½ï¿½ï¿½Ð§ */
     struct {
-        uint16_t u16BufferSize;       /* DMA»º³åÇø´óÐ¡ */
-        uint8_t u8DmaChannel;         /* Ê¹ÓÃµÄDMAÍ¨µÀ */
+        uint16_t u16BufferSize;       /* DMAï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡ */
+        uint8_t u8DmaChannel;         /* Ê¹ï¿½Ãµï¿½DMAÍ¨ï¿½ï¿½ */
     } stcDmaConfig;
 } stc_adc_config_t;
 
 
 typedef struct {
-    uint8_t u8Id;                    /* ADCÊµÀýID (0-7) */
-    uint8_t u8Channel;              /* ADCÍ¨µÀºÅ */
-    en_adc_mode_t enMode;           /* ´¦ÀíÄ£Ê½ */
-    uint8_t u8Port;                 /* GPIO¶Ë¿Ú */
-    uint8_t u8Pin;                  /* GPIOÒý½Å */
-    void (*pfnCallback)(uint16_t u16AdcValue);  /* ÖÐ¶ÏÄ£Ê½»Øµ÷º¯Êý */
-    /* DMAÏà¹Ø */
-    uint16_t *pu16DmaBuffer;         /* DMA»º³åÇøÖ¸Õë */
-    uint16_t u16DmaBufferSize;       /* DMA»º³åÇø´óÐ¡ */
-    uint8_t u8DmaChannel;            /* Ê¹ÓÃµÄDMAÍ¨µÀ */
-    /* ÔËÐÐ×´Ì¬ */
-    uint32_t u32SampleCount;         /* ²ÉÑù¼ÆÊý */
-    uint16_t u16LatestValue;         /* ×îÐÂÖµ (ÖÐ¶ÏÄ£Ê½) */
-    uint8_t u8ValueUpdated;          /* Êý¾Ý¸üÐÂ±êÖ¾ */
+    uint8_t u8Id;                    /* ADCÊµï¿½ï¿½ID (0-7) */
+    uint8_t u8Channel;              /* ADCÍ¨ï¿½ï¿½ï¿½ï¿½ */
+    en_adc_mode_t enMode;           /* ï¿½ï¿½ï¿½ï¿½Ä£Ê½ */
+    uint8_t u8Port;                 /* GPIOï¿½Ë¿ï¿½ */
+    uint8_t u8Pin;                  /* GPIOï¿½ï¿½ï¿½ï¿½ */
+    void (*pfnCallback)(uint16_t u16AdcValue);  /* ï¿½Ð¶ï¿½Ä£Ê½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ */
+    /* DMAï¿½ï¿½ï¿½ */
+    uint16_t *pu16DmaBuffer;         /* DMAï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ */
+    uint16_t u16DmaBufferSize;       /* DMAï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡ */
+    uint8_t u8DmaChannel;            /* Ê¹ï¿½Ãµï¿½DMAÍ¨ï¿½ï¿½ */
+    /* ï¿½ï¿½ï¿½ï¿½×´Ì¬ */
+    uint32_t u32SampleCount;         /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+    uint16_t u16LatestValue;         /* ï¿½ï¿½ï¿½ï¿½Öµ (ï¿½Ð¶ï¿½Ä£Ê½) */
+    uint8_t u8ValueUpdated;          /* ï¿½ï¿½ï¿½Ý¸ï¿½ï¿½Â±ï¿½Ö¾ */
 } stc_adc_instance_t;
 
 
@@ -136,28 +136,28 @@ typedef struct {
  * Global function prototypes
  ******************************************************************************/
 
-/* ADC ÊµÀý¹ÜÀí */
+/* ADC Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 uint8_t Adc_Create(stc_adc_config_t *pstcConfig);
 void Adc_Init(void);
 void Adc_DeInit(void);
 
-/* ADC ¿ØÖÆº¯Êý */
+/* ADC ï¿½ï¿½ï¿½Æºï¿½ï¿½ï¿½ */
 void Adc_Start(void);
 void Adc_Stop(void);
 void Adc_ProcessData(uint32_t u32PrintIntervalMs);
 
-/* ADC Êý¾Ý»ñÈ¡º¯Êý */
+/* ADC ï¿½ï¿½ï¿½Ý»ï¿½È¡ï¿½ï¿½ï¿½ï¿½ */
 uint16_t Adc_GetLatestValue(uint8_t u8AdcId);
 uint16_t Adc_GetAverageValue(uint8_t u8AdcId);
 uint32_t Adc_GetSampleCount(uint8_t u8AdcId);
 
-/* ¸ù¾ÝÍ¨µÀºÅ²éÕÒADC ID */
+/* ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½ï¿½Å²ï¿½ï¿½ï¿½ADC ID */
 int8_t Adc_FindIdByChannel(uint8_t u8Channel);
 
-/* ÖØÐÂÊ¹ÄÜADCÖÐ¶Ï£¨ÓÃÓÚÔÚÒÑÓÐDMAÍ¨µÀºóÌí¼ÓÖÐ¶ÏÄ£Ê½Í¨µÀ£© */
+/* ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ADCï¿½Ð¶Ï£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½DMAÍ¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½Ä£Ê½Í¨ï¿½ï¿½ï¿½ï¿½ */
 void Adc_EnableInterrupt(void);
 
-/* µ÷ÊÔÐÅÏ¢ */
+/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ */
 #ifdef DEBUG
 void Adc_PrintDebugInfo(void);
 #endif

@@ -20,6 +20,7 @@ VALIDATION_RULES = {
     0x271E: (0,    2000, 20,  1,   "ms"),   # 判定时间 0~2000ms, 步进20ms
     0x3712: (10,  65535,  0,  0.1, ""),     # 减速比 1.0~6553.5, 单位0.1
     0x3713: (1,     100,  0,  1,   ""),     # 极对数 1~100, 不取整
+    0x371B: (0,     200,  0,  0.1, "°"),    # 回零阈值 0~20.0°, 步进0.1°
 }
 
 def apply_validation(regAddr, raw_value):
@@ -81,7 +82,10 @@ REALTIME_REGS = [
     (0x2732, "实时电压",   "0.1V"),
     (0x2733, "实时电流",   "mA"),
     (0x2737, "实时方向",   ""),
-    (0x3716, "绝对角度(RAM)", "0.1°"),
+]
+
+ABS_REGS = [
+    (0x3716, "绝对角度(RAM)",  "0.1°"),
     (0x3718, "绝对角度(Flash)","0.1°"),
 ]
 
@@ -91,6 +95,7 @@ DEV_REGS = [
     (0x3711, "电机方向",       ["正常", "反转"], ""),
     (0x3712, "减速比",         None,         "0.1"),
     (0x3713, "电机极对数",     None,         ""),
+    (0x371B, "回零阈值",       None,         "0.1°"),
 ]
 
 FAULT_BITS = [
@@ -161,8 +166,7 @@ def menu_read_realtime():
 
     node = ask_node()
     u = f" ({unit})" if unit else ""
-    nreg = 2 if addr in (0x3716, 0x3718) else 1  # int32 needs 2 registers
-    req_data = [node, 0x03, (addr>>8)&0xFF, addr&0xFF, 0x00, nreg]
+    req_data = [node, 0x03, (addr>>8)&0xFF, addr&0xFF, 0x00, 0x01]
 
     print(f"\n  ▎{name}{u}")
     if addr == 0x2737:
@@ -342,8 +346,6 @@ def menu_dev_options():
         print("  5. 重置霍尔脉冲")
         print("  6. 计算实时角度")
         print("  7. 设定绝对零点")
-        print("  8. 保存绝对位置")
-        print("  9. 回到绝对零点")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0': return
@@ -361,10 +363,6 @@ def menu_dev_options():
             menu_calc_realtime_angle()
         elif c == '7':
             menu_set_abs_zero()
-        elif c == '8':
-            menu_save_abs_position()
-        elif c == '9':
-            menu_goto_zero()
         else:
             print("无效")
 
@@ -606,6 +604,70 @@ def menu_goto_zero():
     req_data = [node, 0x06, 0x37, 0x1A, 0x00, 0x02]
     print_cmd(req_data, node)
 
+def menu_set_abs_threshold():
+    """设置回零阈值: 写 0x371B"""
+    print("\n====== 设置回零阈值 =====")
+    print("  范围: 0.1~20.0°, 步进0.1°")
+    print("  默认: 0.1° (值=1)")
+    val = ask_value("值 (0.1°)")
+    if val is None: print("无效"); return
+    node = ask_node()
+    req_data = [node, 0x06, 0x37, 0x1B, (val>>8)&0xFF, val&0xFF]
+    result, modified = apply_validation(0x371B, val)
+    if modified:
+        note = f"MCU校验后: {val*0.1:.1f}° → {result*0.1:.1f}°"
+    else:
+        note = ""
+    print_cmd(req_data, node, note, skip_echo=True)
+    echo_data = [node, 0x06, 0x37, 0x1B, (result>>8)&0xFF, result&0xFF]
+    crc = modbus_crc16(echo_data)
+    echo = ' '.join(f'{b:02X}' for b in echo_data)
+    print(f"  回令: {echo} {crc&0xFF:02X} {crc>>8&0xFF:02X}")
+
+# ===== 8. 绝对角度 =====
+def menu_abs_angle():
+    while True:
+        print("\n====== 绝对角度 =====")
+        print("  1. 读绝对角度(RAM)")
+        print("  2. 读绝对角度(Flash)")
+        print("  3. 保存绝对位置")
+        print("  4. 回到绝对零点")
+        print("  5. 读回零阈值")
+        print("  6. 设置回零阈值")
+        print("  0. 返回")
+        c = input("选择: ").strip()
+        if c == '0': return
+        elif c == '1':
+            node = ask_node()
+            addr, name, unit = ABS_REGS[0]
+            nreg = 2  # int32
+            req_data = [node, 0x03, (addr>>8)&0xFF, addr&0xFF, 0x00, nreg]
+            u = f" ({unit})" if unit else ""
+            print(f"\n  {name}{u}")
+            print_cmd(req_data, node)
+        elif c == '2':
+            node = ask_node()
+            addr, name, unit = ABS_REGS[1]
+            nreg = 2
+            req_data = [node, 0x03, (addr>>8)&0xFF, addr&0xFF, 0x00, nreg]
+            u = f" ({unit})" if unit else ""
+            print(f"\n  {name}{u}")
+            print_cmd(req_data, node)
+        elif c == '3':
+            menu_save_abs_position()
+        elif c == '4':
+            menu_goto_zero()
+        elif c == '5':
+            node = ask_node()
+            print("\n  回零阈值 (0x371B)")
+            req_data = [node, 0x03, 0x37, 0x1B, 0x00, 0x01]
+            print_cmd(req_data, node)
+        elif c == '6':
+            menu_set_abs_threshold()
+        else:
+            print("无效")
+        input("\n按 Enter 返回...")
+
 # ===== 主菜单 =====
 MENU = [
     ("读实时数据",   menu_read_realtime),
@@ -614,6 +676,7 @@ MENU = [
     ("写配置寄存器", menu_write_config),
     ("查看故障",     menu_read_fault),
     ("清除故障",     menu_clear_fault),
+    ("绝对角度",     menu_abs_angle),
 ]
 
 def main():
@@ -623,14 +686,14 @@ def main():
         print("=" * 42)
         for i, (name, _) in enumerate(MENU):
             print(f"  {i+1}. {name}")
-        print("  7. 开发者选项")
-        print("  8. 退出")
+        print("  8. 开发者选项")
+        print("  9. 退出")
         print("=" * 42)
-        c = input("选择 [1-8]: ").strip()
-        if c == '8' or c == '': print("退出"); break
+        c = input("选择 [1-9]: ").strip()
+        if c == '9' or c == '': print("退出"); break
         try:
             idx = int(c)-1
-            if idx == 6:   # 7. 开发者选项
+            if idx == 7:   # 8. 开发者选项
                 menu_dev_options()
             elif 0 <= idx < len(MENU):
                 MENU[idx][1]()

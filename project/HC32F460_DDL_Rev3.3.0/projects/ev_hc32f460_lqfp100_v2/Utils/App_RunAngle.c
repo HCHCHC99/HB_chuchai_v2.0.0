@@ -46,12 +46,14 @@ static const Param_Config_t s_Config = {
  *============================================================================*/
 static void RunAngle_SetDefaults(void)
 {
-    g_AbsAngle.magic          = ABS_ANGLE_MAGIC_HEAD;
-    g_AbsAngle.sequence_id    = 0;
-    g_AbsAngle.erase_count    = 0;
-    g_AbsAngle.abs_offset_x10 = 0;
-    g_AbsAngle.checksum       = 0;
-    g_AbsAngle.tail_magic     = ABS_ANGLE_MAGIC_TAIL;
+    g_AbsAngle.magic                 = ABS_ANGLE_MAGIC_HEAD;
+    g_AbsAngle.sequence_id           = 0;
+    g_AbsAngle.erase_count           = 0;
+    g_AbsAngle.abs_offset_x10        = 0;
+    g_AbsAngle.goto_zero_thresh_x10  = ABS_THRESH_DEFAULT_X10;
+    g_AbsAngle.reserved              = 0;
+    g_AbsAngle.checksum              = 0;
+    g_AbsAngle.tail_magic            = ABS_ANGLE_MAGIC_TAIL;
 }
 
 /*=============================================================================
@@ -79,6 +81,12 @@ void RunAngle_Init(void)
 {
     /* Load latest valid record from Flash (or write defaults on first boot) */
     Param_Init(&s_Config, &s_Runtime, RunAngle_SetDefaults);
+
+    /* Validate threshold */
+    if (g_AbsAngle.goto_zero_thresh_x10 < ABS_THRESH_MIN_X10
+        || g_AbsAngle.goto_zero_thresh_x10 > ABS_THRESH_MAX_X10) {
+        g_AbsAngle.goto_zero_thresh_x10 = ABS_THRESH_DEFAULT_X10;
+    }
 
     /* RAM = Flash value at power-up */
     s_abs_offset_x10 = g_AbsAngle.abs_offset_x10;
@@ -114,7 +122,7 @@ void RunAngle_Update(void)
     /* Goto-zero: once motor moves past zero or enters threshold, stop.
      * Only one direction command was sent at start — no continuous re-issue. */
     if (s_goto_zero_active) {
-        if (abs(s_abs_offset_x10) <= ABS_GOTO_ZERO_THRESH_X10
+        if (abs(s_abs_offset_x10) <= g_AbsAngle.goto_zero_thresh_x10
             || (s_abs_offset_x10 > 0) != s_goto_zero_initial_sign) {
             MotorManualIOEvent_t ev;
             memset(&ev, 0, sizeof(ev));
@@ -163,14 +171,14 @@ void RunAngle_GotoZero(void)
     MotorManualIOEvent_t ev;
     memset(&ev, 0, sizeof(ev));
 
-    if (s_abs_offset_x10 > ABS_GOTO_ZERO_THRESH_X10) {
+    if (s_abs_offset_x10 > g_AbsAngle.goto_zero_thresh_x10) {
         /* Forward of zero → REV to go back */
         ev.dir  = DIR_REV;
         ev.type = CMD_TYPE_RUN_REV;
         s_goto_zero_active = true;
         s_goto_zero_initial_sign = true;   /* positive → expect sign flip to false */
         MAIN_D("[ABSA] Goto-zero: offset=%ld (>0), REV to zero\r\n", (long)s_abs_offset_x10);
-    } else if (s_abs_offset_x10 < -ABS_GOTO_ZERO_THRESH_X10) {
+    } else if (s_abs_offset_x10 < -g_AbsAngle.goto_zero_thresh_x10) {
         /* Reverse of zero → FWD to go forward */
         ev.dir  = DIR_FWD;
         ev.type = CMD_TYPE_RUN_FWD;
@@ -184,6 +192,21 @@ void RunAngle_GotoZero(void)
     }
 
     EventBus_Publish(TOPIC_MANUAL_RS485, &ev);
+}
+
+void RunAngle_SetThreshold(uint16_t thresh_x10)
+{
+    /* Clamp to valid range */
+    if (thresh_x10 < ABS_THRESH_MIN_X10) {
+        thresh_x10 = ABS_THRESH_MIN_X10;
+    } else if (thresh_x10 > ABS_THRESH_MAX_X10) {
+        thresh_x10 = ABS_THRESH_MAX_X10;
+    }
+
+    g_AbsAngle.goto_zero_thresh_x10 = thresh_x10;
+    Param_Save(&s_Config, &s_Runtime);
+
+    MAIN_D("[ABSA] Threshold set: %u (0.1 deg)\r\n", (unsigned int)thresh_x10);
 }
 
 /*******************************************************************************

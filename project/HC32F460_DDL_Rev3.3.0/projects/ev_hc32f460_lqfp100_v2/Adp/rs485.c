@@ -345,22 +345,22 @@ void RS485_Init(void)
     irqCfg.enIRQn = USART_RX_ERR_IRQn;
     irqCfg.enIntSrc = USART_RX_ERR_INT_SRC;
     irqCfg.pfnCallback = USART_RxError_IrqCallback;
-    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_DEFAULT);
+    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_12);
 
     irqCfg.enIRQn = USART_RX_FULL_IRQn;
     irqCfg.enIntSrc = USART_RX_FULL_INT_SRC;
     irqCfg.pfnCallback = USART_RxFull_IrqCallback;
-    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_DEFAULT);
+    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_12);
 
     irqCfg.enIRQn = USART_TX_EMPTY_IRQn;
     irqCfg.enIntSrc = USART_TX_EMPTY_INT_SRC;
     irqCfg.pfnCallback = USART_TxEmpty_IrqCallback;
-    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_DEFAULT);
+    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_12);
 
     irqCfg.enIRQn = USART_TX_CPLT_IRQn;
     irqCfg.enIntSrc = USART_TX_CPLT_INT_SRC;
     irqCfg.pfnCallback = USART_TxComplete_IrqCallback;
-    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_DEFAULT);
+    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_12);
 
     /* RS485����������ų�ʼ�� */
     RS485_DIR_Init();
