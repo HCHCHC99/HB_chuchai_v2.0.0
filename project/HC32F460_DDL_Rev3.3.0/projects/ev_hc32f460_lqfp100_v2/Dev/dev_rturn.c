@@ -7,6 +7,7 @@
 #include "dev_sensor.h"
 #include "dev_motor.h"
 #include "App_Params.h"   /* g_s32HallPulseAccum for pulse-direct angle */
+#include "App_RunAngle.h"
 
 static uint32_t s_u32LastLockPrintTime = 0;
 static uint32_t s_u32LastLockDebugPrintTime = 0;
@@ -15,7 +16,7 @@ static uint32_t s_u32LastLimitPrintTime = 0;
 #define LOCK_DEBUG_PRINT_INTERVAL_MS   4000
 #define LIMIT_PRINT_INTERVAL_MS        4000
 
-// ========== Keil Watchµ÷ÊÔÈ«¾Ö±äÁ¿ ==========
+// ========== Keil Watchï¿½ï¿½ï¿½ï¿½È«ï¿½Ö±ï¿½ï¿½ï¿½ ==========
 volatile float    g_fDbgRTurnAngle       = 0.0f;
 volatile float    g_fDbgRTurnSpeed       = 0.0f;
 volatile uint8_t  g_u8DbgRTurnDir        = 0;
@@ -25,7 +26,7 @@ volatile uint8_t  g_u8DbgRTurnLockActive = 0;
 volatile uint8_t  g_u8DbgRTurnCalibrated = 0;
 volatile uint8_t  g_u8DbgRTurnLimitTrig  = 0;
 
-// ========== ÄÚ²¿¸¨Öúº¯Êý ==========
+// ========== ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ==========
 static DeviceResult_t RTurn_GetDesiredDirection(RTurn_Device_t* pstcDev, uint8_t* pu8MotorDir) {
     if (!pstcDev || !pu8MotorDir) return RESULT_PARAM_ERR;
     
@@ -100,7 +101,7 @@ static float RTurn_RpmToAngularSpeed(float fRpm, float fReductionRatio) {
     return fRpm * 360.0f / fReductionRatio / 60.0f;
 }
 
-// ¶ÁÈ¡´«¸ÐÆ÷¸æ¾¯×´Ì¬£¨0=Õý³£, 1=¹ýÁ÷¸æ¾¯£©
+// ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ¾¯×´Ì¬ï¿½ï¿½0=ï¿½ï¿½ï¿½ï¿½, 1=ï¿½ï¿½ï¿½ï¿½ï¿½æ¾¯ï¿½ï¿½
 static uint8_t RTurn_ReadSensorAlarm(RTurn_Device_t* pstcDev) {
     if (!pstcDev) return 0;
     
@@ -142,21 +143,21 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
     pstcDev->fCurrentSpeed = RTurn_RpmToAngularSpeed(fRpm, pstcDev->stcConfig.fReductionRatio);
     pstcDev->u8CurrentDir = RTurn_ConvertMotorDirToRTurnDir(u8MotorDir, pstcDev->stcConfig.u8ReverseOutput);
     
-    // »ñÈ¡ÆÚÍû·½Ïò£¨ÖÙ²ÃÆ÷Êä³ö£©£¬ÓÃÓÚ½âËøÅÐ¶Ï
+    // ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½
     uint8_t u8DesiredDir = MOTOR_DIRECTION_NONE;
     RTurn_GetDesiredDirection(pstcDev, &u8DesiredDir);
     uint8_t u8DesiredRTurnDir = RTurn_ConvertMotorDirToRTurnDir(u8DesiredDir, pstcDev->stcConfig.u8ReverseOutput);
     
-    // ========== »º´æÆÚÍû·½Ïò£¨·½°¸4£© ==========
-    // Èç¹ûÆÚÍû·½ÏòÓÐÐ§£¨·ÇSTOP£©£¬»º´æÏÂÀ´
-    // ÓÃÓÚÖ÷¶¯¼ì²â¹ýÁ÷Ê±£¬Èç¹ûÆÚÍû·½ÏòÒÑ±»µç»úÖÙ²ÃÆ÷Êä³öSTOP£¬Ê¹ÓÃ»º´æ·½Ïò
+    // ========== ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ò£¨·ï¿½ï¿½ï¿½4ï¿½ï¿½ ==========
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½ï¿½ï¿½STOPï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ±ï¿½ï¿½ï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½STOPï¿½ï¿½Ê¹ï¿½Ã»ï¿½ï¿½æ·½ï¿½ï¿½
     if (u8DesiredRTurnDir != RTURN_DIR_STOP) {
         pstcDev->u8LastDesiredDir = u8DesiredRTurnDir;
     }
     
-    // ========== Ö÷¶¯¼ì²â¹ýÁ÷¸æ¾¯×´Ì¬£¨²»ÒÀÀµÐ£×¼×´Ì¬£© ==========
-    // ·½°¸4£º·Å¿íÌõ¼þ£¬Ê¹ÓÃ»º´æ·½Ïò×÷Îª±¸Ñ¡
-    // Èç¹ûµ±Ç°ÆÚÍû·½ÏòÎªSTOPµ«»º´æ·½ÏòÓÐÐ§£¬Ê¹ÓÃ»º´æ·½Ïò
+    // ========== ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ¾¯×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð£×¼×´Ì¬ï¿½ï¿½ ==========
+    // ï¿½ï¿½ï¿½ï¿½4ï¿½ï¿½ï¿½Å¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ã»ï¿½ï¿½æ·½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½Ñ¡
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎªSTOPï¿½ï¿½ï¿½ï¿½ï¿½æ·½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½Ê¹ï¿½Ã»ï¿½ï¿½æ·½ï¿½ï¿½
     {
         uint8_t u8CheckDir = u8DesiredRTurnDir;
         if (u8CheckDir == RTURN_DIR_STOP && pstcDev->u8LastDesiredDir != RTURN_DIR_STOP) {
@@ -167,19 +168,20 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
             uint8_t u8Alarm = RTurn_ReadSensorAlarm(pstcDev);
             
             if (u8Alarm) {
-                // ¹ýÁ÷¸æ¾¯ÇÒ·½ÏòÓÐÐ§£¬Á¢¼´ËøËÀ
+                // ï¿½ï¿½ï¿½ï¿½ï¿½æ¾¯ï¿½Ò·ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
                 uint8_t u8LimitDir = (u8CheckDir == RTURN_DIR_FORWARD) ? RTURN_LIMIT_FORWARD : RTURN_LIMIT_REVERSE;
                 
                 if (u8CheckDir == RTURN_DIR_REVERSE) {
-                    /* ¹Ø±ÕÊ±¹ýÁ÷£ºÖØÖÃ½Ç¶ÈÎªÏÂÏÞÎ»½Ç¶È£¬²¢±ê¼ÇÎªÒÑÐ£×¼ */
+                    /* ï¿½Ø±ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½Ç¶ï¿½Îªï¿½ï¿½ï¿½ï¿½Î»ï¿½Ç¶È£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½Ð£×¼ */
                     g_s32HallPulseAccum = 0;
                     pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
                     if (!pstcDev->u8Calibrated) {
                         pstcDev->u8Calibrated = 1;
                         RTURN_OUT("Calibrated! Angle set to min angle: %f deg\r\n", pstcDev->fCurrentAngle);
                     }
+                    RunAngle_OnCalibration();
                 }
-                /* ´ò¿ªÊ±¹ýÁ÷£º²»ÖØÖÃ½Ç¶È£¬±£³Öµ±Ç°½Ç¶È */
+                /* ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½Ç¶È£ï¿½ï¿½ï¿½ï¿½Öµï¿½Ç°ï¿½Ç¶ï¿½ */
                 
                 pstcDev->stcLockState.u8LockedDir = u8CheckDir;
                 pstcDev->stcLockState.u8LockActive = 1;
@@ -201,7 +203,7 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
         }
     }
     
-    // ========== ½â³ýËøËÀÂß¼­£¨²»ÒÀÀµÐ£×¼×´Ì¬£© ==========
+    // ========== ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð£×¼×´Ì¬ï¿½ï¿½ ==========
     if (pstcDev->stcLockState.u8LockActive) {
         if ((pstcDev->stcLockState.u8LockedDir == RTURN_DIR_FORWARD && u8DesiredRTurnDir == RTURN_DIR_REVERSE) ||
             (pstcDev->stcLockState.u8LockedDir == RTURN_DIR_REVERSE && u8DesiredRTurnDir == RTURN_DIR_FORWARD)) {
@@ -220,23 +222,24 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
             stcEvent.u8IsActive = 0;
             EventBus_Publish(TOPIC_RTURN_LIMIT, &stcEvent);
             
-            // ½âËøºóÁ¢¼´¼ì²â¸æ¾¯×´Ì¬£¨²»ÒÀÀµÐ£×¼×´Ì¬£©
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ¾¯×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð£×¼×´Ì¬ï¿½ï¿½
             if (u8DesiredRTurnDir != RTURN_DIR_STOP) {
                 uint8_t u8Alarm = RTurn_ReadSensorAlarm(pstcDev);
                 
                 if (u8Alarm) {
-                    // ÈÔÈ»¹ýÁ÷£¬ËøËÀÐÂ·½Ïò
+                    // ï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½
                     uint8_t u8NewLimitDir = (u8DesiredRTurnDir == RTURN_DIR_FORWARD) ? RTURN_LIMIT_FORWARD : RTURN_LIMIT_REVERSE;
                     
                     if (u8DesiredRTurnDir == RTURN_DIR_REVERSE) {
-                        /* ¹Ø±ÕÊ±¹ýÁ÷£ºÖØÖÃ½Ç¶ÈÎªÏÂÏÞÎ»½Ç¶È£¨½öÔÚÐ£×¼×´Ì¬ÏÂ²ÅÖØÖÃ£© */
+                        /* ï¿½Ø±ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½Ç¶ï¿½Îªï¿½ï¿½ï¿½ï¿½Î»ï¿½Ç¶È£ï¿½ï¿½ï¿½ï¿½ï¿½Ð£×¼×´Ì¬ï¿½Â²ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ */
                         if (pstcDev->u8Calibrated) {
                             g_s32HallPulseAccum = 0;
                             pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
+                            RunAngle_OnCalibration();
                         }
                     }
-                    /* ´ò¿ªÊ±¹ýÁ÷£º²»ÖØÖÃ½Ç¶È£¬±£³Öµ±Ç°½Ç¶È */
-                    
+                    /* ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½Ç¶È£ï¿½ï¿½ï¿½ï¿½Öµï¿½Ç°ï¿½Ç¶ï¿½ */
+
                     pstcDev->stcLockState.u8LockedDir = u8DesiredRTurnDir;
                     pstcDev->stcLockState.u8LockActive = 1;
                     pstcDev->u8LimitTriggered = 1;
@@ -257,16 +260,16 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
         }
     }
     
-    // ========== Ð£×¼ºóµÄÂß¼­£¨½Ç¶È»ý·Ö¡¢ÏÞÎ»¼ì²âµÈ£© ==========
+    // ========== Ð£×¼ï¿½ï¿½ï¿½ï¿½ß¼ï¿½ï¿½ï¿½ï¿½Ç¶È»ï¿½ï¿½Ö¡ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½È£ï¿½ ==========
     if (pstcDev->u8Calibrated) {
-        // ¼ì²éËøËÀ·½Ïò£ºÈç¹ûµ±Ç°ÔË¶¯·½Ïò±»ËøËÀ
-        // - ¹Ø±Õ£¨·´×ª£©ËøËÀ£ºÌø¹ý½Ç¶È»ý·Ö£¬½Ç¶È¶³½áÔÚ fMinAngle
-        // - ´ò¿ª£¨Õý×ª£©ËøËÀ£ºÔÊÐí¼ÌÐø»ý·Ö£¨»ô¶û¼ÆÊý¼ÌÐøÀÛ¼Ó£©£¬Ö±µ½µç»úÍ£Ö¹
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½Ë¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        // - ï¿½Ø±Õ£ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¶È»ï¿½ï¿½Ö£ï¿½ï¿½Ç¶È¶ï¿½ï¿½ï¿½ï¿½ï¿½ fMinAngle
+        // - ï¿½ò¿ª£ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Û¼Ó£ï¿½ï¿½ï¿½Ö±ï¿½ï¿½ï¿½ï¿½ï¿½Í£Ö¹
         if (pstcDev->stcLockState.u8LockActive && 
             pstcDev->stcLockState.u8LockedDir == pstcDev->u8CurrentDir) {
             
             if (pstcDev->stcLockState.u8LockedDir == RTURN_DIR_REVERSE) {
-                /* ¹Ø±ÕËøËÀ£ºÌø¹ý½Ç¶È»ý·Ö£¬½Ç¶È¶³½á */
+                /* ï¿½Ø±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¶È»ï¿½ï¿½Ö£ï¿½ï¿½Ç¶È¶ï¿½ï¿½ï¿½ */
                 if (u32Now - s_u32LastLockDebugPrintTime >= LOCK_DEBUG_PRINT_INTERVAL_MS) {
                     s_u32LastLockDebugPrintTime = u32Now;
                     RTURN_DEBUG("Direction %d is locked (REVERSE), ignore angle change\r\n", pstcDev->u8CurrentDir);
@@ -274,7 +277,7 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
                 pstcDev->u32LastAngleTime = u32Now;
                 return;
             }
-            /* ´ò¿ªËøËÀ£ºÔÊÐí¼ÌÐø»ý·Ö£¬Ö±µ½µç»úÍ£Ö¹ */
+            /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö£ï¿½Ö±ï¿½ï¿½ï¿½ï¿½ï¿½Í£Ö¹ */
             if (u32Now - s_u32LastLockDebugPrintTime >= LOCK_DEBUG_PRINT_INTERVAL_MS) {
                 s_u32LastLockDebugPrintTime = u32Now;
                 RTURN_DEBUG("Direction %d is locked (FORWARD), allow angle integration\r\n", pstcDev->u8CurrentDir);
@@ -287,20 +290,20 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
         pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle +
             (float)g_s32HallPulseAccum * 360.0f / 12.0f / pstcDev->stcConfig.fReductionRatio;
         
-        // Õý×ª½Ç¶ÈÉÏÏÞ¼ì²â£¨½Ç¶Èµ½Î»ËøËÀ£©
+        // ï¿½ï¿½×ªï¿½Ç¶ï¿½ï¿½ï¿½ï¿½Þ¼ï¿½â£¨ï¿½Ç¶Èµï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         if (pstcDev->fCurrentAngle >= pstcDev->stcConfig.fMaxAngle) {
-            // NOTE: ²»Ç¯Î»½Ç¶È£¬±£Áô¿ª´°³¬µ÷ÕæÊµÖµ¹©¶ÁÈ¡
+            // NOTE: ï¿½ï¿½Ç¯Î»ï¿½Ç¶È£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÊµÖµï¿½ï¿½ï¿½ï¿½È¡
             
-            // Ö»ÓÐµ±ÏÞÎ»Î´±»´¥·¢Ê±²Å·¢²¼ÊÂ¼þ
+            // Ö»ï¿½Ðµï¿½ï¿½ï¿½Î»Î´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½Å·ï¿½ï¿½ï¿½ï¿½Â¼ï¿½
             if (!pstcDev->u8LimitTriggered) {
                 pstcDev->u8LimitTriggered = 1;
                 
-                // Ìí¼ÓËøËÀ×´Ì¬ÉèÖÃ
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ï¿½ï¿½
                 pstcDev->stcLockState.u8LockedDir = RTURN_DIR_FORWARD;
                 pstcDev->stcLockState.u8LockActive = 1;
                 
                 RTurn_LimitEvent_t stcEvent;
-                stcEvent.u8Direction = RTURN_LIMIT_FORWARD;  // Õý×ªÏÞÎ»
+                stcEvent.u8Direction = RTURN_LIMIT_FORWARD;  // ï¿½ï¿½×ªï¿½ï¿½Î»
                 stcEvent.fAngle = pstcDev->fCurrentAngle;
                 stcEvent.u8IsActive = 1;
                 EventBus_Publish(TOPIC_RTURN_LIMIT, &stcEvent);
@@ -309,34 +312,34 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
             }
         }
         
-        // ·´×ª½Ç¶ÈÏÂÏÞ¼ì²â£ºÖ»µ÷Õû½Ç¶È£¬²»´¥·¢ÏÞÎ»ËøËÀ
-        // ·´×ªµ½Î»¿¿¹ýÁ÷¼ì²âÀ´ËøËÀ£¬²»ÓÉ½Ç¶È´¥·¢
+        // ï¿½ï¿½×ªï¿½Ç¶ï¿½ï¿½ï¿½ï¿½Þ¼ï¿½â£ºÖ»ï¿½ï¿½ï¿½ï¿½ï¿½Ç¶È£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½
+        // ï¿½ï¿½×ªï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É½Ç¶È´ï¿½ï¿½ï¿½
         if (pstcDev->fCurrentAngle <= pstcDev->stcConfig.fMinAngle) {
             pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
-            // ×¢Òâ£ºÕâÀï²»·¢²¼ÏÞÎ»ÊÂ¼þ£¬²»ÉèÖÃËøËÀ×´Ì¬
+            // ×¢ï¿½â£ºï¿½ï¿½ï¿½ï²»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬
         }
     }
     
     pstcDev->u32LastAngleTime = u32Now;
 }
 
-// ========== ¹ýÁ÷ÊÂ¼þ´¦Àí ==========
-// ÓÉ EventBus »Øµ÷ RTurn_OnCurrentAlarm µ÷ÓÃ
-// ÊÕµ½¹ýÁ÷ÊÂ¼þºó£¬Ö±½ÓËøËÀµ±Ç°ÆÚÍû·½Ïò£¬²»ÔÙÅÐ¶ÏãÐÖµ£¨ãÐÖµÅÐ¶ÏÔÚ dev_sensor ÖÐÍê³É£©
+// ========== ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ ==========
+// ï¿½ï¿½ EventBus ï¿½Øµï¿½ RTurn_OnCurrentAlarm ï¿½ï¿½ï¿½ï¿½
+// ï¿½Õµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½Ö±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ò£¬²ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½Öµï¿½Ð¶ï¿½ï¿½ï¿½ dev_sensor ï¿½ï¿½ï¿½ï¿½É£ï¿½
 static void RTurn_HandleOvercurrent(RTurn_Device_t* pstcDev) {
     if (!pstcDev) return;
     
-    // Èç¹ûÒÑ¾­ËøËÀ»òÏÞÎ»ÒÑ´¥·¢£¬²»ÔÙÖØ¸´´¦Àí
+    // ï¿½ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½Ñ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½ï¿½ï¿½
     if (pstcDev->stcLockState.u8LockActive || pstcDev->u8LimitTriggered) {
         return;
     }
     
-    // Ö»Ê¹ÓÃÆÚÍû·½Ïò£¨ÖÙ²ÃÆ÷Êä³öµÄ·½Ïò£©À´ÅÐ¶ÏÏÞÎ»·½Ïò
+    // Ö»Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½
     uint8_t u8DesiredDir = MOTOR_DIRECTION_NONE;
     RTurn_GetDesiredDirection(pstcDev, &u8DesiredDir);
     uint8_t u8CurrentDir = RTurn_ConvertMotorDirToRTurnDir(u8DesiredDir, pstcDev->stcConfig.u8ReverseOutput);
     
-    // ÆÚÍû·½ÏòÓÐÐ§Ê±²Å´¦Àí
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§Ê±ï¿½Å´ï¿½ï¿½ï¿½
     if (u8CurrentDir != RTURN_DIR_STOP) {
         
         uint8_t u8LimitDir = (u8CurrentDir == RTURN_DIR_FORWARD) ? RTURN_LIMIT_FORWARD : RTURN_LIMIT_REVERSE;
@@ -344,19 +347,20 @@ static void RTurn_HandleOvercurrent(RTurn_Device_t* pstcDev) {
         if (!pstcDev->u8Calibrated) {
             /* ========== Î´Ð£×¼×´Ì¬ ========== */
             if (u8CurrentDir == RTURN_DIR_FORWARD) {
-                /* ´ò¿ª¹ýÁ÷£º²»Ð£×¼¡¢²»ÖØÖÃ½Ç¶È£¬µ«ËøËÀÕý×ª·½Ïò£¨Ó°ÏìÖÙ²ÃÆ÷£© */
+                /* ï¿½ò¿ª¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð£×¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½Ç¶È£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½Ó°ï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ */
                 RTURN_OUT("LIMIT TRIGGERED (uncalibrated, FORWARD)! Lock direction, no calibration\r\n");
             } else {
-                /* ¹Ø±Õ¹ýÁ÷£ºÐ£×¼³É¹¦£¬ÖØÖÃ½Ç¶ÈÎªÏÂÏÞÎ»½Ç¶È */
+                /* ï¿½Ø±Õ¹ï¿½ï¿½ï¿½ï¿½ï¿½Ð£×¼ï¿½É¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½Ç¶ï¿½Îªï¿½ï¿½ï¿½ï¿½Î»ï¿½Ç¶ï¿½ */
                 g_s32HallPulseAccum = 0;
                 pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
                 pstcDev->u8Calibrated = 1;
+                RunAngle_OnCalibration();
                 RTURN_OUT("LIMIT TRIGGERED (uncalibrated, REVERSE)! Calibrated=1, Angle=%ld.%02ld deg\r\n",
                           (long)((int32_t)(pstcDev->fCurrentAngle * 100) / 100),
                           (long)((int32_t)(pstcDev->fCurrentAngle * 100) % 100));
             }
             
-            /* Î´Ð£×¼×´Ì¬ÏÂ£¬´ò¿ªºÍ¹Ø±Õ¹ýÁ÷¶¼ËøËÀ·½Ïò£¨Ó°ÏìÖÙ²ÃÆ÷£© */
+            /* Î´Ð£×¼×´Ì¬ï¿½Â£ï¿½ï¿½ò¿ªºÍ¹Ø±Õ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó°ï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ */
             pstcDev->stcLockState.u8LockedDir = u8CurrentDir;
             pstcDev->stcLockState.u8LockActive = 1;
             pstcDev->u8LimitTriggered = 1;
@@ -367,14 +371,15 @@ static void RTurn_HandleOvercurrent(RTurn_Device_t* pstcDev) {
             stcEvent.u8IsActive = 1;
             EventBus_Publish(TOPIC_RTURN_LIMIT, &stcEvent);
         } else {
-            /* ========== ÒÑÐ£×¼×´Ì¬ ========== */
+            /* ========== ï¿½ï¿½Ð£×¼×´Ì¬ ========== */
             if (u8CurrentDir == RTURN_DIR_REVERSE) {
-                /* ¹Ø±ÕÊ±¹ýÁ÷£ºÖØÖÃ½Ç¶ÈÎªÏÂÏÞÎ»½Ç¶È */
+                /* ï¿½Ø±ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½Ç¶ï¿½Îªï¿½ï¿½ï¿½ï¿½Î»ï¿½Ç¶ï¿½ */
                 pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
                 g_s32HallPulseAccum = 0;
+                RunAngle_OnCalibration();
             }
-            /* ´ò¿ªÊ±¹ýÁ÷£º²»ÖØÖÃ½Ç¶È£¬±£³Öµ±Ç°½Ç¶È */
-            
+            /* ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½Ç¶È£ï¿½ï¿½ï¿½ï¿½Öµï¿½Ç°ï¿½Ç¶ï¿½ */
+
             pstcDev->stcLockState.u8LockedDir = u8CurrentDir;
             pstcDev->stcLockState.u8LockActive = 1;
             pstcDev->u8LimitTriggered = 1;
@@ -404,14 +409,14 @@ static void RTurn_ClearLock(RTurn_Device_t* pstcDev) {
     RTURN_OUT("Lock cleared\r\n");
 }
 
-// ========== EventBus»Øµ÷º¯Êý ==========
+// ========== EventBusï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ ==========
 
 void RTurn_OnCurrentAlarm(void* payload) {
     Current_AlarmEvent_t* pstcEvent = (Current_AlarmEvent_t*)payload;
     
     if (!pstcEvent->u8IsActive) return;
     
-    // ±éÀúËùÓÐÉè±¸£¬Í¨¹ý ops.init º¯ÊýÖ¸ÕëÕÒµ½ RTurn Éè±¸
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½è±¸ï¿½ï¿½Í¨ï¿½ï¿½ ops.init ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Òµï¿½ RTurn ï¿½è±¸
     for (uint8_t i = 0; i < MAX_DEVICES; i++) {
         DeviceNode_t* pstcNode = DeviceManager_Get(i);
         if (pstcNode && pstcNode->used && pstcNode->ops.init == RTurn_Device_Init) {
@@ -422,7 +427,7 @@ void RTurn_OnCurrentAlarm(void* payload) {
     }
 }
 
-// ========== ±ê×¼Éè±¸²Ù×÷ÊµÏÖ ==========
+// ========== ï¿½ï¿½×¼ï¿½è±¸ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ ==========
 
 DeviceResult_t RTurn_Device_Init(void* handle) {
     RTurn_Device_t* pstcDev = (RTurn_Device_t*)handle;
@@ -581,7 +586,7 @@ DeviceResult_t RTurn_Device_Update(void* handle) {
     
     RTurn_UpdateAngle(pstcDev);
     
-    // ========== Ë¢ÐÂKeil Watchµ÷ÊÔÈ«¾Ö±äÁ¿ ==========
+    // ========== Ë¢ï¿½ï¿½Keil Watchï¿½ï¿½ï¿½ï¿½È«ï¿½Ö±ï¿½ï¿½ï¿½ ==========
     g_fDbgRTurnAngle       = pstcDev->fCurrentAngle;
     g_fDbgRTurnSpeed       = pstcDev->fCurrentSpeed;
     g_u8DbgRTurnDir        = pstcDev->u8CurrentDir;
@@ -590,14 +595,14 @@ DeviceResult_t RTurn_Device_Update(void* handle) {
     g_u8DbgRTurnCalibrated = pstcDev->u8Calibrated;
     g_u8DbgRTurnLimitTrig  = pstcDev->u8LimitTriggered;
     
-    // »ñÈ¡ÆÚÍû·½Ïò£¨ÖÙ²ÃÆ÷Êä³ö£©²¢Ë¢ÐÂµ½È«¾Ö±äÁ¿
+    // ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¢ï¿½Âµï¿½È«ï¿½Ö±ï¿½ï¿½ï¿½
     {
         uint8_t u8DesiredDir = MOTOR_DIRECTION_NONE;
         RTurn_GetDesiredDirection(pstcDev, &u8DesiredDir);
         g_u8DbgRTurnDesiredDir = RTurn_ConvertMotorDirToRTurnDir(u8DesiredDir, pstcDev->stcConfig.u8ReverseOutput);
     }
     
-    // ========== Ã¿2000ms´òÓ¡Ò»´ÎËøËÀ·½Ïò×´Ì¬ ==========
+    // ========== Ã¿2000msï¿½ï¿½Ó¡Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ ==========
     if (u32Now - s_u32LastLockPrintTime >= LOCK_PRINT_INTERVAL_MS) {
         s_u32LastLockPrintTime = u32Now;
         
@@ -620,7 +625,7 @@ DeviceResult_t RTurn_Device_Update(void* handle) {
         }
     }
     
-    // ========== Ã¿4000ms´òÓ¡Ò»´Îµ±Ç°½Ç¶È ==========
+    // ========== Ã¿4000msï¿½ï¿½Ó¡Ò»ï¿½Îµï¿½Ç°ï¿½Ç¶ï¿½ ==========
     if (pstcDev->u8Calibrated && (u32Now - s_u32LastLimitPrintTime >= LIMIT_PRINT_INTERVAL_MS)) {
         s_u32LastLimitPrintTime = u32Now;
         int32_t s32AngleInt = (int32_t)(pstcDev->fCurrentAngle * 100);
@@ -633,7 +638,7 @@ DeviceResult_t RTurn_Device_Update(void* handle) {
     return RESULT_OK;
 }
 
-// ========== Ô²»¡×ª¶¯»ú¹¹ÌØ¶¨½Ó¿Ú ==========
+// ========== Ô²ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¶ï¿½ï¿½Ó¿ï¿½ ==========
 
 float RTurn_Device_GetAngle(RTurn_Device_t* pstcDev) {
     if (!pstcDev || !pstcDev->u8Initialized) return 0;
@@ -699,7 +704,7 @@ RTurn_Device_t* RTurn_Device_Create(const RTurn_Config_t* pstcConfig) {
     return pstcDev;
 }
 
-// ========== È«¾Ö²Ù×÷º¯Êý±í ==========
+// ========== È«ï¿½Ö²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ==========
 const DeviceOps_t g_rturn_ops = {
     .init = RTurn_Device_Init,
     .deinit = RTurn_Device_Deinit,

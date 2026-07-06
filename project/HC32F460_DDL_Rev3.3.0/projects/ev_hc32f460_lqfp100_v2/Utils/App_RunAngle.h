@@ -58,6 +58,11 @@ void RunAngle_GotoZero(void);
 /** @brief Set goto-zero threshold (called on Modbus write 0x371B, hot-reload) */
 void RunAngle_SetThreshold(uint16_t thresh_x10);
 
+/** @brief Called by dev_rturn when calibration zeroes g_s32HallPulseAccum.
+ *  Zeros both RAM absolute offset and Flash persisted value,
+ *  and re-syncs the pulse baseline to prevent delta corruption. */
+void RunAngle_OnCalibration(void);
+
 extern AbsAngleRecord_t g_AbsAngle;
 
 #endif /* __APP_RUNANGLE_H__ */

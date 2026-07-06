@@ -209,6 +209,19 @@ void RunAngle_SetThreshold(uint16_t thresh_x10)
     MAIN_D("[ABSA] Threshold set: %u (0.1 deg)\r\n", (unsigned int)thresh_x10);
 }
 
+void RunAngle_OnCalibration(void)
+{
+    __disable_irq();
+    s_abs_offset_x10 = 0;
+    s_last_accum = g_s32HallPulseAccum;   /* accum was just zeroed by dev_rturn */
+    __enable_irq();
+
+    g_AbsAngle.abs_offset_x10 = 0;
+    Param_Save(&s_Config, &s_Runtime);    /* persist to Flash sector 55 */
+
+    MAIN_D("[ABSA] Calibration zero: RAM=0, Flash=0\r\n");
+}
+
 /*******************************************************************************
  * EOF
  ******************************************************************************/

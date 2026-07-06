@@ -59,7 +59,8 @@ HB_chuchai — 基于 HC32F460 (Cortex-M4) 的直流电机推窗控制系统，R
 
 ### Utils 层 - 基础设施
 - `App_Params.c/h` — Flash 参数持久化 + Modbus 寄存器读写映射 + 实时数据结构
-- `param_manager.c/h` — Flash 读写引擎（磨损均衡）
+- `App_RunAngle.c/h` — 绝对角度追踪（独立于 dev_rturn，掉电保留零点，欠压自动保存，回零逻辑）
+- `param_manager.c/h` — Flash 读写引擎（磨损均衡，支持多实例：常规参数用扇区56-62，绝对角度用扇区55）
 - `param_validator.c/h` — Modbus 写入值校验（限幅 + 精度取整）
 - `rtt_manager.c/h` — RTT 日志 + 模块级调试开关
 - `TickTimer.c/h`, `msg_queue.c/h`, `ring_buf.c/h`, `lock.c/h`
@@ -79,8 +80,9 @@ HB_chuchai — 基于 HC32F460 (Cortex-M4) 的直流电机推窗控制系统，R
 - 脉冲数计算公式: `CALC_PULSES_PER_REV = pole_pairs × hall_count × 2`
 
 ### PWM 电机控制 (MOTOR_CONTROL_MODE)
-- `main.c` 中 `Motor_Pwm_Init()` 调用被注释掉
-- 主循环中 PWM_Update 由 `#if MOTOR_CONTROL_MODE == 1` 守卫 — 当前未启用
+- `MOTOR_CONTROL_MODE` 在 `Dev/dev_motor.h:32-38` 中由 `BOARD_VERSION` 决定：原板=0 (GPIO), 整合板=1 (PWM)
+- 当前 `BOARD_VERSION = 0` → `MOTOR_CONTROL_MODE = 0`（GPIO 控制，非 PWM）
+- `main.c` 中 `Motor_Pwm_Init()` 调用被注释掉；主循环中 PWM_Update 由 `#if MOTOR_CONTROL_MODE == 1` 守卫 — 当前未启用
 - PWM 配置: TMRA_4, PB6-PB9, 4通道, 20kHz, 低有效 (active LOW)
 - 停止使用 98% duty（刹车），旧版用 50% 交替极性
 
@@ -117,6 +119,14 @@ SDH21263 是 3 相 BLDC 预驱，本项目用其中 2 个半桥组成 H 桥驱�
 - 极对数 0x3713: 1~100
 - 流程: CRC 校验 → 最大最小值限幅 → 精度取整 → 写入 Flash → 回令
 
+### 绝对角度 (App_RunAngle)
+- `Utils/App_RunAngle.c/h`: 独立于 `dev_rturn` 的角度追踪模块
+- 核心公式: `delta = g_s32HallPulseAccum(当前) - s_last_accum(上次)` → `s_abs_offset_x10 += delta × 3600 / (极对数 × 霍尔数 × 2 × 减速比)`
+- Flash 存储: 扇区55，使用 `param_manager` 多实例引擎（独立于常规参数扇区56-62），魔数 `0xAB5AAB5A`/`0xBA5ABA5A`
+- 欠压自动保存: `App_FaultHandler` 检测到欠压时自动调用 `RunAngle_Cmd(ABS_CMD_SAVE)` 将 RAM 偏移写入 Flash
+- 回零逻辑: 偏移 > +阈值 → REV, 偏移 < -阈值 → FWD, |偏移| ≤ 阈值 → ESTOP；偏移符号翻转也触发 ESTOP
+- 与实时角度 (0x2731) 独立运行、互不影响
+
 ### 减速比精度
 - 寄存器 0x3712 单位改为 0.1 (值 ×10)，原值 1183 对应新值 11830
 - 硬编码默认值: `RTURN_REDUCTION_RATIO = 11830.0f`，`PARAM_DEFAULT_RTURN_REDUCTION_RATIO = 11830`
@@ -131,6 +141,7 @@ SDH21263 是 3 相 BLDC 预驱，本项目用其中 2 个半桥组成 H 桥驱�
 | 0x2730-0x273F | 实时数据 (RAM, 只读) | R (0x03) |
 | 0x2740 | 故障状态 | R/W |
 | 0x3700-0x371F | 高级参数 (Flash 持久化) | R/W (0x03/0x06) |
+| → 0x3716-0x371B | 绝对角度 (独立Flash扇区55) | 混合读写 |
 
 ### 关键寄存器
 
@@ -145,7 +156,7 @@ SDH21263 是 3 相 BLDC 预驱，本项目用其中 2 个半桥组成 H 桥驱�
 | 0x271C | 关窗极限角度 | 0.1° |
 | 0x271D | 开窗极限角度 | 0.1° |
 | 0x271E | 过流判定时间 | 1ms |
-| 0x2720 | 控制命令 | bit0=启动, bit1=停止, bit2=急停, bit4=正转, bit5=反转 |
+| 0x2720 | 控制命令 | bit0=启动, bit1=停止, bit2=急停, bit4=正转, bit5=反转, bit6=保存绝对位置 |
 | 0x2730 | 实时转速 | r/min |
 | 0x2731 | 实时角度 | 0.1° |
 | 0x2732 | 实时电压 | 0.1V |
@@ -157,17 +168,44 @@ SDH21263 是 3 相 BLDC 预驱，本项目用其中 2 个半桥组成 H 桥驱�
 | 0x3712 | 减速比 | ×0.1 |
 | 0x3713 | 极对数 | 1~100 |
 | 0x3714-0x3715 | 霍尔脉冲累计 | 低16位/高16位 (int32) |
+| 0x3716-0x3717 | 绝对角度 RAM 偏移 | 低16位/高16位 (int32, 0.1°) |
+| 0x3718-0x3719 | 绝对角度 Flash 偏移 | 低16位/高16位 (int32, 0.1°) |
+| 0x371A | 绝对角度指令 | W: 0=设零点, 1=保存到Flash, 2=回到零点 |
+| 0x371B | 回零阈值 | R/W (0.1°, 默认1, 范围0~200) |
+
+## 初始化顺序
+
+```
+main():
+  Hardware_Init() → RS485_Init() → Modbus_Init() → ESystem_Init() → FaultHandler_Init() → EventBus_Enable()
+
+ESystem_Init() 内部:
+  EventBus_Init → DeviceManager_Init → RegisterAllDevices → SetupEventBusSubscriptions
+  → Device_Init(ID_MOTOR)  # 电机先于其他设备初始化
+  → Device_Init(其余设备)
+  → SetDeviceUpdateIntervals → DeviceManager_EnableAllUpdate → RunAngle_Init()
+```
 
 ## EventBus 核心主题
 
 | Topic | 发布者 | 订阅者 | 用途 |
 |-------|--------|--------|------|
 | TOPIC_CURRENT_ALARM | dev_sensor | dev_motor, dev_rturn, App_FaultHandler | 过流报警/解除 |
-| TOPIC_VOLTAGE_ALARM | dev_voltage | dev_motor, App_FaultHandler | 过压/欠压 |
+| TOPIC_VOLTAGE_ALARM | dev_voltage | dev_motor, App_FaultHandler | 过压/欠压 → 欠压时自动触发 RunAngle_Cmd(SAVE) |
 | TOPIC_RTURN_LIMIT | dev_rturn | dev_motor | 角度限位 → 电机阻塞 |
-| TOPIC_FAULT_CLEAR | App_FaultHandler | dev_sensor | 手动清除故障 |
 | TOPIC_MOTOR_SPEED_FEEDBACK | dev_motor_hall | dev_rturn, dev_motor | 转速反馈 |
 | TOPIC_MANUAL_RS485 | App_Modbus/App_Params | dev_motor | RS485 手动控制 |
+
+未使用/预留 Topic: `TOPIC_FAULT_CLEAR`（故障清除通过直接函数调用实现）、`TOPIC_CAN_EVENT`、`TOPIC_MOTOR_CMD`、`TOPIC_MOTOR_DRIVE_EXEC`、`TOPIC_ALARM`
+
+## 热重载 (App_ReloadConfig)
+
+`App_ReloadConfig()` 在 Modbus 参数写入后调用，热重载以下运行时配置（无需复位）：
+- 电压阈值: 过压/欠压 + 滞回 + 触发次数
+- 电流阈值: 过流阈值 + 触发/释放窗口 + 滞回
+- 减速比和角度限位 (更新 dev_rturn)
+- 电机霍尔极对数
+- 回零阈值 (0x371B) 写入后立即生效
 
 ## 仿真模式
 
@@ -218,14 +256,16 @@ SDH21263 是 3 相 BLDC 预驱，本项目用其中 2 个半桥组成 H 桥驱�
 
 ## 辅助工具
 
-- `modbus_tool.py` / `dist/modbus_tool.exe` — 交互式 Modbus 指令生成器
-  - 主菜单 7: 开发者选项（密码 5858）
-  - 含读/写配置寄存器、计算霍尔脉冲、读/重置霍尔脉冲、计算实时角度
+- `modbus_tool.py` / `dist/modbus_tool.exe` — 交互式 Modbus 指令生成器 v4.1（含绝对角度）
+  - 主菜单 7: 绝对角度（读RAM/Flash偏移、保存、回零、阈值设置）
+  - 主菜单 8: 开发者选项（密码 5858），含设定绝对零点
 - `modbus_test_cmds.py` — 脚本式 Modbus 指令生成器
 - `实时数据使用说明.md` — 实时数据 API 使用指南
 - `电流控制逻辑说明.md` — 过流检测三层处理详细时序
 - `电机霍尔方案.md` — 角度计算方案分析（含 ABC 方案对比、Pulse-Direct 实现总结）
 - `电机霍尔脉冲.md` — 双链路（Path 1 角度 + Path 2 脉冲）架构说明
+- `绝对角度.md` — 绝对角度功能完整说明（数据模型、寄存器、操作指南、回零逻辑）
+- `chuchai vs HandB.md` — BOARD_VERSION 0/1 硬件差异详细对比（ADC引脚、电机控制、分压电阻、电流传感器、RS485 DIR）
 
 ## 已知问题/注意事项
 
@@ -235,7 +275,7 @@ SDH21263 是 3 相 BLDC 预驱，本项目用其中 2 个半桥组成 H 桥驱�
 4. 减速比改为 0.1 精度后，已有设备 Flash 中的旧值需重新写入
 5. `Motor_Pwm_Init()` 在 main.c 中被注释，PWM 更新由 `MOTOR_CONTROL_MODE` 宏守卫
 6. 当前 `BOARD_VERSION = 0`（原板），如需切换到整合板改为 1
-7. 最新提交 (2026-07-04): 未增加心跳包，未增加绝对位置
+7. 心跳包功能尚未实现
 
 ## /init 自动阅读清单
 
@@ -265,3 +305,7 @@ SDH21263 是 3 相 BLDC 预驱，本项目用其中 2 个半桥组成 H 桥驱�
 ### 系统入口
 - `template/source/main.c` — 初始化顺序、主循环
 - `template/source/main.h` — BOARD_VERSION
+
+### 绝对角度
+- `Utils/App_RunAngle.h` — 绝对角度接口、AbsAngleRecord_t 结构体、指令宏
+- `Utils/App_RunAngle.c` — 脉冲累积追踪、设零/保存/回零、欠压自动保存
