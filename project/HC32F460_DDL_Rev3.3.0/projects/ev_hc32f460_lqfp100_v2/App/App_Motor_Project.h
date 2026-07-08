@@ -84,10 +84,10 @@
 #define PIN_PWR_NEG_PIN         GPIO_PIN_14
 
 // --- Hall �������ܽ� ---
-#define PIN_HALL_A_PORT         GPIO_PORT_A
-#define PIN_HALL_A_PIN          GPIO_PIN_10
-#define PIN_HALL_B_PORT         GPIO_PORT_A
-#define PIN_HALL_B_PIN          GPIO_PIN_09
+#define PIN_HALL_A_PORT         GPIO_PORT_C
+#define PIN_HALL_A_PIN          GPIO_PIN_13
+#define PIN_HALL_B_PORT         GPIO_PORT_C
+#define PIN_HALL_B_PIN          GPIO_PIN_14
 
 // --- ADC ���������ܽ� ---
 #define PIN_ADC_CURRENT_PORT    GPIO_PORT_A
@@ -118,12 +118,12 @@
 #define MOTOR_HALL_UPDATE_MS    (1)
 
 // --- Hall �ж����� ---
-#define HALL_EIRQ_CH_A          EXTINT_CH10
-#define HALL_EIRQ_CH_B          EXTINT_CH09
-#define HALL_IRQN_A             INT010_IRQn
-#define HALL_IRQN_B             INT009_IRQn
-#define HALL_IRQ_SRC_A          INT_SRC_PORT_EIRQ10
-#define HALL_IRQ_SRC_B          INT_SRC_PORT_EIRQ9
+#define HALL_EIRQ_CH_A          EXTINT_CH13
+#define HALL_EIRQ_CH_B          EXTINT_CH14
+#define HALL_IRQN_A             INT013_IRQn
+#define HALL_IRQN_B             INT014_IRQn
+#define HALL_IRQ_SRC_A          INT_SRC_PORT_EIRQ13
+#define HALL_IRQ_SRC_B          INT_SRC_PORT_EIRQ14
 #define HALL_IRQ_PRIORITY       (0)
 
 

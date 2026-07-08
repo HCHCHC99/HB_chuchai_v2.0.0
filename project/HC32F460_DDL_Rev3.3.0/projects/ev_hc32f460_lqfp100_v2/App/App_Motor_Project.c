@@ -192,18 +192,18 @@ static void RegisterAllDevices(void) {
 
     // ?         ��
     motor_hall_config_t motorHallCfg = {
-        .hall_a_port = GPIO_PORT_A,
-        .hall_a_pin = GPIO_PIN_10,
-        .hall_b_port = GPIO_PORT_A,
-        .hall_b_pin = GPIO_PIN_09,
-        .eirq_ch_a = EXTINT_CH10,
-        .eirq_ch_b = EXTINT_CH09,
-        .irqn_a = INT010_IRQn,
-        .irqn_b = INT009_IRQn,
-        .irq_src_a = INT_SRC_PORT_EIRQ10,
-        .irq_src_b = INT_SRC_PORT_EIRQ9,
+        .hall_a_port = PIN_HALL_A_PORT,
+        .hall_a_pin = PIN_HALL_A_PIN,
+        .hall_b_port = PIN_HALL_B_PORT,
+        .hall_b_pin = PIN_HALL_B_PIN,
+        .eirq_ch_a = HALL_EIRQ_CH_A,
+        .eirq_ch_b = HALL_EIRQ_CH_B,
+        .irqn_a = HALL_IRQN_A,
+        .irqn_b = HALL_IRQN_B,
+        .irq_src_a = HALL_IRQ_SRC_A,
+        .irq_src_b = HALL_IRQ_SRC_B,
         .irq_priority = 2,
-        .pole_pairs = (uint8_t)g_AppParam.motor_hall_pole_pairs,  // ��Flash��ȡ
+        .pole_pairs = (uint8_t)g_AppParam.motor_hall_pole_pairs,  // 从Flash读取
         .hall_count = 2,
         .custom_pulses_per_rev = 0
     };
