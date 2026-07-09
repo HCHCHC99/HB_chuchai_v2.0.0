@@ -188,7 +188,7 @@ def menu_control():
         print(f"  {s}")
     c = input("选择: ").strip()
     if c == '0' or c == '': return
-    cm = {'1':0x0001,'2':0x0002,'3':0x0004,'4':0x0011,'5':0x0021,'6':0x0008}
+    cm = {'1':0x0001,'2':0x0002,'3':0x0004,'4':0x0010,'5':0x0020,'6':0x0008}
     val = cm.get(c)
     if val is None: print("无效"); return
 
