@@ -40,9 +40,10 @@ typedef struct {
 #define ABS_THRESH_MAX_X10      200   /* 20.0 deg max */
 
 /* Command values for 0x371A */
-#define ABS_CMD_SET_ZERO       0x0000U
-#define ABS_CMD_SAVE           0x0001U
-#define ABS_CMD_GOTO_ZERO      0x0002U
+#define ABS_CMD_SET_ZERO            0x0000U
+#define ABS_CMD_SAVE                0x0001U
+#define ABS_CMD_GOTO_ZERO           0x0002U
+#define ABS_CMD_SET_ZERO_THEN_SAVE  0x0003U
 
 /*=============================================================================
  * Public API

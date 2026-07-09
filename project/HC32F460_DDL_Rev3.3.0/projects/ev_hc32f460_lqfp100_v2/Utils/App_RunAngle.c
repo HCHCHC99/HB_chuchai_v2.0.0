@@ -147,7 +147,7 @@ int32_t RunAngle_GetFlashOffset_x10(void)
 
 void RunAngle_Cmd(uint16_t cmd)
 {
-    if (cmd == ABS_CMD_SET_ZERO) {
+    if (cmd == ABS_CMD_SET_ZERO || cmd == ABS_CMD_SET_ZERO_THEN_SAVE) {
         /* Set current position as absolute zero */
         s_abs_offset_x10 = 0;
         g_AbsAngle.abs_offset_x10 = 0;

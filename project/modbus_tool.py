@@ -634,6 +634,7 @@ def menu_abs_angle():
         print("  4. 回到绝对零点")
         print("  5. 读回零阈值")
         print("  6. 设置回零阈值")
+        print("  7. 设零点并保存 (0x0003)")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0': return
@@ -664,6 +665,13 @@ def menu_abs_angle():
             print_cmd(req_data, node)
         elif c == '6':
             menu_set_abs_threshold()
+        elif c == '7':
+            print("\n====== 设零点并保存 =====")
+            print("  等效于: 设零点(0x0000) + 保存(0x0001)")
+            print("  将当前位置设为绝对零点并写入Flash")
+            node = ask_node()
+            req_data = [node, 0x06, 0x37, 0x1A, 0x00, 0x03]
+            print_cmd(req_data, node)
         else:
             print("无效")
         input("\n按 Enter 返回...")
