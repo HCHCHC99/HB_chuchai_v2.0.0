@@ -48,7 +48,10 @@
 #define REG_ABS_CMD                 (0x2725U)   /* W: 0=设零并保存, 1=回零, 2=保存, 3=设零 */
 #define REG_ABS_THRESHOLD           (0x2726U)   /* R/W: 回零阈值 (0.1度, 默认1, 0~200) */
 
-/* 注意: 0x2713, 0x2717-0x271B, 0x271F 为保留地址, 不暴露给 Modbus */
+/* --- 心跳包 (只读, 不存 Flash) --- */
+#define REG_HEARTBEAT               (0x271FU)   /* 心跳包: 读回值 = 设备地址 (0x2710) */
+
+/* 注意: 0x2713, 0x2717-0x271B 为保留地址, 不暴露给 Modbus */
 
 /* --- 控制命令 (写立即执行, 不保存 Flash) --- */
 #define REG_CTRL_CMD                (0x2720U)   /* 控制命令寄存器 (uint16_t) */

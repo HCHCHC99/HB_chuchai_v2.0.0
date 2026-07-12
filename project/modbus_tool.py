@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Modbus RTU 指令生成器 v4.1 (含绝对角度) """
+""" Modbus RTU 指令生成器 v4.2 (含绝对角度+心跳包) """
 
 def modbus_crc16(data):
     crc = 0xFFFF
@@ -676,6 +676,22 @@ def menu_abs_angle():
         input("\n按 Enter 返回...")
 
 # ===== 主菜单 =====
+# ===== 心跳包 =====
+def menu_heartbeat():
+    """读取心跳包: 读 0x271F"""
+    print("\n====== 心跳包 =====")
+    print("  地址 0x00 = 广播(全呼), 总线上所有从机均回复")
+    print("  地址 1~247 = 只查询指定从机")
+    print("  ⚠ 广播模式下多个从机同时回复，RS-485 总线会冲突")
+    node = ask_node()
+    if node == 0:
+        print("\n  ▎广播心跳包 — 所有从机将同时回复（可能冲突）")
+    else:
+        print(f"\n  ▎查询地址 {node} — 仅该从机回复")
+    req_data = [node, 0x03, 0x27, 0x1F, 0x00, 0x01]
+    print_cmd(req_data, node)
+    print("  ▎回复解析: 数据值 = 从机设备地址 (0x2710)")
+
 MENU = [
     ("读实时数据",   menu_read_realtime),
     ("控制",         menu_control),
@@ -683,6 +699,7 @@ MENU = [
     ("写配置寄存器", menu_write_config),
     ("查看故障",     menu_read_fault),
     ("清除故障",     menu_clear_fault),
+    ("心跳包",       menu_heartbeat),
     ("绝对角度",     menu_abs_angle),
 ]
 
