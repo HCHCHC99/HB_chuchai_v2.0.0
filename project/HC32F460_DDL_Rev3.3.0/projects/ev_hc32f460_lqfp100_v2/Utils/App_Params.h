@@ -40,13 +40,13 @@
 #define REG_MOTOR_HALL_COUNT_LO    (0x3714U)   /* 霍尔脉冲累计低16位 (int32_t累计值) */
 #define REG_MOTOR_HALL_COUNT_HI    (0x3715U)   /* 霍尔脉冲累计高16位 */
 
-/* --- 绝对角度 (0x3716~0x371B) --- */
-#define REG_ABS_ANGLE_LO            (0x3716U)   /* RAM实时偏移低16位 (int32_t, 0.1度) */
-#define REG_ABS_ANGLE_HI            (0x3717U)   /* RAM实时偏移高16位 */
-#define REG_FLASH_ABS_LO            (0x3718U)   /* Flash已保存偏移低16位 (int32_t, 0.1度) */
-#define REG_FLASH_ABS_HI            (0x3719U)   /* Flash已保存偏移高16位 */
-#define REG_ABS_CMD                 (0x371AU)   /* W: 0=设零点, 1=保存到Flash, 2=回零 */
-#define REG_ABS_THRESHOLD           (0x371BU)   /* R/W: 回零阈值 (0.1度, 默认1, 0~200) */
+/* --- 绝对角度 (0x2721~0x2726) --- */
+#define REG_ABS_ANGLE_LO            (0x2721U)   /* RAM实时偏移低16位 (int32_t, 0.1度) */
+#define REG_ABS_ANGLE_HI            (0x2722U)   /* RAM实时偏移高16位 */
+#define REG_FLASH_ABS_LO            (0x2723U)   /* Flash已保存偏移低16位 (int32_t, 0.1度) */
+#define REG_FLASH_ABS_HI            (0x2724U)   /* Flash已保存偏移高16位 */
+#define REG_ABS_CMD                 (0x2725U)   /* W: 0=设零并保存, 1=回零, 2=保存, 3=设零 */
+#define REG_ABS_THRESHOLD           (0x2726U)   /* R/W: 回零阈值 (0.1度, 默认1, 0~200) */
 
 /* 注意: 0x2713, 0x2717-0x271B, 0x271F 为保留地址, 不暴露给 Modbus */
 

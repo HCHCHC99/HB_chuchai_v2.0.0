@@ -9,10 +9,10 @@
  * Absolute angle tracking module
  *
  * Registers:
- *   0x3716/0x3717  Read RAM offset (int32_t, 0.1 deg)
- *   0x3718/0x3719  Read Flash offset (int32_t, 0.1 deg)
- *   0x371A         Write: 0=set zero, 1=save, 2=goto zero
- *   0x371B         R/W: goto-zero threshold (uint16_t, 0.1 deg, default 1)
+ *   0x2721/0x2722  Read RAM offset (int32_t, 0.1 deg)
+ *   0x2723/0x2724  Read Flash offset (int32_t, 0.1 deg)
+ *   0x2725         Write: 0=set zero+save, 1=goto zero, 2=save, 3=set zero
+ *   0x2726         R/W: goto-zero threshold (uint16_t, 0.1 deg, default 1)
  *============================================================================*/
 
 /*=============================================================================
@@ -39,11 +39,11 @@ typedef struct {
 #define ABS_THRESH_MIN_X10        0
 #define ABS_THRESH_MAX_X10      200   /* 20.0 deg max */
 
-/* Command values for 0x371A */
-#define ABS_CMD_SET_ZERO            0x0000U
-#define ABS_CMD_SAVE                0x0001U
-#define ABS_CMD_GOTO_ZERO           0x0002U
-#define ABS_CMD_SET_ZERO_THEN_SAVE  0x0003U
+/* Command values for 0x2725 */
+#define ABS_CMD_SET_ZERO_THEN_SAVE  0x0000U  /* Set zero + save to Flash */
+#define ABS_CMD_GOTO_ZERO           0x0001U  /* Goto zero position */
+#define ABS_CMD_SAVE                0x0002U  /* Save current offset to Flash */
+#define ABS_CMD_SET_ZERO            0x0003U  /* Set zero (RAM=0, Flash=0, save) */
 
 /*=============================================================================
  * Public API
@@ -56,7 +56,7 @@ int32_t RunAngle_GetFlashOffset_x10(void);
 void RunAngle_Cmd(uint16_t cmd);
 void RunAngle_GotoZero(void);
 
-/** @brief Set goto-zero threshold (called on Modbus write 0x371B, hot-reload) */
+/** @brief Set goto-zero threshold (called on Modbus write 0x2726, hot-reload) */
 void RunAngle_SetThreshold(uint16_t thresh_x10);
 
 /** @brief Called by dev_rturn when calibration zeroes g_s32HallPulseAccum.

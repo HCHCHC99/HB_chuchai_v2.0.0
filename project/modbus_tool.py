@@ -20,7 +20,7 @@ VALIDATION_RULES = {
     0x271E: (0,    2000, 20,  1,   "ms"),   # 判定时间 0~2000ms, 步进20ms
     0x3712: (10,  65535,  0,  0.1, ""),     # 减速比 1.0~6553.5, 单位0.1
     0x3713: (1,     100,  0,  1,   ""),     # 极对数 1~100, 不取整
-    0x371B: (0,     200,  0,  0.1, "°"),    # 回零阈值 0~20.0°, 步进0.1°
+    0x2726: (0,     200,  0,  0.1, "°"),    # 回零阈值 0~20.0°, 步进0.1°
 }
 
 def apply_validation(regAddr, raw_value):
@@ -85,8 +85,8 @@ REALTIME_REGS = [
 ]
 
 ABS_REGS = [
-    (0x3716, "绝对角度(RAM)",  "0.1°"),
-    (0x3718, "绝对角度(Flash)","0.1°"),
+    (0x2721, "绝对角度(RAM)",  "0.1°"),
+    (0x2723, "绝对角度(Flash)","0.1°"),
 ]
 
 DEV_REGS = [
@@ -95,7 +95,7 @@ DEV_REGS = [
     (0x3711, "电机方向",       ["正常", "反转"], ""),
     (0x3712, "减速比",         None,         "0.1"),
     (0x3713, "电机极对数",     None,         ""),
-    (0x371B, "回零阈值",       None,         "0.1°"),
+    (0x2726, "回零阈值",       None,         "0.1°"),
 ]
 
 FAULT_BITS = [
@@ -581,45 +581,45 @@ def menu_calc_hall_pulse():
 
 # ===== 绝对角度 =====
 def menu_set_abs_zero():
-    """设定绝对零点: 写 0x371A=0"""
+    """设定绝对零点: 写 0x2725=3"""
     print("\n====== 设定绝对零点 =====")
-    print("  将当前位置设为绝对0度 (写 0x371A=0)")
+    print("  将当前位置设为绝对0度 (写 0x2725=3)")
     node = ask_node()
-    req_data = [node, 0x06, 0x37, 0x1A, 0x00, 0x00]
+    req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x03]
     print_cmd(req_data, node)
 
 def menu_save_abs_position():
-    """保存绝对位置: 写 0x371A=1"""
+    """保存绝对位置: 写 0x2725=2"""
     print("\n====== 保存绝对位置 =====")
-    print("  固化RAM偏移到Flash (写 0x371A=1)")
+    print("  固化RAM偏移到Flash (写 0x2725=2)")
     node = ask_node()
-    req_data = [node, 0x06, 0x37, 0x1A, 0x00, 0x01]
+    req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x02]
     print_cmd(req_data, node)
 
 def menu_goto_zero():
-    """回到绝对零点: 写 0x371A=2"""
+    """回到绝对零点: 写 0x2725=1"""
     print("\n====== 回到绝对零点 =====")
-    print("  电机自动转动到绝对0度 (写 0x371A=2)")
+    print("  电机自动转动到绝对0度 (写 0x2725=1)")
     node = ask_node()
-    req_data = [node, 0x06, 0x37, 0x1A, 0x00, 0x02]
+    req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x01]
     print_cmd(req_data, node)
 
 def menu_set_abs_threshold():
-    """设置回零阈值: 写 0x371B"""
+    """设置回零阈值: 写 0x2726"""
     print("\n====== 设置回零阈值 =====")
     print("  范围: 0.1~20.0°, 步进0.1°")
     print("  默认: 0.1° (值=1)")
     val = ask_value("值 (0.1°)")
     if val is None: print("无效"); return
     node = ask_node()
-    req_data = [node, 0x06, 0x37, 0x1B, (val>>8)&0xFF, val&0xFF]
-    result, modified = apply_validation(0x371B, val)
+    req_data = [node, 0x06, 0x27, 0x26, (val>>8)&0xFF, val&0xFF]
+    result, modified = apply_validation(0x2726, val)
     if modified:
         note = f"MCU校验后: {val*0.1:.1f}° → {result*0.1:.1f}°"
     else:
         note = ""
     print_cmd(req_data, node, note, skip_echo=True)
-    echo_data = [node, 0x06, 0x37, 0x1B, (result>>8)&0xFF, result&0xFF]
+    echo_data = [node, 0x06, 0x27, 0x26, (result>>8)&0xFF, result&0xFF]
     crc = modbus_crc16(echo_data)
     echo = ' '.join(f'{b:02X}' for b in echo_data)
     print(f"  回令: {echo} {crc&0xFF:02X} {crc>>8&0xFF:02X}")
@@ -634,7 +634,7 @@ def menu_abs_angle():
         print("  4. 回到绝对零点")
         print("  5. 读回零阈值")
         print("  6. 设置回零阈值")
-        print("  7. 设零点并保存 (0x0003)")
+        print("  7. 设零点并保存 (0x0000)")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0': return
@@ -660,17 +660,16 @@ def menu_abs_angle():
             menu_goto_zero()
         elif c == '5':
             node = ask_node()
-            print("\n  回零阈值 (0x371B)")
-            req_data = [node, 0x03, 0x37, 0x1B, 0x00, 0x01]
+            print("\n  回零阈值 (0x2726)")
+            req_data = [node, 0x03, 0x27, 0x26, 0x00, 0x01]
             print_cmd(req_data, node)
         elif c == '6':
             menu_set_abs_threshold()
         elif c == '7':
             print("\n====== 设零点并保存 =====")
-            print("  等效于: 设零点(0x0000) + 保存(0x0001)")
-            print("  将当前位置设为绝对零点并写入Flash")
+            print("  将当前位置设为绝对零点并写入Flash (写 0x2725=0)")
             node = ask_node()
-            req_data = [node, 0x06, 0x37, 0x1A, 0x00, 0x03]
+            req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x00]
             print_cmd(req_data, node)
         else:
             print("无效")

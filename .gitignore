@@ -42,6 +42,10 @@ JLink*
 *.swo
 *~
 
+# PyInstaller
+build/
+*.spec
+
 # OS
 .DS_Store
 Thumbs.db
