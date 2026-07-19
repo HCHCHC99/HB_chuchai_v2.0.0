@@ -38,11 +38,11 @@ typedef struct {
 #define ABS_ANGLE_MAGIC_TAIL   0xBA5ABA5A
 
 /* Default threshold: 0.1 deg */
-#define ABS_THRESH_DEFAULT_X10    1
+#define ABS_THRESH_DEFAULT_X10    6
 #define ABS_THRESH_MIN_X10        0
 #define ABS_THRESH_MAX_X10      200   /* 20.0 deg max */
 
-/* Command values for 0x2725 â€” reference point defined by 0x271C (close_limit_angle) */
+/* Command values for 0x2725 â€? reference point defined by 0x271C (close_limit_angle) */
 #define ABS_CMD_SET_ZERO_THEN_SAVE  0x0000U  /* Set reference + save to Flash */
 #define ABS_CMD_GOTO_ZERO           0x0001U  /* Goto reference position */
 #define ABS_CMD_SAVE                0x0002U  /* Save current offset to Flash */

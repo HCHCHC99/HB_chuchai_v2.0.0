@@ -159,21 +159,19 @@ def menu_read_realtime():
     print(f"\n  ▎{name}{u}")
     if addr == 0x2737:
         print(f"  ▎值: 0=停止  1=开窗(逆时针)  2=关窗(顺时针)")
-        print(f"  举例 (回令含CRC):")
-        for lb, v in [("停止", 0), ("开窗(逆时针)", 1), ("关窗(顺时针)", 2)]:
-            rd = [node, 0x03, 0x02, (v>>8)&0xFF, v&0xFF]
-            rcr = modbus_crc16(rd)
-            rq = ' '.join(f'{b:02X}' for b in rd)
-            print(f"    {lb}: {rq} {rcr&0xFF:02X} {rcr>>8&0xFF:02X}")
 
     print_cmd(req_data, node)
 
 # ===== 2. 控制 =====
 def menu_control():
     print("\n====== 电机控制 =====")
-    for s in ["1. 控制开启","2. 控制关闭（转动时不会停）","3. 急停",
-              "4. 开窗（逆时针）","5. 关窗（顺时针）","6. 重启复位","0. 返回"]:
-        print(f"  {s}")
+    print("  1. 控制开启")
+    print("  2. 控制关闭（转动时不会停）")
+    print("  3. 急停")
+    print("  4. 开窗（逆时针）  ⚠需先解锁(选1)")
+    print("  5. 关窗（顺时针）  ⚠需先解锁(选1)")
+    print("  6. 重启复位        ⚠需先解锁(选1)")
+    print("  0. 返回")
     c = input("选择: ").strip()
     if c == '0' or c == '': return
     cm = {'1':0x0001,'2':0x0002,'3':0x0004,'4':0x0010,'5':0x0020,'6':0x0008}
@@ -206,12 +204,9 @@ def menu_read_config():
 
     print(f"\n  ▎{name}（0x{addr:04X}）")
     if opts is not None:
-        print(f"  举例 (回令含CRC):")
+        print(f"  可选值:")
         for vi, opt_name in enumerate(opts):
-            rd = [node, 0x03, 0x02, (vi>>8)&0xFF, vi&0xFF]
-            rcr = modbus_crc16(rd)
-            rq = ' '.join(f'{b:02X}' for b in rd)
-            print(f"    {opt_name}: {rq} {rcr&0xFF:02X} {rcr>>8&0xFF:02X}")
+            print(f"    {vi} = {opt_name}")
 
     print_cmd(req_data, node)
 
@@ -294,7 +289,7 @@ def menu_read_fault():
 
     print(f"\n  ▎故障状态（0x2740）")
     print(f"  ▎bit0=过压  bit1=过流  bit6=欠压")
-    print(f"  举例 (回令含CRC):")
+    print(f"  回令解析示例:")
     for lb, v in [("无故障", 0), ("过压", 0x0001), ("过流", 0x0002), ("欠压", 0x0040)]:
         rd = [node, 0x03, 0x02, (v>>8)&0xFF, v&0xFF]
         rcr = modbus_crc16(rd)
@@ -336,57 +331,52 @@ def menu_heartbeat():
         print(f"\n  ▎查询地址 {node} — 仅该从机回复")
     req_data = [node, 0x03, 0x27, 0x1F, 0x00, 0x01]
     print_cmd(req_data, node)
-    print("  ▎回复解析: 数据值 = 从机设备地址 (0x2710)")
+    print("  ▎回复值 = 从机设备地址")
 
 # ===== 8. 关窗基准点 (主菜单, 无密码) =====
 def menu_window_zero():
     """主菜单关窗基准点 - 含回基准点和转动到目标角度"""
     while True:
         print("\n====== 关窗基准点 =====")
-        print("  1. 设关窗基准点并保存 (写 0x2725=0, 目标值=0x271C)")
-        print("  2. 回到关窗基准点     (写 0x2725=1, 目标值=0x271C)")
-        print("  3. 转动到目标角度     (写 0x2727+0x2728, 0x10一条指令)")
-        print("  4. 读绝对角度(RAM)     (读 0x2721+0x2722)")
+        print("  1. 设关窗基准点并保存")
+        print("  2. 回到关窗基准点")
+        print("  3. 转动到目标角度")
+        print("  4. 读绝对角度(RAM)")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0':
             return
         elif c == '1':
             print("\n====== 设关窗基准点并保存 =====")
-            print("  将当前位置设为关窗基准点(0x271C的值)并写入Flash (写 0x2725=0)")
+            print("  将当前位置设为关窗基准点并写入Flash")
+            print("  基准点角度值 = 0x271C(关窗极限角度) 的值")
             node = ask_node()
             req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x00]
             print_cmd(req_data, node)
             input("\n按 Enter 返回...")
         elif c == '2':
             print("\n====== 回到关窗基准点 =====")
-            print("  电机自动转动到关窗基准点(0x271C的值) (写 0x2725=1)")
-            print("  ⚠ 需先在菜单2-1中'控制开启'解锁，且电机停转")
+            print("  电机自动转动到关窗基准点")
+            print("  ⚠ 需先在[控制]中'控制开启'解锁，且电机停转")
             node = ask_node()
             req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x01]
             print_cmd(req_data, node)
             input("\n按 Enter 返回...")
         elif c == '3':
             print("\n====== 转动到目标角度 =====")
-            print("  单位 0.1°, int32范围")
-            print("  正=开窗方向, 负=关窗方向")
-            print("  使用功能码0x10一条指令写0x2727+0x2728, 写完即触发")
-            print("  ⚠ 需先在菜单2-1中'控制开启'解锁，且电机停转")
-            print("  举例: 880 → 88.0° (开窗方向), -150 → -15.0° (关窗方向)")
-            val = ask_value("目标角度 (0.1°单位, int32)")
+            print("  单位 0.1°（如 880 = 88.0°，-15 = -1.5°，36000 = 3600.0°）")
+            print("  正 = 开窗方向, 负 = 关窗方向")
+            print("  int32 范围: -2147483648 ~ +2147483647（±2.1 亿度，不会回绕）")
+            print("  ⚠ 需先在[控制]中'控制开启'解锁，且电机停转")
+            val = ask_value("目标角度（0.1°单位）")
             if val is None:
-                print("无效")
-                input("\n按 Enter 返回...")
-                continue
-            # Clamp to int32 range
+                print("无效"); input("\n按 Enter 返回..."); continue
             if val > 2147483647: val = 2147483647
             if val < -2147483648: val = -2147483648
             lo = val & 0xFFFF
             hi = (val >> 16) & 0xFFFF
             node = ask_node()
             print(f"\n  ▎目标角度: {val} (0.1°) = {val*0.1:.1f}°")
-            print(f"  ▎int32 = 0x{val & 0xFFFFFFFF:08X}  LO=0x{lo:04X}  HI=0x{hi:04X}")
-            # 0x10 single frame: write 2 regs starting at 0x2727, 4 bytes data
             req_data = [node, 0x10, 0x27, 0x27, 0x00, 0x02, 0x04,
                         (lo>>8)&0xFF, lo&0xFF, (hi>>8)&0xFF, hi&0xFF]
             print_cmd(req_data, node)
@@ -404,11 +394,11 @@ def menu_window_zero():
 def menu_window_zero_advanced():
     """关窗基准点高级 - 放在开发者选项内"""
     while True:
-        print("\n====== 关窗基准点 =====")
-        print("  1. 读关窗基准点(Flash)  (0x2723/0x2724)")
-        print("  2. 保存基准点到Flash    (写 0x2725=2)")
-        print("  3. 读停止阈值            (0x2726)")
-        print("  4. 设置停止阈值          (0x2726)")
+        print("\n====== 关窗基准点（高级）======")
+        print("  1. 读关窗基准点(Flash)")
+        print("  2. 保存基准点到Flash")
+        print("  3. 读停止阈值")
+        print("  4. 设置停止阈值")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0':
@@ -421,7 +411,7 @@ def menu_window_zero_advanced():
             input("\n按 Enter 返回...")
         elif c == '2':
             print("\n====== 保存基准点到Flash =====")
-            print("  固化RAM偏移到Flash (写 0x2725=2)")
+            print("  将当前RAM偏移值固化到Flash，掉电后自动恢复")
             node = ask_node()
             req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x02]
             print_cmd(req_data, node)
@@ -434,13 +424,12 @@ def menu_window_zero_advanced():
             input("\n按 Enter 返回...")
         elif c == '4':
             print("\n====== 设置停止阈值 =====")
-            print("  范围: 0.1~20.0°, 步进0.1°")
+            print("  回基准点/回目标的停止判定阈值")
+            print("  范围: 0.0°~20.0° (值 0~200, 单位 0.1°)")
             print("  默认: 0.1° (值=1)")
-            val = ask_value("值 (0.1°)")
+            val = ask_value("阈值 (0.1°)")
             if val is None:
-                print("无效")
-                input("\n按 Enter 返回...")
-                continue
+                print("无效"); input("\n按 Enter 返回..."); continue
             node = ask_node()
             req_data = [node, 0x06, 0x27, 0x26, (val>>8)&0xFF, val&0xFF]
             result, modified = apply_validation(0x2726, val)
@@ -455,8 +444,7 @@ def menu_window_zero_advanced():
             print(f"  回令: {echo} {crc&0xFF:02X} {crc>>8&0xFF:02X}")
             input("\n按 Enter 返回...")
         else:
-            print("无效")
-            input("\n按 Enter 返回...")
+            print("无效"); input("\n按 Enter 返回...")
 
 # ===== 9. 开发者选项 (需密码) =====
 def menu_dev_options():
@@ -470,7 +458,7 @@ def menu_dev_options():
         print("  4. 读霍尔脉冲")
         print("  5. 重置霍尔脉冲")
         print("  6. 计算实时角度")
-        print("  7. 关窗基准点")
+        print("  7. 关窗基准点（高级）")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0':
@@ -515,14 +503,10 @@ def menu_read_dev_regs():
     if addr == 0x3714:
         print(f"  ▎开窗(逆时针)→加  关窗(顺时针)→减  上电归零")
         print(f"  ▎公式: 角度(°) = 脉冲数 / 12 / 减速比 × 360°")
-        print(f"  ▎重置: 01 06 37 14 00 00 87 BB")
     if opts is not None:
-        print(f"  举例 (回令含CRC):")
+        print(f"  可选值:")
         for vi, opt_name in enumerate(opts):
-            rd = [node, 0x03, 0x02, (vi>>8)&0xFF, vi&0xFF]
-            rcr = modbus_crc16(rd)
-            rq = ' '.join(f'{b:02X}' for b in rd)
-            print(f"    {opt_name}: {rq} {rcr&0xFF:02X} {rcr>>8&0xFF:02X}")
+            print(f"    {vi} = {opt_name}")
 
     print_cmd(req_data, node)
 
@@ -619,15 +603,13 @@ def menu_calc_realtime_angle():
     try:
         parts = s.split()
         if len(parts) < 4:
-            print("  格式错误: 至少需要4字节")
-            return
+            print("  格式错误: 至少需要4字节"); return
         raw = [int(x, 16) for x in parts]
 
         if raw[1] == 0x03:
             byte_count = raw[2]
             if len(raw) < 3 + byte_count:
-                print(f"  数据不完整, 需要 {3+byte_count} 字节")
-                return
+                print(f"  数据不完整, 需要 {3+byte_count} 字节"); return
             data_bytes = raw[3:3+byte_count]
             val = (data_bytes[0] << 8) | data_bytes[1]
             if val > 32767:
@@ -646,15 +628,13 @@ def menu_calc_hall_pulse():
     try:
         parts = s.split()
         if len(parts) < 4:
-            print("  格式错误: 至少需要4字节")
-            return
+            print("  格式错误: 至少需要4字节"); return
         raw = [int(x, 16) for x in parts]
 
         if raw[1] == 0x03:
             byte_count = raw[2]
             if len(raw) < 3 + byte_count:
-                print(f"  数据不完整, 需要 {3+byte_count} 字节")
-                return
+                print(f"  数据不完整, 需要 {3+byte_count} 字节"); return
             data_bytes = raw[3:3+byte_count]
         else:
             data_bytes = raw
@@ -671,8 +651,7 @@ def menu_calc_hall_pulse():
 
         print(f"  脉冲数: {pulse_count}")
     except Exception as e:
-        print(f"  解析失败: {e}")
-        return
+        print(f"  解析失败: {e}"); return
 
     rs = input("  减速比 (单位0.1, 默认11830): ").strip()
     try:
@@ -706,7 +685,7 @@ MENU = [
     ("查看故障",       menu_read_fault),
     ("清除故障",       menu_clear_fault),
     ("心跳包",         menu_heartbeat),
-    ("关窗基准点",     menu_window_zero),      # 第8项，无密码，含回基准点和转动到目标角度
+    ("关窗基准点",     menu_window_zero),
 ]
 
 def main():
@@ -716,7 +695,7 @@ def main():
         print("=" * 42)
         for i, (name, _) in enumerate(MENU):
             print(f"  {i+1}. {name}")
-        print("  9. 开发者选项")   # 第9项，需密码
+        print("  9. 开发者选项")
         print("  0. 退出")
         print("=" * 42)
         c = input("选择 [0-9]: ").strip()
