@@ -133,6 +133,12 @@ def print_cmd(req_data, node, note="", skip_echo=False):
             dlen = req_data[5] * 2
             xx = ' '.join(['XX'] * dlen)
             print(f"  回令: {node:02X} 03 {dlen:02X} {xx} crc_h crc_l")
+        elif func == 0x10:
+            # 0x10 response: addr + func + start(2) + count(2) + CRC, no data echo
+            resp = [req_data[0], 0x10, req_data[2], req_data[3], req_data[4], req_data[5]]
+            rcrc = modbus_crc16(resp)
+            rq = ' '.join(f'{b:02X}' for b in resp)
+            print(f"  回令: {rq} {rcrc&0xFF:02X} {rcrc>>8&0xFF:02X}")
         else:
             print(f"  回令: {req} {crc&0xFF:02X} {crc>>8&0xFF:02X}  (echo)")
     if note: print(f"  {note}")
@@ -368,6 +374,7 @@ def menu_window_zero():
             print("  正 = 开窗方向, 负 = 关窗方向")
             print("  int32 范围: -2147483648 ~ +2147483647（±2.1 亿度，不会回绕）")
             print("  ⚠ 需先在[控制]中'控制开启'解锁，且电机停转")
+            print("  （未解锁或转动中发指令，返回异常04，不覆盖寄存器）")
             val = ask_value("目标角度（0.1°单位）")
             if val is None:
                 print("无效"); input("\n按 Enter 返回..."); continue
