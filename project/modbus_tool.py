@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Modbus RTU 指令生成器 v4.2 (关窗零点+心跳包) """
+""" Modbus RTU 指令生成器 v4.3 (关窗基准点+心跳包) """
 
 def modbus_crc16(data):
     crc = 0xFFFF
@@ -20,7 +20,7 @@ VALIDATION_RULES = {
     0x271E: (0,    2000, 20,  1,   "ms"),   # 判定时间 0~2000ms, 步进20ms
     0x3712: (10,  65535,  0,  0.1, ""),     # 减速比 1.0~6553.5, 单位0.1
     0x3713: (1,     100,  0,  1,   ""),     # 极对数 1~100, 不取整
-    0x2726: (0,     200,  0,  0.1, "°"),    # 关窗零点阈值 0~20.0°, 步进0.1°
+    0x2726: (0,     200,  0,  0.1, "°"),    # 停止阈值 0~20.0°, 步进0.1°
 }
 
 def apply_validation(regAddr, raw_value):
@@ -75,7 +75,7 @@ DEV_REGS = [
     (0x3711, "电机方向",       ["正常", "反转"], ""),
     (0x3712, "减速比",         None,         "0.1"),
     (0x3713, "电机极对数",     None,         ""),
-    (0x2726, "关窗零点阈值",   None,         "0.1°"),
+    (0x2726, "停止阈值",       None,         "0.1°"),
 ]
 
 REALTIME_REGS = [
@@ -338,75 +338,102 @@ def menu_heartbeat():
     print_cmd(req_data, node)
     print("  ▎回复解析: 数据值 = 从机设备地址 (0x2710)")
 
-# ===== 8. 关窗零点 (主菜单, 无密码) =====
+# ===== 8. 关窗基准点 (主菜单, 无密码) =====
 def menu_window_zero():
-    """主菜单关窗零点 - 仅保留最常用的2个功能"""
+    """主菜单关窗基准点 - 含回基准点和转动到目标角度"""
     while True:
-        print("\n====== 关窗零点 =====")
-        print("  1. 设关窗零点并保存  (写 0x2725=0)")
-        print("  2. 回到关窗零点      (写 0x2725=1)")
+        print("\n====== 关窗基准点 =====")
+        print("  1. 设关窗基准点并保存 (写 0x2725=0, 目标值=0x271C)")
+        print("  2. 回到关窗基准点     (写 0x2725=1, 目标值=0x271C)")
+        print("  3. 转动到目标角度     (写 0x2727+0x2728, 0x10一条指令)")
+        print("  4. 读绝对角度(RAM)     (读 0x2721+0x2722)")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0':
             return
         elif c == '1':
-            print("\n====== 设关窗零点并保存 =====")
-            print("  将当前位置设为关窗零点并写入Flash (写 0x2725=0)")
+            print("\n====== 设关窗基准点并保存 =====")
+            print("  将当前位置设为关窗基准点(0x271C的值)并写入Flash (写 0x2725=0)")
             node = ask_node()
             req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x00]
             print_cmd(req_data, node)
             input("\n按 Enter 返回...")
         elif c == '2':
-            print("\n====== 回到关窗零点 =====")
-            print("  电机自动转动到关窗零点 (写 0x2725=1)")
+            print("\n====== 回到关窗基准点 =====")
+            print("  电机自动转动到关窗基准点(0x271C的值) (写 0x2725=1)")
+            print("  ⚠ 需先在菜单2-1中'控制开启'解锁，且电机停转")
             node = ask_node()
             req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x01]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '3':
+            print("\n====== 转动到目标角度 =====")
+            print("  单位 0.1°, int32范围")
+            print("  正=开窗方向, 负=关窗方向")
+            print("  使用功能码0x10一条指令写0x2727+0x2728, 写完即触发")
+            print("  ⚠ 需先在菜单2-1中'控制开启'解锁，且电机停转")
+            print("  举例: 880 → 88.0° (开窗方向), -150 → -15.0° (关窗方向)")
+            val = ask_value("目标角度 (0.1°单位, int32)")
+            if val is None:
+                print("无效")
+                input("\n按 Enter 返回...")
+                continue
+            # Clamp to int32 range
+            if val > 2147483647: val = 2147483647
+            if val < -2147483648: val = -2147483648
+            lo = val & 0xFFFF
+            hi = (val >> 16) & 0xFFFF
+            node = ask_node()
+            print(f"\n  ▎目标角度: {val} (0.1°) = {val*0.1:.1f}°")
+            print(f"  ▎int32 = 0x{val & 0xFFFFFFFF:08X}  LO=0x{lo:04X}  HI=0x{hi:04X}")
+            # 0x10 single frame: write 2 regs starting at 0x2727, 4 bytes data
+            req_data = [node, 0x10, 0x27, 0x27, 0x00, 0x02, 0x04,
+                        (lo>>8)&0xFF, lo&0xFF, (hi>>8)&0xFF, hi&0xFF]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '4':
+            node = ask_node()
+            req_data = [node, 0x03, 0x27, 0x21, 0x00, 0x02]
+            print("\n  读绝对角度(RAM) (int32, 0.1°)")
             print_cmd(req_data, node)
             input("\n按 Enter 返回...")
         else:
             print("无效")
 
-# ===== 关窗零点高级 (开发者选项内) =====
+# ===== 关窗基准点高级 (开发者选项内) =====
 def menu_window_zero_advanced():
-    """关窗零点高级 - 放在开发者选项内"""
+    """关窗基准点高级 - 放在开发者选项内"""
     while True:
-        print("\n====== 关窗零点 =====")
-        print("  1. 读关窗零点(RAM)     (0x2721)")
-        print("  2. 读关窗零点(Flash)   (0x2723)")
-        print("  3. 保存关窗零点        (写 0x2725=2)")
-        print("  4. 读关窗零点阈值      (0x2726)")
-        print("  5. 设置关窗零点阈值    (0x2726)")
+        print("\n====== 关窗基准点 =====")
+        print("  1. 读关窗基准点(Flash)  (0x2723/0x2724)")
+        print("  2. 保存基准点到Flash    (写 0x2725=2)")
+        print("  3. 读停止阈值            (0x2726)")
+        print("  4. 设置停止阈值          (0x2726)")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0':
             return
         elif c == '1':
             node = ask_node()
-            req_data = [node, 0x03, 0x27, 0x21, 0x00, 0x02]
-            print("\n  读关窗零点(RAM) (int32, 0.1°)")
+            req_data = [node, 0x03, 0x27, 0x23, 0x00, 0x02]
+            print("\n  读关窗基准点(Flash) (int32, 0.1°)")
             print_cmd(req_data, node)
             input("\n按 Enter 返回...")
         elif c == '2':
-            node = ask_node()
-            req_data = [node, 0x03, 0x27, 0x23, 0x00, 0x02]
-            print("\n  读关窗零点(Flash) (int32, 0.1°)")
-            print_cmd(req_data, node)
-            input("\n按 Enter 返回...")
-        elif c == '3':
-            print("\n====== 保存关窗零点 =====")
+            print("\n====== 保存基准点到Flash =====")
             print("  固化RAM偏移到Flash (写 0x2725=2)")
             node = ask_node()
             req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x02]
             print_cmd(req_data, node)
             input("\n按 Enter 返回...")
-        elif c == '4':
+        elif c == '3':
             node = ask_node()
-            print("\n  关窗零点阈值 (0x2726, 0.1°)")
+            print("\n  停止阈值 (0x2726, 0.1°)")
             req_data = [node, 0x03, 0x27, 0x26, 0x00, 0x01]
             print_cmd(req_data, node)
             input("\n按 Enter 返回...")
-        elif c == '5':
-            print("\n====== 设置关窗零点阈值 =====")
+        elif c == '4':
+            print("\n====== 设置停止阈值 =====")
             print("  范围: 0.1~20.0°, 步进0.1°")
             print("  默认: 0.1° (值=1)")
             val = ask_value("值 (0.1°)")
@@ -443,7 +470,7 @@ def menu_dev_options():
         print("  4. 读霍尔脉冲")
         print("  5. 重置霍尔脉冲")
         print("  6. 计算实时角度")
-        print("  7. 关窗零点")
+        print("  7. 关窗基准点")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0':
@@ -679,13 +706,13 @@ MENU = [
     ("查看故障",       menu_read_fault),
     ("清除故障",       menu_clear_fault),
     ("心跳包",         menu_heartbeat),
-    ("关窗零点",       menu_window_zero),      # 第8项，无密码，仅2个常用功能
+    ("关窗基准点",     menu_window_zero),      # 第8项，无密码，含回基准点和转动到目标角度
 ]
 
 def main():
     while True:
         print("\n" + "=" * 42)
-        print("  Modbus RTU 指令生成器 v4.2")
+        print("  Modbus RTU 指令生成器 v4.3")
         print("=" * 42)
         for i, (name, _) in enumerate(MENU):
             print(f"  {i+1}. {name}")

@@ -11,8 +11,11 @@
  * Registers:
  *   0x2721/0x2722  Read RAM offset (int32_t, 0.1 deg)
  *   0x2723/0x2724  Read Flash offset (int32_t, 0.1 deg)
- *   0x2725         Write: 0=set zero+save, 1=goto zero, 2=save, 3=set zero
- *   0x2726         R/W: goto-zero threshold (uint16_t, 0.1 deg, default 1)
+ *   0x2725         Write: 0=set ref+save, 1=goto ref, 2=save, 3=set ref
+ *   0x2726         R/W: stop threshold (uint16_t, 0.1 deg, default 1, shared)
+ *   0x2727/0x2728  R/W: goto-target angle (int32_t, 0.1 deg; 0x10 write triggers)
+ *
+ * Reference point (close-limit reference) is defined by 0x271C close_limit_angle.
  *============================================================================*/
 
 /*=============================================================================
@@ -39,11 +42,11 @@ typedef struct {
 #define ABS_THRESH_MIN_X10        0
 #define ABS_THRESH_MAX_X10      200   /* 20.0 deg max */
 
-/* Command values for 0x2725 */
-#define ABS_CMD_SET_ZERO_THEN_SAVE  0x0000U  /* Set zero + save to Flash */
-#define ABS_CMD_GOTO_ZERO           0x0001U  /* Goto zero position */
+/* Command values for 0x2725 — reference point defined by 0x271C (close_limit_angle) */
+#define ABS_CMD_SET_ZERO_THEN_SAVE  0x0000U  /* Set reference + save to Flash */
+#define ABS_CMD_GOTO_ZERO           0x0001U  /* Goto reference position */
 #define ABS_CMD_SAVE                0x0002U  /* Save current offset to Flash */
-#define ABS_CMD_SET_ZERO            0x0003U  /* Set zero (RAM=0, Flash=0, save) */
+#define ABS_CMD_SET_ZERO            0x0003U  /* Set reference (RAM/Flash = 0x271C, save) */
 
 /*=============================================================================
  * Public API
@@ -55,12 +58,17 @@ int32_t RunAngle_GetOffset_x10(void);
 int32_t RunAngle_GetFlashOffset_x10(void);
 void RunAngle_Cmd(uint16_t cmd);
 void RunAngle_GotoZero(void);
+void RunAngle_GotoTarget(void);
 
 /** @brief Set goto-zero threshold (called on Modbus write 0x2726, hot-reload) */
 void RunAngle_SetThreshold(uint16_t thresh_x10);
 
+/** @brief Get/set goto-target angle in 0.1 deg (int32_t, registers 0x2727/0x2728) */
+int32_t RunAngle_GetTarget_x10(void);
+void    RunAngle_SetTarget_x10(int32_t target_x10);
+
 /** @brief Called by dev_rturn when calibration zeroes g_s32HallPulseAccum.
- *  Zeros both RAM absolute offset and Flash persisted value,
+ *  Sets RAM offset and Flash persisted value to close_limit_angle (0x271C),
  *  and re-syncs the pulse baseline to prevent delta corruption. */
 void RunAngle_OnCalibration(void);
 

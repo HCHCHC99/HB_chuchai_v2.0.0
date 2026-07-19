@@ -19,8 +19,10 @@
  *============================================================================*/
 static int32_t s_abs_offset_x10 = 0;      /* real-time absolute angle offset (0.1 deg) */
 static int32_t s_last_accum     = 0;      /* snapshot of g_s32HallPulseAccum at last update */
+static int32_t s_target_x10     = 0;      /* goto-target angle (0.1 deg), set via 0x2727/0x2728 */
 static bool    s_goto_zero_active = false;/* goto-zero in progress */
 static bool    s_goto_zero_initial_sign;  /* sign of offset when goto-zero started */
+static bool    s_goto_target_active = false;/* goto-target in progress */
 
 AbsAngleRecord_t g_AbsAngle;              /* Flash mirror */
 
@@ -119,18 +121,37 @@ void RunAngle_Update(void)
         }
     }
 
-    /* Goto-zero: once motor moves past zero or enters threshold, stop.
+    /* Goto-ref: once motor moves past close-limit reference or enters threshold, stop.
      * Only one direction command was sent at start — no continuous re-issue. */
     if (s_goto_zero_active) {
-        if (abs(s_abs_offset_x10) <= g_AbsAngle.goto_zero_thresh_x10
-            || (s_abs_offset_x10 > 0) != s_goto_zero_initial_sign) {
+        int32_t ref = (int32_t)g_AppParam.close_limit_angle;
+        int32_t dist = s_abs_offset_x10 - ref;
+        if (abs(dist) <= g_AbsAngle.goto_zero_thresh_x10
+            || (dist > 0) != s_goto_zero_initial_sign) {
             MotorManualIOEvent_t ev;
             memset(&ev, 0, sizeof(ev));
             ev.type = CMD_TYPE_STOP;        /* ESTOP (same as CTRL_CMD_ESTOP) */
             ev.dir  = DIR_NONE;
             EventBus_Publish(TOPIC_MANUAL_RS485, &ev);
             s_goto_zero_active = false;
-            MAIN_D("[ABSA] Goto-zero complete: offset=%ld\r\n", (long)s_abs_offset_x10);
+            MAIN_D("[ABSA] Goto-ref complete: offset=%ld, ref=%ld, dist=%ld\r\n",
+                   (long)s_abs_offset_x10, (long)ref, (long)dist);
+        }
+    }
+
+    /* Goto-target: stop when within threshold of target, or overshoot past it */
+    if (s_goto_target_active) {
+        int32_t dist = s_abs_offset_x10 - s_target_x10;
+        if (abs(dist) <= g_AbsAngle.goto_zero_thresh_x10
+            || (dist > 0) != (s_goto_zero_initial_sign)) {
+            MotorManualIOEvent_t ev;
+            memset(&ev, 0, sizeof(ev));
+            ev.type = CMD_TYPE_STOP;
+            ev.dir  = DIR_NONE;
+            EventBus_Publish(TOPIC_MANUAL_RS485, &ev);
+            s_goto_target_active = false;
+            MAIN_D("[ABSA] Goto-target complete: offset=%ld, target=%ld, dist=%ld\r\n",
+                   (long)s_abs_offset_x10, (long)s_target_x10, (long)dist);
         }
     }
 }
@@ -148,12 +169,14 @@ int32_t RunAngle_GetFlashOffset_x10(void)
 void RunAngle_Cmd(uint16_t cmd)
 {
     if (cmd == ABS_CMD_SET_ZERO || cmd == ABS_CMD_SET_ZERO_THEN_SAVE) {
-        /* Set current position as absolute zero */
-        s_abs_offset_x10 = 0;
-        g_AbsAngle.abs_offset_x10 = 0;
+        /* Set current position to close-limit reference angle (0x271C) */
+        int32_t ref = (int32_t)g_AppParam.close_limit_angle;
+        s_abs_offset_x10 = ref;
+        g_AbsAngle.abs_offset_x10 = ref;
         Param_Save(&s_Config, &s_Runtime);
 
-        MAIN_D("[ABSA] Zero set: RAM=0, Flash=0\r\n");
+        MAIN_D("[ABSA] Reference set: RAM=%ld, Flash=%ld (0x271C=%ld)\r\n",
+               (long)ref, (long)ref, (long)g_AppParam.close_limit_angle);
     } else if (cmd == ABS_CMD_SAVE) {
         /* Persist current RAM value to Flash */
         g_AbsAngle.abs_offset_x10 = s_abs_offset_x10;
@@ -168,30 +191,105 @@ void RunAngle_Cmd(uint16_t cmd)
 
 void RunAngle_GotoZero(void)
 {
+    int32_t ref = (int32_t)g_AppParam.close_limit_angle;
+
+    /* Gate 1: control must be unlocked (same lock as REG_CTRL_CMD bit3~bit5) */
+    if (!Param_IsCtrlUnlocked()) {
+        MAIN_D("[ABSA] Goto-ref rejected: RS485 control locked\r\n");
+        return;
+    }
+
+    /* Gate 2: motor must be stopped before accepting goto-ref */
+    if (!Param_IsMotorStopped()) {
+        MAIN_D("[ABSA] Goto-ref rejected: motor is running\r\n");
+        return;
+    }
+
+    int32_t dist = s_abs_offset_x10 - ref;
+
     MotorManualIOEvent_t ev;
     memset(&ev, 0, sizeof(ev));
 
-    if (s_abs_offset_x10 > g_AbsAngle.goto_zero_thresh_x10) {
-        /* Forward of zero → REV to go back */
+    if (dist > g_AbsAngle.goto_zero_thresh_x10) {
+        /* Beyond reference → REV to go back */
         ev.dir  = DIR_REV;
         ev.type = CMD_TYPE_RUN_REV;
         s_goto_zero_active = true;
-        s_goto_zero_initial_sign = true;   /* positive → expect sign flip to false */
-        MAIN_D("[ABSA] Goto-zero: offset=%ld (>0), REV to zero\r\n", (long)s_abs_offset_x10);
-    } else if (s_abs_offset_x10 < -g_AbsAngle.goto_zero_thresh_x10) {
-        /* Reverse of zero → FWD to go forward */
+        s_goto_zero_initial_sign = true;   /* positive dist → expect sign flip to false */
+        MAIN_D("[ABSA] Goto-ref: cur=%ld, ref=%ld, dist=%ld (>0), REV\r\n",
+               (long)s_abs_offset_x10, (long)ref, (long)dist);
+    } else if (dist < -g_AbsAngle.goto_zero_thresh_x10) {
+        /* Before reference → FWD to go forward */
         ev.dir  = DIR_FWD;
         ev.type = CMD_TYPE_RUN_FWD;
         s_goto_zero_active = true;
-        s_goto_zero_initial_sign = false;  /* negative → expect sign flip to true */
-        MAIN_D("[ABSA] Goto-zero: offset=%ld (<0), FWD to zero\r\n", (long)s_abs_offset_x10);
+        s_goto_zero_initial_sign = false;  /* negative dist → expect sign flip to true */
+        MAIN_D("[ABSA] Goto-ref: cur=%ld, ref=%ld, dist=%ld (<0), FWD\r\n",
+               (long)s_abs_offset_x10, (long)ref, (long)dist);
     } else {
-        /* Already at zero — nothing to do */
-        MAIN_D("[ABSA] Goto-zero: offset=%ld, already at zero\r\n", (long)s_abs_offset_x10);
+        /* Already at reference — nothing to do */
+        MAIN_D("[ABSA] Goto-ref: cur=%ld, ref=%ld, already at reference\r\n",
+               (long)s_abs_offset_x10, (long)ref);
         return;
     }
 
     EventBus_Publish(TOPIC_MANUAL_RS485, &ev);
+}
+
+void RunAngle_GotoTarget(void)
+{
+    /* Gate 1: control must be unlocked */
+    if (!Param_IsCtrlUnlocked()) {
+        MAIN_D("[ABSA] Goto-target rejected: RS485 control locked\r\n");
+        return;
+    }
+
+    /* Gate 2: motor must be stopped */
+    if (!Param_IsMotorStopped()) {
+        MAIN_D("[ABSA] Goto-target rejected: motor is running\r\n");
+        return;
+    }
+
+    int32_t dist = s_abs_offset_x10 - s_target_x10;
+
+    MotorManualIOEvent_t ev;
+    memset(&ev, 0, sizeof(ev));
+
+    if (dist > g_AbsAngle.goto_zero_thresh_x10) {
+        /* Current offset > target → REV to go back */
+        ev.dir  = DIR_REV;
+        ev.type = CMD_TYPE_RUN_REV;
+        s_goto_target_active = true;
+        s_goto_zero_initial_sign = true;    /* positive dist → expect sign flip to false */
+        MAIN_D("[ABSA] Goto-target: cur=%ld, target=%ld, dist=%ld (>0), REV to target\r\n",
+               (long)s_abs_offset_x10, (long)s_target_x10, (long)dist);
+    } else if (dist < -g_AbsAngle.goto_zero_thresh_x10) {
+        /* Current offset < target → FWD to go forward */
+        ev.dir  = DIR_FWD;
+        ev.type = CMD_TYPE_RUN_FWD;
+        s_goto_target_active = true;
+        s_goto_zero_initial_sign = false;   /* negative dist → expect sign flip to true */
+        MAIN_D("[ABSA] Goto-target: cur=%ld, target=%ld, dist=%ld (<0), FWD to target\r\n",
+               (long)s_abs_offset_x10, (long)s_target_x10, (long)dist);
+    } else {
+        /* Already at target */
+        MAIN_D("[ABSA] Goto-target: cur=%ld, target=%ld, already at target\r\n",
+               (long)s_abs_offset_x10, (long)s_target_x10);
+        return;
+    }
+
+    EventBus_Publish(TOPIC_MANUAL_RS485, &ev);
+}
+
+int32_t RunAngle_GetTarget_x10(void)
+{
+    return s_target_x10;
+}
+
+void RunAngle_SetTarget_x10(int32_t target_x10)
+{
+    s_target_x10 = target_x10;
+    MAIN_D("[ABSA] Target set: %ld (0.1 deg)\r\n", (long)target_x10);
 }
 
 void RunAngle_SetThreshold(uint16_t thresh_x10)
@@ -211,15 +309,18 @@ void RunAngle_SetThreshold(uint16_t thresh_x10)
 
 void RunAngle_OnCalibration(void)
 {
+    int32_t ref = (int32_t)g_AppParam.close_limit_angle;
+
     __disable_irq();
-    s_abs_offset_x10 = 0;
+    s_abs_offset_x10 = ref;
     s_last_accum = g_s32HallPulseAccum;   /* accum was just zeroed by dev_rturn */
     __enable_irq();
 
-    g_AbsAngle.abs_offset_x10 = 0;
+    g_AbsAngle.abs_offset_x10 = ref;
     Param_Save(&s_Config, &s_Runtime);    /* persist to Flash sector 55 */
 
-    MAIN_D("[ABSA] Calibration zero: RAM=0, Flash=0\r\n");
+    MAIN_D("[ABSA] Calibration: RAM=%ld, Flash=%ld (0x271C=%ld)\r\n",
+           (long)ref, (long)ref, (long)g_AppParam.close_limit_angle);
 }
 
 /*******************************************************************************

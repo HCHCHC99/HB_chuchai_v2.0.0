@@ -45,8 +45,10 @@
 #define REG_ABS_ANGLE_HI            (0x2722U)   /* RAM实时偏移高16位 */
 #define REG_FLASH_ABS_LO            (0x2723U)   /* Flash已保存偏移低16位 (int32_t, 0.1度) */
 #define REG_FLASH_ABS_HI            (0x2724U)   /* Flash已保存偏移高16位 */
-#define REG_ABS_CMD                 (0x2725U)   /* W: 0=设零并保存, 1=回零, 2=保存, 3=设零 */
-#define REG_ABS_THRESHOLD           (0x2726U)   /* R/W: 回零阈值 (0.1度, 默认1, 0~200) */
+#define REG_ABS_CMD                 (0x2725U)   /* W: 0=设基准点并保存, 1=回基准点, 2=保存, 3=设基准点 */
+#define REG_ABS_THRESHOLD           (0x2726U)   /* R/W: 回基准点/回目标停止阈值 (0.1度, 默认1, 0~200) */
+#define REG_ABS_TARGET_LO           (0x2727U)   /* R/W: 目标角度 int32 低16位 (0.1度); 0x10连续写触发 */
+#define REG_ABS_TARGET_HI           (0x2728U)   /* R/W: 目标角度 int32 高16位 (0.1度) */
 
 /* --- 心跳包 (只读, 不存 Flash) --- */
 #define REG_HEARTBEAT               (0x271FU)   /* 心跳包: 读回值 = 设备地址 (0x2710) */
@@ -111,7 +113,7 @@
 #define PARAM_DEFAULT_VOLTAGE_LOWER_LIMIT       (210U)      /* 欠压阈值 0.1V (21.0V) */
 #define PARAM_DEFAULT_CURRENT_UPPER_LIMIT       (2300)       /* 过流阈值 1mA (5A) */
 #define PARAM_DEFAULT_CURRENT_DETECT_MS         (20)        /* 过流判定时间 1ms */
-#define PARAM_DEFAULT_MOTOR_HALL_DIR        (1)   /* 霍尔方向 0=正常, 1=反转 */
+#define PARAM_DEFAULT_MOTOR_HALL_DIR        (0)   /* 霍尔方向 0=正常, 1=反转 */
 #define PARAM_DEFAULT_MOTOR_DIR             (1)   /* 电机方向 0=正常, 1=反转 */
 #define PARAM_DEFAULT_RTURN_REDUCTION_RATIO   (11830)  /* 减速比 x0.1 */
 #define PARAM_DEFAULT_MOTOR_HALL_POLE_PAIRS  (3)       /* 电机极对数 */
@@ -319,5 +321,24 @@ void SimRealtime_Sync(void);
  * @brief  打印模拟实时数据当前值(调试用)
  */
 void SimRealtime_PrintDebug(void);
+
+/*=============================================================================
+ * 控制锁状态查询 (供绝对角度回零等模块使用)
+ *============================================================================*/
+
+/**
+ * @brief  查询 RS485 控制是否已解锁
+ * @retval true   已解锁 (bit3~bit5 可写入)
+ * @retval false  已上锁 (bit3~bit5 被忽略)
+ */
+bool Param_IsCtrlUnlocked(void);
+
+/**
+ * @brief  查询电机是否处于停转状态
+ *         同时检查 dev_motor_hall 方向 和 dev_motor 期望方向
+ * @retval true   电机停转中
+ * @retval false  电机正在正转或反转
+ */
+bool Param_IsMotorStopped(void);
 
 #endif /* __APP_PARAMS_H__ */
