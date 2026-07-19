@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Modbus RTU 指令生成器 v4.2 (含绝对角度+心跳包) """
+""" Modbus RTU 指令生成器 v4.2 (关窗零点+心跳包) """
 
 def modbus_crc16(data):
     crc = 0xFFFF
@@ -20,7 +20,7 @@ VALIDATION_RULES = {
     0x271E: (0,    2000, 20,  1,   "ms"),   # 判定时间 0~2000ms, 步进20ms
     0x3712: (10,  65535,  0,  0.1, ""),     # 减速比 1.0~6553.5, 单位0.1
     0x3713: (1,     100,  0,  1,   ""),     # 极对数 1~100, 不取整
-    0x2726: (0,     200,  0,  0.1, "°"),    # 回零阈值 0~20.0°, 步进0.1°
+    0x2726: (0,     200,  0,  0.1, "°"),    # 关窗零点阈值 0~20.0°, 步进0.1°
 }
 
 def apply_validation(regAddr, raw_value):
@@ -70,10 +70,12 @@ CONFIG_REGS = [
 ]
 
 DEV_REGS = [
+    (0x3714, "霍尔脉冲累计", None,         ""),
     (0x3710, "霍尔方向",       ["正常", "反转"], ""),
     (0x3711, "电机方向",       ["正常", "反转"], ""),
     (0x3712, "减速比",         None,         "0.1"),
     (0x3713, "电机极对数",     None,         ""),
+    (0x2726, "关窗零点阈值",   None,         "0.1°"),
 ]
 
 REALTIME_REGS = [
@@ -82,20 +84,6 @@ REALTIME_REGS = [
     (0x2732, "实时电压",   "0.1V"),
     (0x2733, "实时电流",   "mA"),
     (0x2737, "实时方向",   ""),
-]
-
-ABS_REGS = [
-    (0x2721, "绝对角度(RAM)",  "0.1°"),
-    (0x2723, "绝对角度(Flash)","0.1°"),
-]
-
-DEV_REGS = [
-    (0x3714, "霍尔脉冲累计", None,         ""),
-    (0x3710, "霍尔方向",       ["正常", "反转"], ""),
-    (0x3711, "电机方向",       ["正常", "反转"], ""),
-    (0x3712, "减速比",         None,         "0.1"),
-    (0x3713, "电机极对数",     None,         ""),
-    (0x2726, "回零阈值",       None,         "0.1°"),
 ]
 
 FAULT_BITS = [
@@ -334,9 +322,119 @@ def menu_clear_fault():
     req_data = [node, 0x06, 0x27, 0x40, (val>>8)&0xFF, val&0xFF]
     print_cmd(req_data, node)
 
-# ===== 7. 开发者选项 =====
+# ===== 7. 心跳包 =====
+def menu_heartbeat():
+    """读取心跳包: 读 0x271F"""
+    print("\n====== 心跳包 =====")
+    print("  地址 0x00 = 广播(全呼), 总线上所有从机均回复")
+    print("  地址 1~247 = 只查询指定从机")
+    print("  ⚠ 广播模式下多个从机同时回复，RS-485 总线会冲突")
+    node = ask_node()
+    if node == 0:
+        print("\n  ▎广播心跳包 — 所有从机将同时回复（可能冲突）")
+    else:
+        print(f"\n  ▎查询地址 {node} — 仅该从机回复")
+    req_data = [node, 0x03, 0x27, 0x1F, 0x00, 0x01]
+    print_cmd(req_data, node)
+    print("  ▎回复解析: 数据值 = 从机设备地址 (0x2710)")
+
+# ===== 8. 关窗零点 (主菜单, 无密码) =====
+def menu_window_zero():
+    """主菜单关窗零点 - 仅保留最常用的2个功能"""
+    while True:
+        print("\n====== 关窗零点 =====")
+        print("  1. 设关窗零点并保存  (写 0x2725=0)")
+        print("  2. 回到关窗零点      (写 0x2725=1)")
+        print("  0. 返回")
+        c = input("选择: ").strip()
+        if c == '0':
+            return
+        elif c == '1':
+            print("\n====== 设关窗零点并保存 =====")
+            print("  将当前位置设为关窗零点并写入Flash (写 0x2725=0)")
+            node = ask_node()
+            req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x00]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '2':
+            print("\n====== 回到关窗零点 =====")
+            print("  电机自动转动到关窗零点 (写 0x2725=1)")
+            node = ask_node()
+            req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x01]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        else:
+            print("无效")
+
+# ===== 关窗零点高级 (开发者选项内) =====
+def menu_window_zero_advanced():
+    """关窗零点高级 - 放在开发者选项内"""
+    while True:
+        print("\n====== 关窗零点 =====")
+        print("  1. 读关窗零点(RAM)     (0x2721)")
+        print("  2. 读关窗零点(Flash)   (0x2723)")
+        print("  3. 保存关窗零点        (写 0x2725=2)")
+        print("  4. 读关窗零点阈值      (0x2726)")
+        print("  5. 设置关窗零点阈值    (0x2726)")
+        print("  0. 返回")
+        c = input("选择: ").strip()
+        if c == '0':
+            return
+        elif c == '1':
+            node = ask_node()
+            req_data = [node, 0x03, 0x27, 0x21, 0x00, 0x02]
+            print("\n  读关窗零点(RAM) (int32, 0.1°)")
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '2':
+            node = ask_node()
+            req_data = [node, 0x03, 0x27, 0x23, 0x00, 0x02]
+            print("\n  读关窗零点(Flash) (int32, 0.1°)")
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '3':
+            print("\n====== 保存关窗零点 =====")
+            print("  固化RAM偏移到Flash (写 0x2725=2)")
+            node = ask_node()
+            req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x02]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '4':
+            node = ask_node()
+            print("\n  关窗零点阈值 (0x2726, 0.1°)")
+            req_data = [node, 0x03, 0x27, 0x26, 0x00, 0x01]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '5':
+            print("\n====== 设置关窗零点阈值 =====")
+            print("  范围: 0.1~20.0°, 步进0.1°")
+            print("  默认: 0.1° (值=1)")
+            val = ask_value("值 (0.1°)")
+            if val is None:
+                print("无效")
+                input("\n按 Enter 返回...")
+                continue
+            node = ask_node()
+            req_data = [node, 0x06, 0x27, 0x26, (val>>8)&0xFF, val&0xFF]
+            result, modified = apply_validation(0x2726, val)
+            if modified:
+                note = f"MCU校验后: {val*0.1:.1f}° → {result*0.1:.1f}°"
+            else:
+                note = ""
+            print_cmd(req_data, node, note, skip_echo=True)
+            echo_data = [node, 0x06, 0x27, 0x26, (result>>8)&0xFF, result&0xFF]
+            crc = modbus_crc16(echo_data)
+            echo = ' '.join(f'{b:02X}' for b in echo_data)
+            print(f"  回令: {echo} {crc&0xFF:02X} {crc>>8&0xFF:02X}")
+            input("\n按 Enter 返回...")
+        else:
+            print("无效")
+            input("\n按 Enter 返回...")
+
+# ===== 9. 开发者选项 (需密码) =====
 def menu_dev_options():
-    if not check_dev_password(): return
+    if not check_dev_password():
+        return
     while True:
         print("\n====== 开发者选项 =====")
         print("  1. 读配置寄存器")
@@ -345,10 +443,11 @@ def menu_dev_options():
         print("  4. 读霍尔脉冲")
         print("  5. 重置霍尔脉冲")
         print("  6. 计算实时角度")
-        print("  7. 设定绝对零点")
+        print("  7. 关窗零点")
         print("  0. 返回")
         c = input("选择: ").strip()
-        if c == '0': return
+        if c == '0':
+            return
         elif c == '1':
             menu_read_dev_regs()
         elif c == '2':
@@ -362,7 +461,7 @@ def menu_dev_options():
         elif c == '6':
             menu_calc_realtime_angle()
         elif c == '7':
-            menu_set_abs_zero()
+            menu_window_zero_advanced()
         else:
             print("无效")
 
@@ -503,10 +602,9 @@ def menu_calc_realtime_angle():
                 print(f"  数据不完整, 需要 {3+byte_count} 字节")
                 return
             data_bytes = raw[3:3+byte_count]
-            # Modbus大端序: int16 = (H<<8)|L
             val = (data_bytes[0] << 8) | data_bytes[1]
             if val > 32767:
-                val = val - 65536  # 有符号 int16
+                val = val - 65536
             angle = val * 0.1
             print(f"  实时角度: {angle:.1f}°")
         else:
@@ -525,7 +623,6 @@ def menu_calc_hall_pulse():
             return
         raw = [int(x, 16) for x in parts]
 
-        # 解析 0x03 回令: addr 03 byteCount data[byteCount] crc_l crc_h
         if raw[1] == 0x03:
             byte_count = raw[2]
             if len(raw) < 3 + byte_count:
@@ -533,28 +630,23 @@ def menu_calc_hall_pulse():
                 return
             data_bytes = raw[3:3+byte_count]
         else:
-            # 尝试直接解析为 hex 数据
             data_bytes = raw
 
-        # Modbus 是大端序: 每2字节一个寄存器, 低地址寄存器在前
-        # data_bytes = [regL_H, regL_L, regH_H, regH_L]
         pulse_count = 0
         for i, b in enumerate(data_bytes):
-            # 每16位寄存器内大端序, 寄存器间低16位在前
-            reg_idx = i // 2         # 0=低16位寄存器, 1=高16位寄存器
-            byte_in_reg = 1 - (i % 2)  # 寄存器内: 高位字节在前
+            reg_idx = i // 2
+            byte_in_reg = 1 - (i % 2)
             shift = reg_idx * 16 + byte_in_reg * 8
             pulse_count |= (b << shift)
 
         if pulse_count > 0x7FFFFFFF:
-            pulse_count = pulse_count - 0x100000000  # 转为有符号 int32
+            pulse_count = pulse_count - 0x100000000
 
         print(f"  脉冲数: {pulse_count}")
     except Exception as e:
         print(f"  解析失败: {e}")
         return
 
-    # 减速比
     rs = input("  减速比 (单位0.1, 默认11830): ").strip()
     try:
         ratio_raw = int(rs) if rs else 11830
@@ -562,7 +654,6 @@ def menu_calc_hall_pulse():
         print("  无效"); return
     ratio = ratio_raw / 10.0
 
-    # 一圈几脉冲
     ps = input("  一圈几脉冲 [12]: ").strip()
     try:
         pulses_per_rev = int(ps) if ps else 12
@@ -579,151 +670,43 @@ def menu_calc_hall_pulse():
     print(f"  转动角度: {angle:.2f}°")
     print(f"  {'='*42}")
 
-# ===== 绝对角度 =====
-def menu_set_abs_zero():
-    """设定绝对零点: 写 0x2725=3"""
-    print("\n====== 设定绝对零点 =====")
-    print("  将当前位置设为绝对0度 (写 0x2725=3)")
-    node = ask_node()
-    req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x03]
-    print_cmd(req_data, node)
-
-def menu_save_abs_position():
-    """保存绝对位置: 写 0x2725=2"""
-    print("\n====== 保存绝对位置 =====")
-    print("  固化RAM偏移到Flash (写 0x2725=2)")
-    node = ask_node()
-    req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x02]
-    print_cmd(req_data, node)
-
-def menu_goto_zero():
-    """回到绝对零点: 写 0x2725=1"""
-    print("\n====== 回到绝对零点 =====")
-    print("  电机自动转动到绝对0度 (写 0x2725=1)")
-    node = ask_node()
-    req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x01]
-    print_cmd(req_data, node)
-
-def menu_set_abs_threshold():
-    """设置回零阈值: 写 0x2726"""
-    print("\n====== 设置回零阈值 =====")
-    print("  范围: 0.1~20.0°, 步进0.1°")
-    print("  默认: 0.1° (值=1)")
-    val = ask_value("值 (0.1°)")
-    if val is None: print("无效"); return
-    node = ask_node()
-    req_data = [node, 0x06, 0x27, 0x26, (val>>8)&0xFF, val&0xFF]
-    result, modified = apply_validation(0x2726, val)
-    if modified:
-        note = f"MCU校验后: {val*0.1:.1f}° → {result*0.1:.1f}°"
-    else:
-        note = ""
-    print_cmd(req_data, node, note, skip_echo=True)
-    echo_data = [node, 0x06, 0x27, 0x26, (result>>8)&0xFF, result&0xFF]
-    crc = modbus_crc16(echo_data)
-    echo = ' '.join(f'{b:02X}' for b in echo_data)
-    print(f"  回令: {echo} {crc&0xFF:02X} {crc>>8&0xFF:02X}")
-
-# ===== 8. 绝对角度 =====
-def menu_abs_angle():
-    while True:
-        print("\n====== 绝对角度 =====")
-        print("  1. 读绝对角度(RAM)")
-        print("  2. 读绝对角度(Flash)")
-        print("  3. 保存绝对位置")
-        print("  4. 回到绝对零点")
-        print("  5. 读回零阈值")
-        print("  6. 设置回零阈值")
-        print("  7. 设零点并保存 (0x0000)")
-        print("  0. 返回")
-        c = input("选择: ").strip()
-        if c == '0': return
-        elif c == '1':
-            node = ask_node()
-            addr, name, unit = ABS_REGS[0]
-            nreg = 2  # int32
-            req_data = [node, 0x03, (addr>>8)&0xFF, addr&0xFF, 0x00, nreg]
-            u = f" ({unit})" if unit else ""
-            print(f"\n  {name}{u}")
-            print_cmd(req_data, node)
-        elif c == '2':
-            node = ask_node()
-            addr, name, unit = ABS_REGS[1]
-            nreg = 2
-            req_data = [node, 0x03, (addr>>8)&0xFF, addr&0xFF, 0x00, nreg]
-            u = f" ({unit})" if unit else ""
-            print(f"\n  {name}{u}")
-            print_cmd(req_data, node)
-        elif c == '3':
-            menu_save_abs_position()
-        elif c == '4':
-            menu_goto_zero()
-        elif c == '5':
-            node = ask_node()
-            print("\n  回零阈值 (0x2726)")
-            req_data = [node, 0x03, 0x27, 0x26, 0x00, 0x01]
-            print_cmd(req_data, node)
-        elif c == '6':
-            menu_set_abs_threshold()
-        elif c == '7':
-            print("\n====== 设零点并保存 =====")
-            print("  将当前位置设为绝对零点并写入Flash (写 0x2725=0)")
-            node = ask_node()
-            req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x00]
-            print_cmd(req_data, node)
-        else:
-            print("无效")
-        input("\n按 Enter 返回...")
-
 # ===== 主菜单 =====
-# ===== 心跳包 =====
-def menu_heartbeat():
-    """读取心跳包: 读 0x271F"""
-    print("\n====== 心跳包 =====")
-    print("  地址 0x00 = 广播(全呼), 总线上所有从机均回复")
-    print("  地址 1~247 = 只查询指定从机")
-    print("  ⚠ 广播模式下多个从机同时回复，RS-485 总线会冲突")
-    node = ask_node()
-    if node == 0:
-        print("\n  ▎广播心跳包 — 所有从机将同时回复（可能冲突）")
-    else:
-        print(f"\n  ▎查询地址 {node} — 仅该从机回复")
-    req_data = [node, 0x03, 0x27, 0x1F, 0x00, 0x01]
-    print_cmd(req_data, node)
-    print("  ▎回复解析: 数据值 = 从机设备地址 (0x2710)")
-
 MENU = [
-    ("读实时数据",   menu_read_realtime),
-    ("控制",         menu_control),
-    ("读配置寄存器", menu_read_config),
-    ("写配置寄存器", menu_write_config),
-    ("查看故障",     menu_read_fault),
-    ("清除故障",     menu_clear_fault),
-    ("心跳包",       menu_heartbeat),
-    ("绝对角度",     menu_abs_angle),
+    ("读实时数据",     menu_read_realtime),
+    ("控制",           menu_control),
+    ("读配置寄存器",   menu_read_config),
+    ("写配置寄存器",   menu_write_config),
+    ("查看故障",       menu_read_fault),
+    ("清除故障",       menu_clear_fault),
+    ("心跳包",         menu_heartbeat),
+    ("关窗零点",       menu_window_zero),      # 第8项，无密码，仅2个常用功能
 ]
 
 def main():
     while True:
         print("\n" + "=" * 42)
-        print("  Modbus RTU 指令生成器 v4.0")
+        print("  Modbus RTU 指令生成器 v4.2")
         print("=" * 42)
         for i, (name, _) in enumerate(MENU):
             print(f"  {i+1}. {name}")
-        print("  8. 开发者选项")
-        print("  9. 退出")
+        print("  9. 开发者选项")   # 第9项，需密码
+        print("  0. 退出")
         print("=" * 42)
-        c = input("选择 [1-9]: ").strip()
-        if c == '9' or c == '': print("退出"); break
-        try:
-            idx = int(c)-1
-            if idx == 7:   # 8. 开发者选项
-                menu_dev_options()
-            elif 0 <= idx < len(MENU):
-                MENU[idx][1]()
-            else:
+        c = input("选择 [0-9]: ").strip()
+        if c == '0':
+            print("退出")
+            break
+        if c == '9':
+            menu_dev_options()
+        else:
+            try:
+                idx = int(c) - 1
+                if 0 <= idx < len(MENU):
+                    MENU[idx][1]()
+                else:
+                    print("无效")
+            except:
                 print("无效")
-        except: print("无效")
         input("\n按 Enter 返回...")
 
 if __name__ == '__main__':

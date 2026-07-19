@@ -88,7 +88,7 @@ static void Motor_Pwm_Init(void)
 int main(void)
 {
     Hardware_Init();
-
+	tickTimer_DelayMs(120);
     /* RS485   ?         USART  GPIO   §Ø?    §Ö?  */
     RS485_Init();
     

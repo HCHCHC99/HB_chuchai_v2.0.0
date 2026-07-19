@@ -112,7 +112,7 @@
 #define PARAM_DEFAULT_CURRENT_UPPER_LIMIT       (2300)       /* 过流阈值 1mA (5A) */
 #define PARAM_DEFAULT_CURRENT_DETECT_MS         (20)        /* 过流判定时间 1ms */
 #define PARAM_DEFAULT_MOTOR_HALL_DIR        (1)   /* 霍尔方向 0=正常, 1=反转 */
-#define PARAM_DEFAULT_MOTOR_DIR             (0)   /* 电机方向 0=正常, 1=反转 */
+#define PARAM_DEFAULT_MOTOR_DIR             (1)   /* 电机方向 0=正常, 1=反转 */
 #define PARAM_DEFAULT_RTURN_REDUCTION_RATIO   (11830)  /* 减速比 x0.1 */
 #define PARAM_DEFAULT_MOTOR_HALL_POLE_PAIRS  (3)       /* 电机极对数 */
 #define PARAM_DEFAULT_CLOSE_LIMIT_ANGLE         (-20)       /* 关窗极限角度 0.1度 */
