@@ -15,6 +15,12 @@
     #define PARAMS_DBG(fmt, ...)    ((void)0)
 #endif
 
+#ifdef APP_REALTIME_DBG
+    #define REALTIME_DBG(fmt, ...)  MAIN_D("[REALTIME] " fmt, ##__VA_ARGS__)
+#else
+    #define REALTIME_DBG(fmt, ...)  ((void)0)
+#endif
+
 /*=============================================================================
  * 客户协议寄存器地址定义
  * 保持寄存器 (Holding Register, 功能码 03/06/10)
@@ -35,10 +41,10 @@
 /* --- 高级参数配置寄存器 (不在 Flash 保存范围内但在 RAM 有效) --- */
 #define REG_MOTOR_HALL_DIR          (0x3710U)   /* 霍尔方向: 0=正常, 1=反转 (uint16_t) */
 #define REG_MOTOR_DIR               (0x3711U)   /* 电机方向: 0=正常, 1=反转 (uint16_t) */
-#define REG_RTURN_REDUCTION_RATIO    (0x3712U)   /* 减速比 (uint16_t) */
+#define REG_RTURN_REDUCTION_RATIO   (0x3712U)   /* 减速比 (uint16_t) */
 #define REG_MOTOR_HALL_POLE_PAIRS   (0x3713U)   /* 电机极对数 (uint16_t) */
-#define REG_MOTOR_HALL_COUNT_LO    (0x3714U)   /* 霍尔脉冲累计低16位 (int32_t累计值) */
-#define REG_MOTOR_HALL_COUNT_HI    (0x3715U)   /* 霍尔脉冲累计高16位 */
+#define REG_MOTOR_HALL_COUNT_LO     (0x3714U)   /* 霍尔脉冲累计低16位 (int32_t累计值) */
+#define REG_MOTOR_HALL_COUNT_HI     (0x3715U)   /* 霍尔脉冲累计高16位 */
 
 /* --- 绝对角度 (0x2721~0x2726) --- */
 #define REG_ABS_ANGLE_LO            (0x2721U)   /* RAM实时偏移低16位 (int32_t, 0.1度) */
@@ -113,10 +119,10 @@
 #define PARAM_DEFAULT_VOLTAGE_LOWER_LIMIT       (210U)      /* 欠压阈值 0.1V (21.0V) */
 #define PARAM_DEFAULT_CURRENT_UPPER_LIMIT       (2300)       /* 过流阈值 1mA (5A) */
 #define PARAM_DEFAULT_CURRENT_DETECT_MS         (20)        /* 过流判定时间 1ms */
-#define PARAM_DEFAULT_MOTOR_HALL_DIR        (0)   /* 霍尔方向 0=正常, 1=反转 */
-#define PARAM_DEFAULT_MOTOR_DIR             (1)   /* 电机方向 0=正常, 1=反转 */
-#define PARAM_DEFAULT_RTURN_REDUCTION_RATIO   (11830)  /* 减速比 x0.1 */
-#define PARAM_DEFAULT_MOTOR_HALL_POLE_PAIRS  (3)       /* 电机极对数 */
+#define PARAM_DEFAULT_MOTOR_HALL_DIR            (0)   /* 霍尔方向 0=正常, 1=反转 */
+#define PARAM_DEFAULT_MOTOR_DIR                 (1)   /* 电机方向 0=正常, 1=反转 */
+#define PARAM_DEFAULT_RTURN_REDUCTION_RATIO     (11830)  /* 减速比 x0.1 */
+#define PARAM_DEFAULT_MOTOR_HALL_POLE_PAIRS     (3)       /* 电机极对数 */
 #define PARAM_DEFAULT_CLOSE_LIMIT_ANGLE         (-20)       /* 关窗极限角度 0.1度 */
 #define PARAM_DEFAULT_OPEN_LIMIT_ANGLE          (880)       /* 开窗极限角度 0.1度 */
 #define PARAM_DEFAULT_BAUD_RATE                 (9600UL)    /* 默认波特率 */

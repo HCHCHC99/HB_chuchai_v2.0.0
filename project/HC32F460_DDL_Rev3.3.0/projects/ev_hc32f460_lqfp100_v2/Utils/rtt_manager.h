@@ -76,6 +76,7 @@
  *============================================================================*/
 // #define UTILS_RING_BUF              /* 环形缓冲区 */
 // #define PARAM_DEBUG                 /* 参数管理 */
+// #define APP_REALTIME_DBG             /* 实时数据打印 */
 // #define APP_PARAMS_DBG              /* 参数读写接口 (App_Params) */
 // #define QUEUE_INIT_PRINT            /* 队列初始化 */
 // #define QUEUE_SEND_PRINT            /* 队列发送 */

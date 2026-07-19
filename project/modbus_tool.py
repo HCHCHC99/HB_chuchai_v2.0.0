@@ -134,11 +134,16 @@ def print_cmd(req_data, node, note="", skip_echo=False):
             xx = ' '.join(['XX'] * dlen)
             print(f"  回令: {node:02X} 03 {dlen:02X} {xx} crc_h crc_l")
         elif func == 0x10:
-            # 0x10 response: addr + func + start(2) + count(2) + CRC, no data echo
-            resp = [req_data[0], 0x10, req_data[2], req_data[3], req_data[4], req_data[5]]
-            rcrc = modbus_crc16(resp)
-            rq = ' '.join(f'{b:02X}' for b in resp)
-            print(f"  回令: {rq} {rcrc&0xFF:02X} {rcrc>>8&0xFF:02X}")
+            # 0x10 success: addr + 0x10 + start(2) + count(2) + CRC
+            resp_ok = [req_data[0], 0x10, req_data[2], req_data[3], req_data[4], req_data[5]]
+            rcrc = modbus_crc16(resp_ok)
+            rq = ' '.join(f'{b:02X}' for b in resp_ok)
+            print(f"  成功回令: {rq} {rcrc&0xFF:02X} {rcrc>>8&0xFF:02X}")
+            # 0x10 failure: addr + 0x90 + 0x04 + CRC (异常04=未解锁或转动中)
+            resp_fail = [req_data[0], 0x90, 0x04]
+            fcrc = modbus_crc16(resp_fail)
+            fq = ' '.join(f'{b:02X}' for b in resp_fail)
+            print(f"  失败回令: {fq} {fcrc&0xFF:02X} {fcrc>>8&0xFF:02X}  (未解锁或转动中)")
         else:
             print(f"  回令: {req} {crc&0xFF:02X} {crc>>8&0xFF:02X}  (echo)")
     if note: print(f"  {note}")
@@ -176,7 +181,7 @@ def menu_control():
     print("  3. 急停")
     print("  4. 开窗（逆时针）  ⚠需先解锁(选1)")
     print("  5. 关窗（顺时针）  ⚠需先解锁(选1)")
-    print("  6. 重启复位        ⚠需先解锁(选1)")
+    print("  6. 重启复位")
     print("  0. 返回")
     c = input("选择: ").strip()
     if c == '0' or c == '': return
