@@ -55,6 +55,8 @@
 #define REG_ABS_THRESHOLD           (0x2726U)   /* R/W: 回基准点/回目标停止阈值 (0.1度, 默认1, 0~200) */
 #define REG_ABS_TARGET_LO           (0x2727U)   /* R/W: 目标角度 int32 低16位 (0.1度); 0x10连续写触发 */
 #define REG_ABS_TARGET_HI           (0x2728U)   /* R/W: 目标角度 int32 高16位 (0.1度) */
+#define REG_CALIB_UPPER_X10         (0x2729U)   /* R/W: 关窗过流校准角度上限 0.1度 (默认200=20.0°) */
+#define REG_CALIB_LOWER_X10         (0x272AU)   /* R/W: 关窗过流校准角度下限 0.1度 (默认-20=-2.0°) */
 
 /* --- 心跳包 (只读, 不存 Flash) --- */
 #define REG_HEARTBEAT               (0x271FU)   /* 心跳包: 读回值 = 设备地址 (0x2710) */
@@ -135,6 +137,8 @@
 #define PARAM_DEFAULT_CURRENT_HYSTERESIS_MA     (0U)        /* 电流滞回 1mA (0A) - 设为0无滞回 */
 #define PARAM_DEFAULT_CURRENT_RELEASE_MS        (200U)      /* 过流释放时间窗口 1ms (0.2s) */
 #define PARAM_DEFAULT_OVERCURRENT_TRIGGER_CNT   (1U)        /* 过流触发次数(时间窗口模式下可选使用) */
+#define PARAM_DEFAULT_CALIB_UPPER_X10           (-10)       /* 关窗过流校准角度上限 0.1度  */
+#define PARAM_DEFAULT_CALIB_LOWER_X10           (-30)       /* 关窗过流校准角度下限 0.1度  */
 
 /*=============================================================================
  * 运行时配置宏定义 (不存 Flash, 通过宏定义开关)
@@ -187,7 +191,8 @@ typedef struct {
     uint16_t  motor_dir;                    /* 0x3711: 电机方向 0=正常 1=反转 */
     uint16_t  rturn_reduction_ratio;          /* 0x3712: 减速比x10 */
     uint16_t  motor_hall_pole_pairs;          /* 0x3713: 电机极对数 */
-    uint8_t  reserved[3];                /* 保留字节, 补齐到4字节边界 */
+    int16_t   calib_upper_x10;                /* 0x2729: 关窗过流校准角度上限 (0.1度) */
+    int16_t   calib_lower_x10;                /* 0x272A: 关窗过流校准角度下限 (0.1度) */
 
     /* 尾部信息 */
     uint32_t checksum;              /* CRC32校验 */

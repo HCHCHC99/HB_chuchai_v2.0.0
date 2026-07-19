@@ -60,13 +60,15 @@ def fmt_constraint(regAddr):
     return "  [" + ", ".join(parts) + "]"
 
 CONFIG_REGS = [
-    (0x2710, "设备地址",       None,         "1~247"),
-    (0x2714, "过压阈值",       None,         "0.1V"),
-    (0x2715, "欠压阈值",       None,         "0.1V"),
-    (0x2716, "过流阈值",       None,         "mA"),
-    (0x271C, "关窗极限角度",   None,         "0.1°"),
-    (0x271D, "开窗极限角度",   None,         "0.1°"),
-    (0x271E, "过流判定时间",   None,         "ms"),
+    (0x2710, "设备地址",           None,         "1~247"),
+    (0x2714, "过压阈值",           None,         "0.1V"),
+    (0x2715, "欠压阈值",           None,         "0.1V"),
+    (0x2716, "过流阈值",           None,         "mA"),
+    (0x271C, "关窗极限角度",       None,         "0.1°"),
+    (0x271D, "开窗极限角度",       None,         "0.1°"),
+    (0x271E, "过流判定时间",       None,         "ms"),
+    (0x2729, "关窗过流校准上限",   None,         "0.1°"),
+    (0x272A, "关窗过流校准下限",   None,         "0.1°"),
 ]
 
 DEV_REGS = [
@@ -471,6 +473,7 @@ def menu_dev_options():
         print("  5. 重置霍尔脉冲")
         print("  6. 计算实时角度")
         print("  7. 关窗基准点（高级）")
+        print("  8. 关窗过流校准阈值")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0':
@@ -489,6 +492,8 @@ def menu_dev_options():
             menu_calc_realtime_angle()
         elif c == '7':
             menu_window_zero_advanced()
+        elif c == '8':
+            menu_calib_threshold()
         else:
             print("无效")
 
@@ -594,6 +599,66 @@ def menu_write_dev_regs():
             print(f"  回令: {req} {crc&0xFF:02X} {crc>>8&0xFF:02X}  (echo)")
     else:
         print_cmd(req_data, node)
+
+# ===== 关窗过流校准阈值 (开发者选项内) =====
+def menu_calib_threshold():
+    """关窗过流校准阈值 - 0x2729(上限) 0x272A(下限)"""
+    while True:
+        print("\n====== 关窗过流校准阈值 =====")
+        print("  校准有效角度区间 [下限, 上限]")
+        print("  默认: 上限=-1.0° 下限=-3.0°")
+        print("  1. 读上限 (0x2729)")
+        print("  2. 读下限 (0x272A)")
+        print("  3. 设上限")
+        print("  4. 设下限")
+        print("  0. 返回")
+        c = input("选择: ").strip()
+        if c == '0':
+            return
+        elif c == '1':
+            node = ask_node()
+            req_data = [node, 0x03, 0x27, 0x29, 0x00, 0x01]
+            print("\n  读关窗过流校准上限 (0x2729, int16, 0.1°)")
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '2':
+            node = ask_node()
+            req_data = [node, 0x03, 0x27, 0x2A, 0x00, 0x01]
+            print("\n  读关窗过流校准下限 (0x272A, int16, 0.1°)")
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '3':
+            print("\n====== 设关窗过流校准上限 =====")
+            print("  单位 0.1°, int16 范围")
+            print("  默认: -10 (即 -1.0°)")
+            print("  仅当关窗过流时角度 ≤ 此值才执行校准")
+            val = ask_value("上限 (0.1°单位)")
+            if val is None:
+                print("无效"); input("\n按 Enter 返回..."); continue
+            if val > 32767: val = 32767
+            if val < -32768: val = -32768
+            node = ask_node()
+            print(f"\n  ▎上限: {val} (0.1°) = {val*0.1:.1f}°")
+            req_data = [node, 0x06, 0x27, 0x29, (val>>8)&0xFF, val&0xFF]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '4':
+            print("\n====== 设关窗过流校准下限 =====")
+            print("  单位 0.1°, int16 范围")
+            print("  默认: -30 (即 -3.0°)")
+            print("  仅当关窗过流时角度 ≥ 此值才执行校准")
+            val = ask_value("下限 (0.1°单位)")
+            if val is None:
+                print("无效"); input("\n按 Enter 返回..."); continue
+            if val > 32767: val = 32767
+            if val < -32768: val = -32768
+            node = ask_node()
+            print(f"\n  ▎下限: {val} (0.1°) = {val*0.1:.1f}°")
+            req_data = [node, 0x06, 0x27, 0x2A, (val>>8)&0xFF, val&0xFF]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        else:
+            print("无效")
 
 def menu_read_hall_pulse():
     print("\n====== 读霍尔脉冲 =====")

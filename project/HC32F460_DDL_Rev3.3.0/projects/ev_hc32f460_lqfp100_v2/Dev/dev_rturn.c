@@ -173,13 +173,17 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
                 
                 if (u8CheckDir == RTURN_DIR_REVERSE) {
                     /* �ر�ʱ���������ýǶ�Ϊ����λ�Ƕȣ������Ϊ��У׼ */
-                    g_s32HallPulseAccum = 0;
-                    pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
-                    if (!pstcDev->u8Calibrated) {
-                        pstcDev->u8Calibrated = 1;
-                        RTURN_OUT("Calibrated! Angle set to min angle: %f deg\r\n", pstcDev->fCurrentAngle);
+                                        if (RunAngle_TryCalibrate()) {
+                        g_s32HallPulseAccum = 0;
+                        pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
+                        if (!pstcDev->u8Calibrated) {
+                            pstcDev->u8Calibrated = 1;
+                            RTURN_OUT("Calibrated! Angle set to min angle: %f deg\r\n", pstcDev->fCurrentAngle);
+                        }
+                        RunAngle_OnCalibration();
+                    } else {
+                        RealTime_SetFault(FAULT_BIT_OVERCURRENT);
                     }
-                    RunAngle_OnCalibration();
                 }
                 /* ��ʱ�����������ýǶȣ����ֵ�ǰ�Ƕ� */
                 
@@ -233,9 +237,13 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
                     if (u8DesiredRTurnDir == RTURN_DIR_REVERSE) {
                         /* �ر�ʱ���������ýǶ�Ϊ����λ�Ƕȣ�����У׼״̬�²����ã� */
                         if (pstcDev->u8Calibrated) {
-                            g_s32HallPulseAccum = 0;
-                            pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
-                            RunAngle_OnCalibration();
+                            if (RunAngle_TryCalibrate()) {
+                                g_s32HallPulseAccum = 0;
+                                pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
+                                RunAngle_OnCalibration();
+                            } else {
+                                RealTime_SetFault(FAULT_BIT_OVERCURRENT);
+                            }
                         }
                     }
                     /* ��ʱ�����������ýǶȣ����ֵ�ǰ�Ƕ� */
@@ -351,10 +359,14 @@ static void RTurn_HandleOvercurrent(RTurn_Device_t* pstcDev) {
                 RTURN_OUT("LIMIT TRIGGERED (uncalibrated, FORWARD)! Lock direction, no calibration\r\n");
             } else {
                 /* �رչ�����У׼�ɹ������ýǶ�Ϊ����λ�Ƕ� */
-                g_s32HallPulseAccum = 0;
-                pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
-                pstcDev->u8Calibrated = 1;
-                RunAngle_OnCalibration();
+                if (RunAngle_TryCalibrate()) {
+                    g_s32HallPulseAccum = 0;
+                    pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
+                    pstcDev->u8Calibrated = 1;
+                    RunAngle_OnCalibration();
+                } else {
+                    RealTime_SetFault(FAULT_BIT_OVERCURRENT);
+                }
                 RTURN_OUT("LIMIT TRIGGERED (uncalibrated, REVERSE)! Calibrated=1, Angle=%ld.%02ld deg\r\n",
                           (long)((int32_t)(pstcDev->fCurrentAngle * 100) / 100),
                           (long)((int32_t)(pstcDev->fCurrentAngle * 100) % 100));
@@ -374,9 +386,13 @@ static void RTurn_HandleOvercurrent(RTurn_Device_t* pstcDev) {
             /* ========== ��У׼״̬ ========== */
             if (u8CurrentDir == RTURN_DIR_REVERSE) {
                 /* �ر�ʱ���������ýǶ�Ϊ����λ�Ƕ� */
-                pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
-                g_s32HallPulseAccum = 0;
-                RunAngle_OnCalibration();
+                if (RunAngle_TryCalibrate()) {
+                    pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
+                    g_s32HallPulseAccum = 0;
+                    RunAngle_OnCalibration();
+                } else {
+                    RealTime_SetFault(FAULT_BIT_OVERCURRENT);
+                }
             }
             /* ��ʱ�����������ýǶȣ����ֵ�ǰ�Ƕ� */
 

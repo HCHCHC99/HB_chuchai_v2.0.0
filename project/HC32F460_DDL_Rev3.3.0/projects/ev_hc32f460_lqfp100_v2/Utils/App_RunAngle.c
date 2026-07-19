@@ -323,6 +323,24 @@ void RunAngle_OnCalibration(void)
            (long)ref, (long)ref, (long)g_AppParam.close_limit_angle);
 }
 
+/** @brief Check if current absolute angle is within calibration range.
+ *  @retval true   angle in [calib_lower, calib_upper], caller should proceed
+ *  @retval false  angle out of range, caller should set fault */
+bool RunAngle_TryCalibrate(void)
+{
+    int32_t lower = (int32_t)g_AppParam.calib_lower_x10;
+    int32_t upper = (int32_t)g_AppParam.calib_upper_x10;
+
+    if (s_abs_offset_x10 >= lower && s_abs_offset_x10 <= upper) {
+        MAIN_D("[ABSA] TryCalibrate: angle=%ld in [%ld,%ld], OK\r\n",
+               (long)s_abs_offset_x10, (long)lower, (long)upper);
+        return true;
+    }
+    MAIN_D("[ABSA] TryCalibrate: angle=%ld OUT of [%ld,%ld], rejected\r\n",
+           (long)s_abs_offset_x10, (long)lower, (long)upper);
+    return false;
+}
+
 /*******************************************************************************
  * EOF
  ******************************************************************************/
