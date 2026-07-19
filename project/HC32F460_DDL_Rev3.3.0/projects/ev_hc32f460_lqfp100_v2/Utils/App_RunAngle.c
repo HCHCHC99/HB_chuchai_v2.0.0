@@ -85,7 +85,7 @@ void RunAngle_Init(void)
     Param_Init(&s_Config, &s_Runtime, RunAngle_SetDefaults);
 
     /* Validate threshold */
-    if (g_AbsAngle.goto_zero_thresh_x10 < ABS_THRESH_MIN_X10
+    if (g_AbsAngle.goto_zero_thresh_x10 < 0
         || g_AbsAngle.goto_zero_thresh_x10 > ABS_THRESH_MAX_X10) {
         g_AbsAngle.goto_zero_thresh_x10 = ABS_THRESH_DEFAULT_X10;
     }
@@ -295,8 +295,8 @@ void RunAngle_SetTarget_x10(int32_t target_x10)
 void RunAngle_SetThreshold(uint16_t thresh_x10)
 {
     /* Clamp to valid range */
-    if (thresh_x10 < ABS_THRESH_MIN_X10) {
-        thresh_x10 = ABS_THRESH_MIN_X10;
+    if (thresh_x10 < 0) {
+        thresh_x10 = 0;
     } else if (thresh_x10 > ABS_THRESH_MAX_X10) {
         thresh_x10 = ABS_THRESH_MAX_X10;
     }

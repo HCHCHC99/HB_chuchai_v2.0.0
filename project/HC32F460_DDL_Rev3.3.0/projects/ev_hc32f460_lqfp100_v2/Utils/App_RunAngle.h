@@ -27,7 +27,7 @@ typedef struct {
     uint32_t sequence_id;
     uint32_t erase_count;
     int32_t  abs_offset_x10;        /* persisted absolute angle offset (0.1 deg) */
-    uint16_t goto_zero_thresh_x10;  /* goto-zero stop threshold (0.1 deg, default 1, max 200) */
+    int16_t  goto_zero_thresh_x10;  /* stop threshold (0.1 deg, default 1, range 0~200) */
     uint16_t reserved;              /* padding to 4-byte alignment */
     uint32_t checksum;              /* CRC32 */
     uint32_t tail_magic;            /* 0xBA5ABA5A */
