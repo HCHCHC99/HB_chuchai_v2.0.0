@@ -356,7 +356,7 @@ __weak void Motor_OnArbitrationFwd(MotorDevice_t* motor, float duty) {
 #if MOTOR_CONTROL_MODE == 0
     // === GPIO ģʽ ===
     (void)duty;
-    tickTimer_DelayMs(100);
+
 if (g_AppParam.motor_dir != 0) {
         GPIO_SET(PHV_PORT, PHV_PIN);
         GPIO_RESET(PHU_PORT, PHU_PIN);
@@ -390,7 +390,7 @@ __weak void Motor_OnArbitrationRev(MotorDevice_t* motor, float duty) {
 #if MOTOR_CONTROL_MODE == 0
     // === GPIO ģʽ ===
     (void)duty;
-    tickTimer_DelayMs(100);
+
 if (g_AppParam.motor_dir != 0) {
         GPIO_SET(PHU_PORT, PHU_PIN);
         GPIO_RESET(PHV_PORT, PHV_PIN);
