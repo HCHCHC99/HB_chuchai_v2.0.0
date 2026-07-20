@@ -437,12 +437,12 @@ static void SetDeviceUpdateIntervals(void) {
     DeviceManager_SetUpdateInterval(ID_MOTOR, 1);
     DeviceManager_SetUpdateInterval(ID_MOTOR_HALL, 1);  // ?10ms    
     //    SetDeviceUpdateIntervals           
-    DeviceManager_SetUpdateInterval(ID_ADC_CURRENT, 1);   // ADC        
+    DeviceManager_SetUpdateInterval(ID_ADC_CURRENT, 0);   // ADC        
     DeviceManager_SetUpdateInterval(ID_ADC_VOLTAGE, 1);   // ADC  ?    
     
     //   ?? ??          �� - ?10ms  ADC  ?      ?  
     DeviceManager_SetUpdateInterval(ID_VOLTAGE_BUS, 10);   // ?10ms    ?  ? ? ?
-    DeviceManager_SetUpdateInterval(ID_SENSOR_CURRENT, 1); // ?10ms    ? ��   ?
+    DeviceManager_SetUpdateInterval(ID_SENSOR_CURRENT, 0); // ?10ms    ? ��   ?
     DeviceManager_SetUpdateInterval(ID_RTURN, 1);  // ?10ms    ? ��? 
 }
 

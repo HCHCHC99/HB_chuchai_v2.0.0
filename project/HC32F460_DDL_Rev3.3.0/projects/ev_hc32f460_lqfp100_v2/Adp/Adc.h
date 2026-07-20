@@ -58,11 +58,21 @@ extern "C" {
 #define TMR0_CH                         (TMR0_CH_B)
 #define TMR0_PERIPH_CLK                 (FCG2_PERIPH_TMR0_1)
 #define TMR0_CLK_DIV                    (TMR0_CLK_DIV256)
+#define ADC_SAMPLE_INTERVAL_US          (200U)          /* ADC 采样间隔(µs): 200=5kHz, 500=2kHz, 1000=1kHz */
 
 /* ADC����A�ж����� */
 #define ADC_SEQA_INT_PRIO               (DDL_IRQ_PRIO_06)
 #define ADC_SEQA_INT_SRC                (INT_SRC_ADC1_EOCA)
 #define ADC_SEQA_INT_IRQn               (INT116_IRQn)
+
+/* ADC 采样调试翻转引脚 �? 注释此宏关闭调试翻转功能 */
+#define ADC_DEBUG_TOGGLE_ENABLE
+
+#ifdef ADC_DEBUG_TOGGLE_ENABLE
+/* 每次 ADC 触发完成翻转，示波器测频�?=采样�?/2 */
+#define ADC_DEBUG_TOGGLE_PORT           (GPIO_PORT_A)
+#define ADC_DEBUG_TOGGLE_PIN            (GPIO_PIN_07)
+#endif
 
 /* ADC�ο���ѹ */
 #define ADC_VREF                        (3.3F)
@@ -91,7 +101,7 @@ typedef enum {
 } en_adc_mode_t;
 
 /**
- * @brief  ADC����ӳ��ṹ��
+ * @brief  ADC����ӳ��ṹ��?
  */
 typedef struct {
     uint8_t u8Port;      /* GPIO�˿� (�� GPIO_PORT_A) */
@@ -106,7 +116,7 @@ typedef struct {
     en_adc_mode_t enMode;           /* ����ģʽ */
     stc_adc_pin_t stcPin;           /* �������� */
     void (*pfnCallback)(uint16_t u16AdcValue);  /* �ж�ģʽ�ص����� */
-    /* DMA������� - ֻ��ģʽΪDMAʱ����Ч */
+    /* DMA�������? - ֻ��ģʽΪDMAʱ����Ч */
     struct {
         uint16_t u16BufferSize;       /* DMA��������С */
         uint8_t u8DmaChannel;         /* ʹ�õ�DMAͨ�� */
@@ -121,7 +131,7 @@ typedef struct {
     uint8_t u8Port;                 /* GPIO�˿� */
     uint8_t u8Pin;                  /* GPIO���� */
     void (*pfnCallback)(uint16_t u16AdcValue);  /* �ж�ģʽ�ص����� */
-    /* DMA��� */
+    /* DMA���? */
     uint16_t *pu16DmaBuffer;         /* DMA������ָ�� */
     uint16_t u16DmaBufferSize;       /* DMA��������С */
     uint8_t u8DmaChannel;            /* ʹ�õ�DMAͨ�� */

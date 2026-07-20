@@ -2,12 +2,13 @@
  *******************************************************************************
  * @file  Adc.c
  * @brief ADC Driver for HC32F460 - Generic framework with multiple instances
- *        DMA Ïà¹Ø²Ù×÷Î¯ÍĞ¸ø Dma ²ã´¦Àí
+ *        DMA ï¿½ï¿½Ø²ï¿½ï¿½ï¿½Î¯ï¿½Ğ¸ï¿½ Dma ï¿½ã´¦ï¿½ï¿½
  *******************************************************************************
  */
 
 #include "Adc.h"
 #include "Dma.h"
+#include "Gpio_io.h"
 #include "rtt_log.h"
 #include <stdlib.h>
 #include <string.h>
@@ -16,17 +17,17 @@
  * Local variables ('static')
  ******************************************************************************/
 
-/* ADC ÊµÀıÊı×é */
+/* ADC Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 static stc_adc_instance_t s_astcAdcInstances[ADC_MAX_INSTANCES];
 static uint8_t s_u8AdcInstanceCount = 0;
 
-/* ADC ³õÊ¼»¯±êÖ¾ */
+/* ADC ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ö¾ */
 static bool s_bAdcInitialized = false;
 
-/* ÊÇ·ñÓĞ DMA Ä£Ê½ÊµÀı */
+/* ï¿½Ç·ï¿½ï¿½ï¿½ DMA Ä£Ê½Êµï¿½ï¿½ */
 static bool s_bHasDmaInstance = false;
 
-/* DMA ÊµÀı ID Ó³Éä£ºADC ÊµÀı ID ¡ú DMA ÊµÀı ID£¨½ö DMA Ä£Ê½ÓĞĞ§£© */
+/* DMA Êµï¿½ï¿½ ID Ó³ï¿½ä£ºADC Êµï¿½ï¿½ ID ï¿½ï¿½ DMA Êµï¿½ï¿½ IDï¿½ï¿½ï¿½ï¿½ DMA Ä£Ê½ï¿½ï¿½Ğ§ï¿½ï¿½ */
 static int8_t s_a8AdcIdToDmaId[ADC_MAX_INSTANCES];
 
 /*******************************************************************************
@@ -49,7 +50,7 @@ static char Adc_GetPortLetter(uint8_t u8Port);
 static uint8_t Adc_GetPinNumber(uint16_t u16Pin);
 
 /*******************************************************************************
- * ADC ¸¨Öúº¯Êı
+ * ADC ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
  ******************************************************************************/
 
 /**
@@ -114,12 +115,21 @@ static void Adc_InitConfig(void)
 {
     stc_adc_init_t stcAdcInit;
 
+    /* 0. åˆå§‹åŒ–è°ƒè¯•ç¿»è½¬å¼•è„š â€” æ¯æ¬¡ EOCA ç¿»è½¬ï¼Œç¤ºæ³¢å™¨å¯æµ‹ 200us è§¦å‘ */
+#ifdef ADC_DEBUG_TOGGLE_ENABLE
+    LL_PERIPH_WE(LL_PERIPH_GPIO);
+    Output_GPIO_Init(ADC_DEBUG_TOGGLE_PORT, ADC_DEBUG_TOGGLE_PIN, GPIO_INIT_LOW);
+    LL_PERIPH_WP(LL_PERIPH_GPIO);
+#endif
+
     /* 1. Enable ADC peripheral clock */
+    LL_PERIPH_WE(LL_PERIPH_FCG);
     FCG_Fcg3PeriphClockCmd(ADC_PERIPH_CLK, ENABLE);
+    LL_PERIPH_WP(LL_PERIPH_FCG);
 
     /* 2. Modify the default value depends on the application */
     (void)ADC_StructInit(&stcAdcInit);
-    stcAdcInit.u16ScanMode = ADC_MD_SEQA_SINGLESHOT;  /* ĞòÁĞAµ¥´Î×ª»»Ä£Ê½ */
+    stcAdcInit.u16ScanMode = ADC_MD_SEQA_SINGLESHOT;  /* ï¿½ï¿½ï¿½ï¿½Aï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Ä£Ê½ */
 
     /* 3. Initialize ADC */
     (void)ADC_Init(ADC_UNIT, &stcAdcInit);
@@ -128,14 +138,14 @@ static void Adc_InitConfig(void)
     for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
         stc_adc_instance_t *pstcInst = &s_astcAdcInstances[i];
         
-        /* ÉèÖÃÒı½ÅÎªÄ£ÄâÄ£Ê½ */
+        /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎªÄ£ï¿½ï¿½Ä£Ê½ */
         Adc_SetPinAnalogMode(pstcInst->u8Port, pstcInst->u8Pin);
         ADC_Adp_DEBUG("ADC CH%d pin initialized (P%c%d)\r\n", 
                pstcInst->u8Channel,
                Adc_GetPortLetter(pstcInst->u8Port),
                Adc_GetPinNumber(pstcInst->u8Pin));
         
-        /* Ê¹ÄÜ ADC Í¨µÀ */
+        /* Ê¹ï¿½ï¿½ ADC Í¨ï¿½ï¿½ */
         ADC_ChCmd(ADC_UNIT, ADC_SEQ_A, pstcInst->u8Channel, ENABLE);
         ADC_Adp_DEBUG("ADC SEQ_A CH%d enabled (%s mode)\r\n", 
                pstcInst->u8Channel,
@@ -147,20 +157,22 @@ static void Adc_InitConfig(void)
 
 /**
  * @brief  Timer0 configuration for ADC trigger
- * @param  u32IntervalUs ´¥·¢¼ä¸ô(us)£¬ÀıÈç 1000 = 1ms
+ * @param  u32IntervalUs ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(us)ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 1000 = 1ms
  */
 static void Timer0_Config(uint32_t u32IntervalUs)
 {
     stc_tmr0_init_t stcTmr0Init;
     
     /* Enable Timer0 peripheral clock */
+    LL_PERIPH_WE(LL_PERIPH_FCG);
     FCG_Fcg2PeriphClockCmd(TMR0_PERIPH_CLK, ENABLE);
+    LL_PERIPH_WP(LL_PERIPH_FCG);
     
-    /* ¼ÆËã¶¨Ê±Æ÷Ê±ÖÓÆµÂÊ */
+    /* ï¿½ï¿½ï¿½ã¶¨Ê±ï¿½ï¿½Ê±ï¿½ï¿½Æµï¿½ï¿½ */
     uint32_t u32TimerClk = CLK_GetBusClockFreq(CLK_BUS_PCLK1) / (1UL << (TMR0_CLK_DIV >> TMR0_BCONR_CKDIVA_POS));
     
-    /* ¼ÆËãÆµÂÊ: freq = 1 / interval */
-    uint32_t u32Freq = 1000000UL / u32IntervalUs;  /* ×ª»»Îª Hz */
+    /* ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½: freq = 1 / interval */
+    uint32_t u32Freq = 1000000UL / u32IntervalUs;  /* ×ªï¿½ï¿½Îª Hz */
     uint16_t u16CompareValue = (uint16_t)(u32TimerClk / u32Freq) - 1;
     
     /* Timer0 structure initialize */
@@ -182,7 +194,7 @@ static void Timer0_Config(uint32_t u32IntervalUs)
  */
 static void Adc_HardTriggerConfig(void)
 {
-    /* ÅäÖÃ ADC Ó²¼ş´¥·¢ */
+    /* ï¿½ï¿½ï¿½ï¿½ ADC Ó²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
     ADC_TriggerConfig(ADC_UNIT, ADC_SEQ_A, ADC_SEQA_HARDTRIG);
     ADC_TriggerCmd(ADC_UNIT, ADC_SEQ_A, ENABLE);
     
@@ -197,7 +209,7 @@ static void Adc_IrqConfig(void)
     stc_irq_signin_config_t stcIrq;
     uint8_t u8AdcIntEn = 0U;
 
-    /* ¼ì²éÊÇ·ñÓĞÖĞ¶ÏÄ£Ê½µÄÊµÀı */
+    /* ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ğ¶ï¿½Ä£Ê½ï¿½ï¿½Êµï¿½ï¿½ */
     uint8_t u8HasInterruptMode = 0U;
     for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
         if (s_astcAdcInstances[i].enMode == ADC_MODE_INTERRUPT) {
@@ -206,12 +218,14 @@ static void Adc_IrqConfig(void)
         }
     }
 
-    /* Èç¹ûÓĞÖĞ¶ÏÄ£Ê½ÊµÀı£¬Ê¹ÄÜ ADC ÖĞ¶Ï */
+    /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¶ï¿½Ä£Ê½Êµï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ ADC ï¿½Ğ¶ï¿½ */
     if (u8HasInterruptMode) {
         stcIrq.enIntSrc    = ADC_SEQA_INT_SRC;
         stcIrq.enIRQn      = ADC_SEQA_INT_IRQn;
         stcIrq.pfnCallback = &ADC1_SeqA_IrqCallback;
+        LL_PERIPH_WE(LL_PERIPH_INTC);
         (void)INTC_IrqSignIn(&stcIrq);
+        LL_PERIPH_WP(LL_PERIPH_INTC);
         NVIC_ClearPendingIRQ(stcIrq.enIRQn);
         NVIC_SetPriority(stcIrq.enIRQn, ADC_SEQA_INT_PRIO);
         NVIC_EnableIRQ(stcIrq.enIRQn);
@@ -222,7 +236,7 @@ static void Adc_IrqConfig(void)
         ADC_Adp_DEBUG("SEQ_A interrupt disabled (no interrupt-mode channels)\r\n");
     }
     
-    /* Ê¹ÄÜÖĞ¶Ï */
+    /* Ê¹ï¿½ï¿½ï¿½Ğ¶ï¿½ */
     if (u8AdcIntEn != 0U) {
         ADC_IntCmd(ADC_UNIT, u8AdcIntEn, ENABLE);
     }
@@ -235,20 +249,20 @@ static void Adc_ProcessInterruptChannels(void)
 {
     uint16_t u16AdcValue;
     
-    /* ±éÀúËùÓĞÊµÀı£¬´¦ÀíÖĞ¶ÏÄ£Ê½µÄÍ¨µÀ */
+    /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¶ï¿½Ä£Ê½ï¿½ï¿½Í¨ï¿½ï¿½ */
     for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
         stc_adc_instance_t *pstcInst = &s_astcAdcInstances[i];
         
         if (pstcInst->enMode == ADC_MODE_INTERRUPT) {
-            /* ¶ÁÈ¡ ADC Öµ */
+            /* ï¿½ï¿½È¡ ADC Öµ */
             u16AdcValue = ADC_GetValue(ADC_UNIT, pstcInst->u8Channel);
             
-            /* ¸üĞÂÊµÀıÊı¾İ */
+            /* ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
             pstcInst->u16LatestValue = u16AdcValue;
             pstcInst->u8ValueUpdated = 1U;
             pstcInst->u32SampleCount++;
             
-            /* Èç¹û×¢²áÁË»Øµ÷º¯Êı£¬µ÷ÓÃËü */
+            /* ï¿½ï¿½ï¿½×¢ï¿½ï¿½ï¿½Ë»Øµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
             if (pstcInst->pfnCallback != NULL) {
                 pstcInst->pfnCallback(u16AdcValue);
             }
@@ -261,10 +275,17 @@ static void Adc_ProcessInterruptChannels(void)
  */
 static void ADC1_SeqA_IrqCallback(void)
 {
-    /* Çå³ıÖĞ¶Ï±êÖ¾ */
+    /* è°ƒè¯•ç¿»è½¬: æ¯æ¬¡ ADC è§¦å‘å®Œæˆç¿»è½¬å¼•è„šï¼Œç¤ºæ³¢å™¨æµ‹é¢‘ç‡=é‡‡æ ·ç‡/2 */
+#ifdef ADC_DEBUG_TOGGLE_ENABLE
+    LL_PERIPH_WE(LL_PERIPH_GPIO);
+    GPIO_TOGGLE(ADC_DEBUG_TOGGLE_PORT, ADC_DEBUG_TOGGLE_PIN);
+    LL_PERIPH_WP(LL_PERIPH_GPIO);
+#endif
+
+    /* ï¿½ï¿½ï¿½ï¿½Ğ¶Ï±ï¿½Ö¾ */
     ADC_ClearStatus(ADC_UNIT, ADC_FLAG_EOCA);
-    
-    /* ´¦ÀíËùÓĞÖĞ¶ÏÄ£Ê½µÄÍ¨µÀ */
+
+    /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¶ï¿½Ä£Ê½ï¿½ï¿½Í¨ï¿½ï¿½ */
     Adc_ProcessInterruptChannels();
 }
 
@@ -278,7 +299,7 @@ static void Adc_HardTriggerStart(void)
 }
 
 /*******************************************************************************
- * µçÑ¹¼ÆËãº¯Êı
+ * ï¿½ï¿½Ñ¹ï¿½ï¿½ï¿½ãº¯ï¿½ï¿½
  ******************************************************************************/
 
 static uint16_t Adc_CalcVoltage(uint16_t u16AdcValue)
@@ -287,13 +308,13 @@ static uint16_t Adc_CalcVoltage(uint16_t u16AdcValue)
 }
 
 /*******************************************************************************
- * API º¯Êı - ¶ÔÍâ½Ó¿Ú
+ * API ï¿½ï¿½ï¿½ï¿½ - ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
  ******************************************************************************/
 
 /**
  * @brief  Create an ADC instance
- * @param  pstcConfig  ADC ÅäÖÃ½á¹¹Ìå
- * @return ADC ÊµÀı ID (0-7)£¬Ê§°Ü·µ»Ø 0xFF
+ * @param  pstcConfig  ADC ï¿½ï¿½ï¿½Ã½á¹¹ï¿½ï¿½
+ * @return ADC Êµï¿½ï¿½ ID (0-7)ï¿½ï¿½Ê§ï¿½Ü·ï¿½ï¿½ï¿½ 0xFF
  */
 uint8_t Adc_Create(stc_adc_config_t *pstcConfig)
 {
@@ -302,7 +323,7 @@ uint8_t Adc_Create(stc_adc_config_t *pstcConfig)
         return 0xFF;
     }
     
-    /* ¼ì²éÍ¨µÀÊÇ·ñÒÑ´æÔÚ */
+    /* ï¿½ï¿½ï¿½Í¨ï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ñ´ï¿½ï¿½ï¿½ */
     for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
         if (s_astcAdcInstances[i].u8Channel == pstcConfig->u8Channel) {
             ADC_Adp_DEBUG("ADC CH%d already exists! Skip\r\n", pstcConfig->u8Channel);
@@ -313,7 +334,7 @@ uint8_t Adc_Create(stc_adc_config_t *pstcConfig)
     uint8_t u8Id = s_u8AdcInstanceCount;
     stc_adc_instance_t *pstcInst = &s_astcAdcInstances[u8Id];
     
-    /* ³õÊ¼»¯ÊµÀı */
+    /* ï¿½ï¿½Ê¼ï¿½ï¿½Êµï¿½ï¿½ */
     memset(pstcInst, 0, sizeof(stc_adc_instance_t));
     pstcInst->u8Id = u8Id;
     pstcInst->u8Channel = pstcConfig->u8Channel;
@@ -322,7 +343,7 @@ uint8_t Adc_Create(stc_adc_config_t *pstcConfig)
     pstcInst->u8Pin = pstcConfig->stcPin.u8Pin;
     pstcInst->pfnCallback = pstcConfig->pfnCallback;
     
-    /* ³õÊ¼»¯ DMA ID Ó³ÉäÎªÎŞĞ§ */
+    /* ï¿½ï¿½Ê¼ï¿½ï¿½ DMA ID Ó³ï¿½ï¿½Îªï¿½ï¿½Ğ§ */
     s_a8AdcIdToDmaId[u8Id] = -1;
     
     if (pstcConfig->enMode == ADC_MODE_DMA) {
@@ -344,7 +365,7 @@ uint8_t Adc_Create(stc_adc_config_t *pstcConfig)
 
 /**
  * @brief  Initialize ADC driver (call after creating all instances)
- * @note   Èç¹û´æÔÚ DMA Ä£Ê½ÊµÀı£¬»á×Ô¶¯´´½¨²¢³õÊ¼»¯¶ÔÓ¦µÄ DMA Í¨µÀ
+ * @note   ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ DMA Ä£Ê½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ DMA Í¨ï¿½ï¿½
  */
 void Adc_Init(void)
 {
@@ -358,35 +379,35 @@ void Adc_Init(void)
         return;
     }
     
-    /* 1. ³õÊ¼»¯ ADC Ó²¼ş */
+    /* 1. ï¿½ï¿½Ê¼ï¿½ï¿½ ADC Ó²ï¿½ï¿½ */
     Adc_InitConfig();
     
-    /* 2. Èç¹ûÓĞ DMA Ä£Ê½ÊµÀı£¬Í¨¹ı Dma ²ã´´½¨²¢³õÊ¼»¯ DMA Í¨µÀ */
+    /* 2. ï¿½ï¿½ï¿½ï¿½ï¿½ DMA Ä£Ê½Êµï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½ Dma ï¿½ã´´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ DMA Í¨ï¿½ï¿½ */
     if (s_bHasDmaInstance) {
         for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
             stc_adc_instance_t *pstcInst = &s_astcAdcInstances[i];
             
             if (pstcInst->enMode == ADC_MODE_DMA) {
-                /* ¹¹Ôì DMA ÅäÖÃ */
+                /* ï¿½ï¿½ï¿½ï¿½ DMA ï¿½ï¿½ï¿½ï¿½ */
                 stc_dma_config_t stcDmaConfig;
                 memset(&stcDmaConfig, 0, sizeof(stc_dma_config_t));
                 
-                stcDmaConfig.u8DmaUnit      = 1;  /* Ê¹ÓÃ DMA1 */
+                stcDmaConfig.u8DmaUnit      = 1;  /* Ê¹ï¿½ï¿½ DMA1 */
                 stcDmaConfig.u8Channel      = pstcInst->u8DmaChannel;
                 stcDmaConfig.enDir          = DMA_DIR_PERIPH_TO_MEM;
                 stcDmaConfig.enTransMode    = DMA_TRANS_MODE_REPEAT;
                 stcDmaConfig.u32SrcAddr     = (uint32_t)((uint32_t)&ADC_UNIT->DR0 + (pstcInst->u8Channel * 2U));
-                stcDmaConfig.u32DestAddr    = 0;  /* ÓÉ Dma ²ã·ÖÅä»º³åÇøºóÉèÖÃ */
+                stcDmaConfig.u32DestAddr    = 0;  /* ï¿½ï¿½ Dma ï¿½ï¿½ï¿½ï¿½ä»ºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
                 stcDmaConfig.u32DataWidth   = DMA_DATAWIDTH_16BIT;
                 stcDmaConfig.u16BlockSize   = pstcInst->u16DmaBufferSize;
-                stcDmaConfig.u16TransCount  = 0;  /* ÎŞÏŞ´«Êä */
+                stcDmaConfig.u16TransCount  = 0;  /* ï¿½ï¿½ï¿½Ş´ï¿½ï¿½ï¿½ */
                 stcDmaConfig.u32SrcAddrInc  = DMA_SRC_ADDR_FIX;
                 stcDmaConfig.u32DestAddrInc = DMA_DEST_ADDR_INC;
                 stcDmaConfig.u8EnableInt    = 1;
                 stcDmaConfig.u8IntPriority  = DMA_DEFAULT_INT_PRIO;
-                stcDmaConfig.pfnCallback    = NULL;  /* DMA Íê³É»Øµ÷ÓÉ Dma ²ã¹ÜÀí */
+                stcDmaConfig.pfnCallback    = NULL;  /* DMA ï¿½ï¿½É»Øµï¿½ï¿½ï¿½ Dma ï¿½ï¿½ï¿½ï¿½ï¿½ */
                 
-                /* ´´½¨ DMA ÊµÀı */
+                /* ï¿½ï¿½ï¿½ï¿½ DMA Êµï¿½ï¿½ */
                 uint8_t u8DmaId = Dma_Create(&stcDmaConfig);
                 if (u8DmaId != 0xFF) {
                     s_a8AdcIdToDmaId[i] = (int8_t)u8DmaId;
@@ -399,20 +420,20 @@ void Adc_Init(void)
             }
         }
         
-        /* ³õÊ¼»¯ËùÓĞ DMA Í¨µÀ */
+        /* ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ DMA Í¨ï¿½ï¿½ */
         Dma_Init();
         
-        /* Æô¶¯ËùÓĞ DMA Í¨µÀ */
+        /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ DMA Í¨ï¿½ï¿½ */
         Dma_StartAll();
     }
     
-    /* 3. ÅäÖÃ¶¨Ê±Æ÷´¥·¢ */
-    Timer0_Config(1000);
+    /* 3. è®¾ç½®é‡‡æ ·é—´éš” (è§ Adc.h ADC_SAMPLE_INTERVAL_US) */
+    Timer0_Config(ADC_SAMPLE_INTERVAL_US);
     
-    /* 4. ÅäÖÃ ADC Ó²¼ş´¥·¢ */
+    /* 4. ï¿½ï¿½ï¿½ï¿½ ADC Ó²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
     Adc_HardTriggerConfig();
     
-    /* 5. ÅäÖÃ ADC ÖĞ¶Ï */
+    /* 5. ï¿½ï¿½ï¿½ï¿½ ADC ï¿½Ğ¶ï¿½ */
     Adc_IrqConfig();
     
     s_bAdcInitialized = true;
@@ -426,7 +447,7 @@ void Adc_DeInit(void)
 {
     Adc_Stop();
     
-    /* ·´³õÊ¼»¯ DMA */
+    /* ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ DMA */
     if (s_bHasDmaInstance) {
         Dma_DeInit();
     }
@@ -456,7 +477,7 @@ void Adc_Stop(void)
 
 /**
  * @brief  Process ADC data - call this in main loop
- * @param  u32PrintIntervalMs ´òÓ¡¼ä¸ô(ms)£¬0 ±íÊ¾²»´òÓ¡
+ * @param  u32PrintIntervalMs ï¿½ï¿½Ó¡ï¿½ï¿½ï¿½(ms)ï¿½ï¿½0 ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½Ó¡
  */
 void Adc_ProcessData(uint32_t u32PrintIntervalMs)
 {
@@ -469,14 +490,14 @@ void Adc_ProcessData(uint32_t u32PrintIntervalMs)
         s_u32LastPrintTick = u32CurrentTick;
     }
     
-    /* Çå³ıÖĞ¶ÏÄ£Ê½ÊµÀıµÄÊı¾İ¸üĞÂ±êÖ¾ */
+    /* ï¿½ï¿½ï¿½ï¿½Ğ¶ï¿½Ä£Ê½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ¸ï¿½ï¿½Â±ï¿½Ö¾ */
     for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
         if (s_astcAdcInstances[i].u8ValueUpdated != 0U) {
             s_astcAdcInstances[i].u8ValueUpdated = 0U;
         }
     }
     
-    /* ´òÓ¡µ÷ÊÔĞÅÏ¢ */
+    /* ï¿½ï¿½Ó¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ */
     if (bPrintNow) {
         for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
             stc_adc_instance_t *pstcInst = &s_astcAdcInstances[i];
@@ -493,7 +514,7 @@ void Adc_ProcessData(uint32_t u32PrintIntervalMs)
                 }
             }
             else if (pstcInst->enMode == ADC_MODE_DMA) {
-                /* Í¨¹ı Dma ²ã»ñÈ¡Êı¾İ */
+                /* Í¨ï¿½ï¿½ Dma ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ */
                 int8_t s8DmaId = s_a8AdcIdToDmaId[i];
                 if (s8DmaId >= 0) {
                     uint16_t u16Latest = Dma_GetLatestValue((uint8_t)s8DmaId);
@@ -517,7 +538,7 @@ void Adc_ProcessData(uint32_t u32PrintIntervalMs)
 
 /**
  * @brief  Get latest ADC value for an ADC instance
- * @param  u8AdcId ADC ÊµÀı ID
+ * @param  u8AdcId ADC Êµï¿½ï¿½ ID
  * @return ADC Ô­Ê¼Öµ
  */
 uint16_t Adc_GetLatestValue(uint8_t u8AdcId)
@@ -541,8 +562,8 @@ uint16_t Adc_GetLatestValue(uint8_t u8AdcId)
 
 /**
  * @brief  Get average ADC value for an ADC instance
- * @param  u8AdcId ADC ÊµÀı ID
- * @return ADC Æ½¾ùÖµ£¨DMA Ä£Ê½ÏÂÎª»º³åÇø¾ùÖµ£¬ÖĞ¶ÏÄ£Ê½ÏÂÎª×îĞÂÖµ£©
+ * @param  u8AdcId ADC Êµï¿½ï¿½ ID
+ * @return ADC Æ½ï¿½ï¿½Öµï¿½ï¿½DMA Ä£Ê½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½Ğ¶ï¿½Ä£Ê½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½
  */
 uint16_t Adc_GetAverageValue(uint8_t u8AdcId)
 {
@@ -565,8 +586,8 @@ uint16_t Adc_GetAverageValue(uint8_t u8AdcId)
 
 /**
  * @brief  Get sample count for an ADC instance
- * @param  u8AdcId ADC ÊµÀı ID
- * @return ²ÉÑù´ÎÊı
+ * @param  u8AdcId ADC Êµï¿½ï¿½ ID
+ * @return ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
  */
 uint32_t Adc_GetSampleCount(uint8_t u8AdcId)
 {
@@ -589,8 +610,8 @@ uint32_t Adc_GetSampleCount(uint8_t u8AdcId)
 
 /**
  * @brief  Find ADC instance ID by channel number
- * @param  u8Channel ADC Í¨µÀºÅ
- * @return ADC ÊµÀı ID£¬Î´ÕÒµ½·µ»Ø -1
+ * @param  u8Channel ADC Í¨ï¿½ï¿½ï¿½ï¿½
+ * @return ADC Êµï¿½ï¿½ IDï¿½ï¿½Î´ï¿½Òµï¿½ï¿½ï¿½ï¿½ï¿½ -1
  */
 int8_t Adc_FindIdByChannel(uint8_t u8Channel)
 {
@@ -616,7 +637,9 @@ void Adc_EnableInterrupt(void)
     stcIrq.enIntSrc    = ADC_SEQA_INT_SRC;
     stcIrq.enIRQn      = ADC_SEQA_INT_IRQn;
     stcIrq.pfnCallback = &ADC1_SeqA_IrqCallback;
+    LL_PERIPH_WE(LL_PERIPH_INTC);
     (void)INTC_IrqSignIn(&stcIrq);
+    LL_PERIPH_WP(LL_PERIPH_INTC);
 
     /* Configure NVIC */
     NVIC_ClearPendingIRQ(stcIrq.enIRQn);
