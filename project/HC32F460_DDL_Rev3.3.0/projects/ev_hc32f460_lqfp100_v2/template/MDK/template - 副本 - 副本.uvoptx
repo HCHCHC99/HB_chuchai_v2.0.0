@@ -148,62 +148,34 @@
           <Name>UL2CM3(-S0 -C0 -P0 -FD1FFF8000 -FC1000 -FN2 -FF0HC32F46x -FS00 -FL0200000 -FF1HC32F46x_otp -FS13000C00 -FL13FC -FP0($$Device:HC32F460JETA$FlashARM\HC32F46x.FLM) -FP1($$Device:HC32F460JETA$FlashARM\HC32F46x_otp.FLM))</Name>
         </SetRegEntry>
       </TargetDriverDllRegistry>
-      <Breakpoint>
-        <Bp>
-          <Number>0</Number>
-          <Type>0</Type>
-          <LineNumber>402</LineNumber>
-          <EnabledFlag>1</EnabledFlag>
-          <Address>29852</Address>
-          <ByteObject>0</ByteObject>
-          <HtxType>0</HtxType>
-          <ManyObjects>0</ManyObjects>
-          <SizeOfObject>0</SizeOfObject>
-          <BreakByAccess>0</BreakByAccess>
-          <BreakIfRCount>1</BreakIfRCount>
-          <Filename>..\..\Dev\dev_motor.c</Filename>
-          <ExecCommand></ExecCommand>
-          <Expression>\\template\../../Dev/dev_motor.c\402</Expression>
-        </Bp>
-        <Bp>
-          <Number>1</Number>
-          <Type>0</Type>
-          <LineNumber>368</LineNumber>
-          <EnabledFlag>1</EnabledFlag>
-          <Address>29764</Address>
-          <ByteObject>0</ByteObject>
-          <HtxType>0</HtxType>
-          <ManyObjects>0</ManyObjects>
-          <SizeOfObject>0</SizeOfObject>
-          <BreakByAccess>0</BreakByAccess>
-          <BreakIfRCount>1</BreakIfRCount>
-          <Filename>..\..\Dev\dev_motor.c</Filename>
-          <ExecCommand></ExecCommand>
-          <Expression>\\template\../../Dev/dev_motor.c\368</Expression>
-        </Bp>
-      </Breakpoint>
-      <WatchWindow2>
+      <Breakpoint/>
+      <WatchWindow1>
         <Ww>
           <count>0</count>
-          <WinNumber>2</WinNumber>
-          <ItemText>g_AppParam,0x0A</ItemText>
+          <WinNumber>1</WinNumber>
+          <ItemText>g_adc_current_dev,0x0A</ItemText>
         </Ww>
         <Ww>
           <count>1</count>
-          <WinNumber>2</WinNumber>
-          <ItemText>GPIOB-&gt;ODR</ItemText>
+          <WinNumber>1</WinNumber>
+          <ItemText>pstcResp,0x0A</ItemText>
         </Ww>
         <Ww>
           <count>2</count>
-          <WinNumber>2</WinNumber>
-          <ItemText>GPIOB-&gt;IDR</ItemText>
+          <WinNumber>1</WinNumber>
+          <ItemText>data,0x0A</ItemText>
         </Ww>
         <Ww>
           <count>3</count>
-          <WinNumber>2</WinNumber>
-          <ItemText>GPIOB</ItemText>
+          <WinNumber>1</WinNumber>
+          <ItemText>pstcDev,0x0A</ItemText>
         </Ww>
-      </WatchWindow2>
+        <Ww>
+          <count>4</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>pstcAlarm</ItemText>
+        </Ww>
+      </WatchWindow1>
       <Tracepoint>
         <THDelay>0</THDelay>
       </Tracepoint>
@@ -246,12 +218,6 @@
       <pszMrulep></pszMrulep>
       <pSingCmdsp></pSingCmdsp>
       <pMultCmdsp></pMultCmdsp>
-      <SystemViewers>
-        <Entry>
-          <Name>System Viewer\PORT</Name>
-          <WinId>35905</WinId>
-        </Entry>
-      </SystemViewers>
       <DebugDescription>
         <Enable>1</Enable>
         <EnableFlashSeq>1</EnableFlashSeq>
@@ -437,7 +403,7 @@
 
   <Group>
     <GroupName>source</GroupName>
-    <tvExp>0</tvExp>
+    <tvExp>1</tvExp>
     <tvExpOptDlg>0</tvExpOptDlg>
     <cbSel>0</cbSel>
     <RteFlg>0</RteFlg>
@@ -1502,6 +1468,18 @@
       <bDave2>0</bDave2>
       <PathWithFileName>..\..\Utils\param_validator.c</PathWithFileName>
       <FilenameWithoutPath>param_validator.c</FilenameWithoutPath>
+      <RteFlg>0</RteFlg>
+      <bShared>0</bShared>
+    </File>
+    <File>
+      <GroupNumber>9</GroupNumber>
+      <FileNumber>87</FileNumber>
+      <FileType>1</FileType>
+      <tvExp>0</tvExp>
+      <tvExpOptDlg>0</tvExpOptDlg>
+      <bDave2>0</bDave2>
+      <PathWithFileName>..\..\Utils\App_RunAngle.c</PathWithFileName>
+      <FilenameWithoutPath>App_RunAngle.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>

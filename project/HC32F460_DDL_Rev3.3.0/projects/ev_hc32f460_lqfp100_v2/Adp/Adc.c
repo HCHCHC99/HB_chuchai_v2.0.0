@@ -2,7 +2,6 @@
  *******************************************************************************
  * @file  Adc.c
  * @brief ADC Driver for HC32F460 - Generic framework with multiple instances
- *        DMA ��ز���ί�и� Dma �㴦��
  *******************************************************************************
  */
 
@@ -17,17 +16,10 @@
  * Local variables ('static')
  ******************************************************************************/
 
-/* ADC ʵ������ */
 static stc_adc_instance_t s_astcAdcInstances[ADC_MAX_INSTANCES];
 static uint8_t s_u8AdcInstanceCount = 0;
-
-/* ADC ��ʼ����־ */
 static bool s_bAdcInitialized = false;
-
-/* �Ƿ��� DMA ģʽʵ�� */
 static bool s_bHasDmaInstance = false;
-
-/* DMA ʵ�� ID ӳ�䣺ADC ʵ�� ID �� DMA ʵ�� ID���� DMA ģʽ��Ч�� */
 static int8_t s_a8AdcIdToDmaId[ADC_MAX_INSTANCES];
 
 /*******************************************************************************
@@ -39,23 +31,17 @@ static void Adc_SetPinAnalogMode(uint8_t u8Port, uint8_t u8Pin);
 static void Adc_HardTriggerConfig(void);
 static void Adc_IrqConfig(void);
 static void Adc_HardTriggerStart(void);
-
 static void Timer0_Config(uint32_t u32IntervalUs);
-
 static void ADC1_SeqA_IrqCallback(void);
-
 static uint16_t Adc_CalcVoltage(uint16_t u16AdcValue);
 static void Adc_ProcessInterruptChannels(void);
 static char Adc_GetPortLetter(uint8_t u8Port);
 static uint8_t Adc_GetPinNumber(uint16_t u16Pin);
 
 /*******************************************************************************
- * ADC ��������
+ * Implementation
  ******************************************************************************/
 
-/**
- * @brief  Get pin number from GPIO pin macro
- */
 static uint8_t Adc_GetPinNumber(uint16_t u16Pin)
 {
     switch (u16Pin) {
@@ -79,9 +65,6 @@ static uint8_t Adc_GetPinNumber(uint16_t u16Pin)
     }
 }
 
-/**
- * @brief  Get port letter for display
- */
 static char Adc_GetPortLetter(uint8_t u8Port)
 {
     switch (u8Port) {
@@ -95,57 +78,44 @@ static char Adc_GetPortLetter(uint8_t u8Port)
     }
 }
 
-/**
- * @brief  Set a single ADC pin to analog mode
- */
 static void Adc_SetPinAnalogMode(uint8_t u8Port, uint8_t u8Pin)
 {
     stc_gpio_init_t stcGpioInit;
     (void)GPIO_StructInit(&stcGpioInit);
     stcGpioInit.u16PinAttr = PIN_ATTR_ANALOG;
-	LL_PERIPH_WE(LL_PERIPH_GPIO);
+    LL_PERIPH_WE(LL_PERIPH_GPIO);
     (void)GPIO_Init(u8Port, u8Pin, &stcGpioInit);
-	LL_PERIPH_WP(LL_PERIPH_GPIO);
+    LL_PERIPH_WP(LL_PERIPH_GPIO);
 }
 
-/**
- * @brief  Initialize ADC hardware
- */
 static void Adc_InitConfig(void)
 {
     stc_adc_init_t stcAdcInit;
 
-    /* 0. 初始化调试翻转引脚 — 每次 EOCA 翻转，示波器可测 200us 触发 */
 #ifdef ADC_DEBUG_TOGGLE_ENABLE
     LL_PERIPH_WE(LL_PERIPH_GPIO);
     Output_GPIO_Init(ADC_DEBUG_TOGGLE_PORT, ADC_DEBUG_TOGGLE_PIN, GPIO_INIT_LOW);
     LL_PERIPH_WP(LL_PERIPH_GPIO);
 #endif
 
-    /* 1. Enable ADC peripheral clock */
     LL_PERIPH_WE(LL_PERIPH_FCG);
     FCG_Fcg3PeriphClockCmd(ADC_PERIPH_CLK, ENABLE);
     LL_PERIPH_WP(LL_PERIPH_FCG);
 
-    /* 2. Modify the default value depends on the application */
     (void)ADC_StructInit(&stcAdcInit);
-    stcAdcInit.u16ScanMode = ADC_MD_SEQA_SINGLESHOT;  /* ����A����ת��ģʽ */
+    stcAdcInit.u16ScanMode = ADC_MD_SEQA_SINGLESHOT;
 
-    /* 3. Initialize ADC */
     (void)ADC_Init(ADC_UNIT, &stcAdcInit);
 
-    /* 4. Configure all ADC pins and enable channels */
     for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
         stc_adc_instance_t *pstcInst = &s_astcAdcInstances[i];
         
-        /* ��������Ϊģ��ģʽ */
         Adc_SetPinAnalogMode(pstcInst->u8Port, pstcInst->u8Pin);
         ADC_Adp_DEBUG("ADC CH%d pin initialized (P%c%d)\r\n", 
                pstcInst->u8Channel,
                Adc_GetPortLetter(pstcInst->u8Port),
                Adc_GetPinNumber(pstcInst->u8Pin));
         
-        /* ʹ�� ADC ͨ�� */
         ADC_ChCmd(ADC_UNIT, ADC_SEQ_A, pstcInst->u8Channel, ENABLE);
         ADC_Adp_DEBUG("ADC SEQ_A CH%d enabled (%s mode)\r\n", 
                pstcInst->u8Channel,
@@ -155,61 +125,42 @@ static void Adc_InitConfig(void)
     ADC_Adp_DEBUG("ADC initialized: %d channels in SEQ_A\r\n", s_u8AdcInstanceCount);
 }
 
-/**
- * @brief  Timer0 configuration for ADC trigger
- * @param  u32IntervalUs �������(us)������ 1000 = 1ms
- */
 static void Timer0_Config(uint32_t u32IntervalUs)
 {
     stc_tmr0_init_t stcTmr0Init;
     
-    /* Enable Timer0 peripheral clock */
     LL_PERIPH_WE(LL_PERIPH_FCG);
     FCG_Fcg2PeriphClockCmd(TMR0_PERIPH_CLK, ENABLE);
     LL_PERIPH_WP(LL_PERIPH_FCG);
     
-    /* ���㶨ʱ��ʱ��Ƶ�� */
     uint32_t u32TimerClk = CLK_GetBusClockFreq(CLK_BUS_PCLK1) / (1UL << (TMR0_CLK_DIV >> TMR0_BCONR_CKDIVA_POS));
-    
-    /* ����Ƶ��: freq = 1 / interval */
-    uint32_t u32Freq = 1000000UL / u32IntervalUs;  /* ת��Ϊ Hz */
+    uint32_t u32Freq = 1000000UL / u32IntervalUs;
     uint16_t u16CompareValue = (uint16_t)(u32TimerClk / u32Freq) - 1;
     
-    /* Timer0 structure initialize */
     (void)TMR0_StructInit(&stcTmr0Init);
     stcTmr0Init.u32ClockDiv = TMR0_CLK_DIV;
     stcTmr0Init.u32Func = TMR0_FUNC_CMP;
     stcTmr0Init.u16CompareValue = u16CompareValue;
     stcTmr0Init.u32ClockSrc = TMR0_CLK_SRC_INTERN_CLK;
     
-    /* Initialize Timer0 */
     (void)TMR0_Init(TMR0_UNIT, TMR0_CH, &stcTmr0Init);
     
     ADC_Adp_DEBUG("Timer0 configured for ADC trigger, interval=%lu us, compare=%u\r\n", 
            u32IntervalUs, u16CompareValue);
 }
 
-/**
- * @brief  ADC hard trigger configuration
- */
 static void Adc_HardTriggerConfig(void)
 {
-    /* ���� ADC Ӳ������ */
     ADC_TriggerConfig(ADC_UNIT, ADC_SEQ_A, ADC_SEQA_HARDTRIG);
     ADC_TriggerCmd(ADC_UNIT, ADC_SEQ_A, ENABLE);
-    
     ADC_Adp_DEBUG("SEQ_A: Timer0 -> ADC (mixed interrupt/DMA modes)\r\n");
 }
 
-/**
- * @brief  ADC interrupt configuration
- */
 static void Adc_IrqConfig(void)
 {
     stc_irq_signin_config_t stcIrq;
     uint8_t u8AdcIntEn = 0U;
 
-    /* ����Ƿ����ж�ģʽ��ʵ�� */
     uint8_t u8HasInterruptMode = 0U;
     for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
         if (s_astcAdcInstances[i].enMode == ADC_MODE_INTERRUPT) {
@@ -218,7 +169,6 @@ static void Adc_IrqConfig(void)
         }
     }
 
-    /* ������ж�ģʽʵ����ʹ�� ADC �ж� */
     if (u8HasInterruptMode) {
         stcIrq.enIntSrc    = ADC_SEQA_INT_SRC;
         stcIrq.enIRQn      = ADC_SEQA_INT_IRQn;
@@ -236,71 +186,54 @@ static void Adc_IrqConfig(void)
         ADC_Adp_DEBUG("SEQ_A interrupt disabled (no interrupt-mode channels)\r\n");
     }
     
-    /* ʹ���ж� */
     if (u8AdcIntEn != 0U) {
         ADC_IntCmd(ADC_UNIT, u8AdcIntEn, ENABLE);
     }
 }
 
 /**
- * @brief  Process all interrupt mode channels in ADC interrupt
+ * @brief Process all interrupt mode channels in ADC interrupt
+ * @note  Now calls callback with channel parameter for dev_adc layer
  */
 static void Adc_ProcessInterruptChannels(void)
 {
     uint16_t u16AdcValue;
     
-    /* ��������ʵ���������ж�ģʽ��ͨ�� */
     for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
         stc_adc_instance_t *pstcInst = &s_astcAdcInstances[i];
         
         if (pstcInst->enMode == ADC_MODE_INTERRUPT) {
-            /* ��ȡ ADC ֵ */
             u16AdcValue = ADC_GetValue(ADC_UNIT, pstcInst->u8Channel);
             
-            /* ����ʵ������ */
             pstcInst->u16LatestValue = u16AdcValue;
             pstcInst->u8ValueUpdated = 1U;
             pstcInst->u32SampleCount++;
             
-            /* ���ע���˻ص������������� */
+            /* Call callback with channel parameter if registered */
             if (pstcInst->pfnCallback != NULL) {
-                pstcInst->pfnCallback(u16AdcValue);
+                pstcInst->pfnCallback(u16AdcValue, pstcInst->u8Channel);
             }
         }
     }
 }
 
-/**
- * @brief  ADC1 Sequence A interrupt callback
- */
 static void ADC1_SeqA_IrqCallback(void)
 {
-    /* 调试翻转: 每次 ADC 触发完成翻转引脚，示波器测频率=采样率/2 */
 #ifdef ADC_DEBUG_TOGGLE_ENABLE
     LL_PERIPH_WE(LL_PERIPH_GPIO);
     GPIO_TOGGLE(ADC_DEBUG_TOGGLE_PORT, ADC_DEBUG_TOGGLE_PIN);
     LL_PERIPH_WP(LL_PERIPH_GPIO);
 #endif
 
-    /* ����жϱ�־ */
     ADC_ClearStatus(ADC_UNIT, ADC_FLAG_EOCA);
-
-    /* ���������ж�ģʽ��ͨ�� */
     Adc_ProcessInterruptChannels();
 }
 
-/**
- * @brief  Start hardware triggers
- */
 static void Adc_HardTriggerStart(void)
 {
     TMR0_Start(TMR0_UNIT, TMR0_CH);
     ADC_Adp_DEBUG("Timer0 started for SEQ_A\r\n");
 }
-
-/*******************************************************************************
- * ��ѹ���㺯��
- ******************************************************************************/
 
 static uint16_t Adc_CalcVoltage(uint16_t u16AdcValue)
 {
@@ -308,14 +241,9 @@ static uint16_t Adc_CalcVoltage(uint16_t u16AdcValue)
 }
 
 /*******************************************************************************
- * API ���� - ����ӿ�
+ * API Functions
  ******************************************************************************/
 
-/**
- * @brief  Create an ADC instance
- * @param  pstcConfig  ADC ���ýṹ��
- * @return ADC ʵ�� ID (0-7)��ʧ�ܷ��� 0xFF
- */
 uint8_t Adc_Create(stc_adc_config_t *pstcConfig)
 {
     if (s_u8AdcInstanceCount >= ADC_MAX_INSTANCES) {
@@ -323,7 +251,6 @@ uint8_t Adc_Create(stc_adc_config_t *pstcConfig)
         return 0xFF;
     }
     
-    /* ���ͨ���Ƿ��Ѵ��� */
     for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
         if (s_astcAdcInstances[i].u8Channel == pstcConfig->u8Channel) {
             ADC_Adp_DEBUG("ADC CH%d already exists! Skip\r\n", pstcConfig->u8Channel);
@@ -334,7 +261,6 @@ uint8_t Adc_Create(stc_adc_config_t *pstcConfig)
     uint8_t u8Id = s_u8AdcInstanceCount;
     stc_adc_instance_t *pstcInst = &s_astcAdcInstances[u8Id];
     
-    /* ��ʼ��ʵ�� */
     memset(pstcInst, 0, sizeof(stc_adc_instance_t));
     pstcInst->u8Id = u8Id;
     pstcInst->u8Channel = pstcConfig->u8Channel;
@@ -343,7 +269,6 @@ uint8_t Adc_Create(stc_adc_config_t *pstcConfig)
     pstcInst->u8Pin = pstcConfig->stcPin.u8Pin;
     pstcInst->pfnCallback = pstcConfig->pfnCallback;
     
-    /* ��ʼ�� DMA ID ӳ��Ϊ��Ч */
     s_a8AdcIdToDmaId[u8Id] = -1;
     
     if (pstcConfig->enMode == ADC_MODE_DMA) {
@@ -363,10 +288,6 @@ uint8_t Adc_Create(stc_adc_config_t *pstcConfig)
     return u8Id;
 }
 
-/**
- * @brief  Initialize ADC driver (call after creating all instances)
- * @note   ������� DMA ģʽʵ�������Զ���������ʼ����Ӧ�� DMA ͨ��
- */
 void Adc_Init(void)
 {
     if (s_bAdcInitialized) {
@@ -379,35 +300,31 @@ void Adc_Init(void)
         return;
     }
     
-    /* 1. ��ʼ�� ADC Ӳ�� */
     Adc_InitConfig();
     
-    /* 2. ����� DMA ģʽʵ����ͨ�� Dma �㴴������ʼ�� DMA ͨ�� */
     if (s_bHasDmaInstance) {
         for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
             stc_adc_instance_t *pstcInst = &s_astcAdcInstances[i];
             
             if (pstcInst->enMode == ADC_MODE_DMA) {
-                /* ���� DMA ���� */
                 stc_dma_config_t stcDmaConfig;
                 memset(&stcDmaConfig, 0, sizeof(stc_dma_config_t));
                 
-                stcDmaConfig.u8DmaUnit      = 1;  /* ʹ�� DMA1 */
+                stcDmaConfig.u8DmaUnit      = 1;
                 stcDmaConfig.u8Channel      = pstcInst->u8DmaChannel;
                 stcDmaConfig.enDir          = DMA_DIR_PERIPH_TO_MEM;
                 stcDmaConfig.enTransMode    = DMA_TRANS_MODE_REPEAT;
                 stcDmaConfig.u32SrcAddr     = (uint32_t)((uint32_t)&ADC_UNIT->DR0 + (pstcInst->u8Channel * 2U));
-                stcDmaConfig.u32DestAddr    = 0;  /* �� Dma ����仺���������� */
+                stcDmaConfig.u32DestAddr    = 0;
                 stcDmaConfig.u32DataWidth   = DMA_DATAWIDTH_16BIT;
                 stcDmaConfig.u16BlockSize   = pstcInst->u16DmaBufferSize;
-                stcDmaConfig.u16TransCount  = 0;  /* ���޴��� */
+                stcDmaConfig.u16TransCount  = 0;
                 stcDmaConfig.u32SrcAddrInc  = DMA_SRC_ADDR_FIX;
                 stcDmaConfig.u32DestAddrInc = DMA_DEST_ADDR_INC;
                 stcDmaConfig.u8EnableInt    = 1;
                 stcDmaConfig.u8IntPriority  = DMA_DEFAULT_INT_PRIO;
-                stcDmaConfig.pfnCallback    = NULL;  /* DMA ��ɻص��� Dma ����� */
+                stcDmaConfig.pfnCallback    = NULL;
                 
-                /* ���� DMA ʵ�� */
                 uint8_t u8DmaId = Dma_Create(&stcDmaConfig);
                 if (u8DmaId != 0xFF) {
                     s_a8AdcIdToDmaId[i] = (int8_t)u8DmaId;
@@ -420,34 +337,22 @@ void Adc_Init(void)
             }
         }
         
-        /* ��ʼ������ DMA ͨ�� */
         Dma_Init();
-        
-        /* �������� DMA ͨ�� */
         Dma_StartAll();
     }
     
-    /* 3. 设置采样间隔 (见 Adc.h ADC_SAMPLE_INTERVAL_US) */
     Timer0_Config(ADC_SAMPLE_INTERVAL_US);
-    
-    /* 4. ���� ADC Ӳ������ */
     Adc_HardTriggerConfig();
-    
-    /* 5. ���� ADC �ж� */
     Adc_IrqConfig();
     
     s_bAdcInitialized = true;
     ADC_Adp_DEBUG("ADC driver initialized with %d instance(s)\r\n", s_u8AdcInstanceCount);
 }
 
-/**
- * @brief  Deinitialize ADC driver
- */
 void Adc_DeInit(void)
 {
     Adc_Stop();
     
-    /* ����ʼ�� DMA */
     if (s_bHasDmaInstance) {
         Dma_DeInit();
     }
@@ -458,27 +363,17 @@ void Adc_DeInit(void)
     ADC_Adp_DEBUG("ADC driver deinitialized\r\n");
 }
 
-/**
- * @brief  Start ADC conversions
- */
 void Adc_Start(void)
 {
     Adc_HardTriggerStart();
 }
 
-/**
- * @brief  Stop ADC conversions
- */
 void Adc_Stop(void)
 {
     TMR0_Stop(TMR0_UNIT, TMR0_CH);
     ADC_Adp_DEBUG("ADC stopped\r\n");
 }
 
-/**
- * @brief  Process ADC data - call this in main loop
- * @param  u32PrintIntervalMs ��ӡ���(ms)��0 ��ʾ����ӡ
- */
 void Adc_ProcessData(uint32_t u32PrintIntervalMs)
 {
     static uint32_t s_u32LastPrintTick = 0;
@@ -490,14 +385,12 @@ void Adc_ProcessData(uint32_t u32PrintIntervalMs)
         s_u32LastPrintTick = u32CurrentTick;
     }
     
-    /* ����ж�ģʽʵ�������ݸ��±�־ */
     for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
         if (s_astcAdcInstances[i].u8ValueUpdated != 0U) {
             s_astcAdcInstances[i].u8ValueUpdated = 0U;
         }
     }
     
-    /* ��ӡ������Ϣ */
     if (bPrintNow) {
         for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
             stc_adc_instance_t *pstcInst = &s_astcAdcInstances[i];
@@ -514,7 +407,6 @@ void Adc_ProcessData(uint32_t u32PrintIntervalMs)
                 }
             }
             else if (pstcInst->enMode == ADC_MODE_DMA) {
-                /* ͨ�� Dma ���ȡ���� */
                 int8_t s8DmaId = s_a8AdcIdToDmaId[i];
                 if (s8DmaId >= 0) {
                     uint16_t u16Latest = Dma_GetLatestValue((uint8_t)s8DmaId);
@@ -536,11 +428,6 @@ void Adc_ProcessData(uint32_t u32PrintIntervalMs)
     }
 }
 
-/**
- * @brief  Get latest ADC value for an ADC instance
- * @param  u8AdcId ADC ʵ�� ID
- * @return ADC ԭʼֵ
- */
 uint16_t Adc_GetLatestValue(uint8_t u8AdcId)
 {
     if (u8AdcId >= s_u8AdcInstanceCount) {
@@ -560,11 +447,6 @@ uint16_t Adc_GetLatestValue(uint8_t u8AdcId)
     return 0;
 }
 
-/**
- * @brief  Get average ADC value for an ADC instance
- * @param  u8AdcId ADC ʵ�� ID
- * @return ADC ƽ��ֵ��DMA ģʽ��Ϊ��������ֵ���ж�ģʽ��Ϊ����ֵ��
- */
 uint16_t Adc_GetAverageValue(uint8_t u8AdcId)
 {
     if (u8AdcId >= s_u8AdcInstanceCount) {
@@ -584,11 +466,6 @@ uint16_t Adc_GetAverageValue(uint8_t u8AdcId)
     return 0;
 }
 
-/**
- * @brief  Get sample count for an ADC instance
- * @param  u8AdcId ADC ʵ�� ID
- * @return ��������
- */
 uint32_t Adc_GetSampleCount(uint8_t u8AdcId)
 {
     if (u8AdcId >= s_u8AdcInstanceCount) {
@@ -608,11 +485,6 @@ uint32_t Adc_GetSampleCount(uint8_t u8AdcId)
     return 0;
 }
 
-/**
- * @brief  Find ADC instance ID by channel number
- * @param  u8Channel ADC ͨ����
- * @return ADC ʵ�� ID��δ�ҵ����� -1
- */
 int8_t Adc_FindIdByChannel(uint8_t u8Channel)
 {
     for (uint8_t i = 0; i < s_u8AdcInstanceCount; i++) {
@@ -623,17 +495,10 @@ int8_t Adc_FindIdByChannel(uint8_t u8Channel)
     return -1;
 }
 
-/**
- * @brief  Re-enable ADC interrupt (for adding interrupt-mode channels after DMA channels)
- * @note   This function is called when a new interrupt-mode ADC instance is created
- *         after Adc_Init() has already been called. It ensures the ADC EOCA interrupt
- *         is properly enabled so that interrupt-mode channels can receive data.
- */
 void Adc_EnableInterrupt(void)
 {
     stc_irq_signin_config_t stcIrq;
 
-    /* Register interrupt callback */
     stcIrq.enIntSrc    = ADC_SEQA_INT_SRC;
     stcIrq.enIRQn      = ADC_SEQA_INT_IRQn;
     stcIrq.pfnCallback = &ADC1_SeqA_IrqCallback;
@@ -641,12 +506,10 @@ void Adc_EnableInterrupt(void)
     (void)INTC_IrqSignIn(&stcIrq);
     LL_PERIPH_WP(LL_PERIPH_INTC);
 
-    /* Configure NVIC */
     NVIC_ClearPendingIRQ(stcIrq.enIRQn);
     NVIC_SetPriority(stcIrq.enIRQn, ADC_SEQA_INT_PRIO);
     NVIC_EnableIRQ(stcIrq.enIRQn);
 
-    /* Enable ADC EOCA interrupt */
     ADC_IntCmd(ADC_UNIT, ADC_INT_EOCA, ENABLE);
 
     ADC_Adp_DEBUG("ADC interrupt re-enabled (EOCA)\r\n");
