@@ -120,7 +120,7 @@
         <SetRegEntry>
           <Number>0</Number>
           <Key>DLGUARM</Key>
-          <Name>?</Name>
+          <Name>@</Name>
         </SetRegEntry>
         <SetRegEntry>
           <Number>0</Number>
@@ -148,7 +148,24 @@
           <Name></Name>
         </SetRegEntry>
       </TargetDriverDllRegistry>
-      <Breakpoint/>
+      <Breakpoint>
+        <Bp>
+          <Number>0</Number>
+          <Type>0</Type>
+          <LineNumber>520</LineNumber>
+          <EnabledFlag>1</EnabledFlag>
+          <Address>35668</Address>
+          <ByteObject>0</ByteObject>
+          <HtxType>0</HtxType>
+          <ManyObjects>0</ManyObjects>
+          <SizeOfObject>0</SizeOfObject>
+          <BreakByAccess>0</BreakByAccess>
+          <BreakIfRCount>1</BreakIfRCount>
+          <Filename>..\..\Dev\dev_motor.c</Filename>
+          <ExecCommand></ExecCommand>
+          <Expression>\\template\../../Dev/dev_motor.c\520</Expression>
+        </Bp>
+      </Breakpoint>
       <WatchWindow1>
         <Ww>
           <count>0</count>
@@ -223,7 +240,7 @@
         <Ww>
           <count>14</count>
           <WinNumber>1</WinNumber>
-          <ItemText>g_pu16DbgSimAdcVoltageMv,0x0A</ItemText>
+          <ItemText>s_u16SimSensorRawMv,0x0A</ItemText>
         </Ww>
         <Ww>
           <count>15</count>
@@ -304,6 +321,11 @@
           <count>30</count>
           <WinNumber>1</WinNumber>
           <ItemText>g_rturn_dev-&gt;fCurrentAngle,0x0A</ItemText>
+        </Ww>
+        <Ww>
+          <count>31</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>s_u16SimSensorRawMv,0x0A</ItemText>
         </Ww>
       </WatchWindow1>
       <Tracepoint>

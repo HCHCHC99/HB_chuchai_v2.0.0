@@ -75,7 +75,7 @@ void RunAngle_OnCalibration(void);
 /** @brief Try to calibrate on close-window overcurrent.
  *  Checks s_abs_offset_x10 against [calib_lower, calib_upper] from g_AppParam.
  *  If in range, calls RunAngle_OnCalibration() and returns true.
- *  If out of range, returns false (caller should set FAULT_BIT_OVERCURRENT). */
+ *  If out of range, returns false (caller should set FAULT_BIT_OVERCURRENT_FWD). */
 bool RunAngle_TryCalibrate(void);
 
 extern AbsAngleRecord_t g_AbsAngle;

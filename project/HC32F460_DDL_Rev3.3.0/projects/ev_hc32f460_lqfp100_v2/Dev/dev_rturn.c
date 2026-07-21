@@ -9,6 +9,16 @@
 #include "App_Params.h"   /* g_s32HallPulseAccum for pulse-direct angle */
 #include "App_RunAngle.h"
 
+/* 双向过流锁事件发布辅助: 故障位触发时同时封锁FWD和REV */
+static void RTurn_PublishBidirectionalOvercurrent(uint8_t u8IsActive) {
+    Current_AlarmEvent_t stcEvent;
+    stcEvent.s32CurrentMa = 0;
+    stcEvent.s32ThresholdMa = 0;
+    stcEvent.u8IsActive = u8IsActive;
+    EventBus_Publish(TOPIC_OVERCURRENT_FWD, &stcEvent);
+    EventBus_Publish(TOPIC_OVERCURRENT_REV, &stcEvent);
+}
+
 static uint32_t s_u32LastLockPrintTime = 0;
 static uint32_t s_u32LastLockDebugPrintTime = 0;
 static uint32_t s_u32LastLimitPrintTime = 0;
@@ -16,7 +26,7 @@ static uint32_t s_u32LastLimitPrintTime = 0;
 #define LOCK_DEBUG_PRINT_INTERVAL_MS   4000
 #define LIMIT_PRINT_INTERVAL_MS        4000
 
-// ========== Keil Watch����ȫ�ֱ��� ==========
+// ========== Keil Watch锟斤拷锟斤拷全锟街憋拷锟斤拷 ==========
 volatile float    g_fDbgRTurnAngle       = 0.0f;
 volatile float    g_fDbgRTurnSpeed       = 0.0f;
 volatile uint8_t  g_u8DbgRTurnDir        = 0;
@@ -26,7 +36,7 @@ volatile uint8_t  g_u8DbgRTurnLockActive = 0;
 volatile uint8_t  g_u8DbgRTurnCalibrated = 0;
 volatile uint8_t  g_u8DbgRTurnLimitTrig  = 0;
 
-// ========== �ڲ��������� ==========
+// ========== 锟节诧拷锟斤拷锟斤拷锟斤拷锟斤拷 ==========
 static DeviceResult_t RTurn_GetDesiredDirection(RTurn_Device_t* pstcDev, uint8_t* pu8MotorDir) {
     if (!pstcDev || !pu8MotorDir) return RESULT_PARAM_ERR;
     
@@ -101,7 +111,7 @@ static float RTurn_RpmToAngularSpeed(float fRpm, float fReductionRatio) {
     return fRpm * 360.0f / fReductionRatio / 60.0f;
 }
 
-// ��ȡ�������澯״̬��0=����, 1=�����澯��
+// 锟斤拷取锟斤拷锟斤拷锟斤拷锟芥警状态锟斤拷0=锟斤拷锟斤拷, 1=锟斤拷锟斤拷锟芥警锟斤拷
 static uint8_t RTurn_ReadSensorAlarm(RTurn_Device_t* pstcDev) {
     if (!pstcDev) return 0;
     
@@ -143,21 +153,21 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
     pstcDev->fCurrentSpeed = RTurn_RpmToAngularSpeed(fRpm, pstcDev->stcConfig.fReductionRatio);
     pstcDev->u8CurrentDir = RTurn_ConvertMotorDirToRTurnDir(u8MotorDir, pstcDev->stcConfig.u8ReverseOutput);
     
-    // ��ȡ���������ٲ�������������ڽ����ж�
+    // 锟斤拷取锟斤拷锟斤拷锟斤拷锟斤拷锟劫诧拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷诮锟斤拷锟斤拷卸锟�
     uint8_t u8DesiredDir = MOTOR_DIRECTION_NONE;
     RTurn_GetDesiredDirection(pstcDev, &u8DesiredDir);
     uint8_t u8DesiredRTurnDir = RTurn_ConvertMotorDirToRTurnDir(u8DesiredDir, pstcDev->stcConfig.u8ReverseOutput);
     
-    // ========== �����������򣨷���4�� ==========
-    // �������������Ч����STOP������������
-    // ��������������ʱ��������������ѱ�����ٲ������STOP��ʹ�û��淽��
+    // ========== 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟津（凤拷锟斤拷4锟斤拷 ==========
+    // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟叫э拷锟斤拷锟絊TOP锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+    // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷时锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷驯锟斤拷锟斤拷锟劫诧拷锟斤拷锟斤拷锟絊TOP锟斤拷使锟矫伙拷锟芥方锟斤拷
     if (u8DesiredRTurnDir != RTURN_DIR_STOP) {
         pstcDev->u8LastDesiredDir = u8DesiredRTurnDir;
     }
     
-    // ========== �����������澯״̬��������У׼״̬�� ==========
-    // ����4���ſ�������ʹ�û��淽����Ϊ��ѡ
-    // �����ǰ��������ΪSTOP�����淽����Ч��ʹ�û��淽��
+    // ========== 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟芥警状态锟斤拷锟斤拷锟斤拷锟斤拷校准状态锟斤拷 ==========
+    // 锟斤拷锟斤拷4锟斤拷锟脚匡拷锟斤拷锟斤拷锟斤拷使锟矫伙拷锟芥方锟斤拷锟斤拷为锟斤拷选
+    // 锟斤拷锟斤拷锟角帮拷锟斤拷锟斤拷锟斤拷锟轿猄TOP锟斤拷锟斤拷锟芥方锟斤拷锟斤拷效锟斤拷使锟矫伙拷锟芥方锟斤拷
     {
         uint8_t u8CheckDir = u8DesiredRTurnDir;
         if (u8CheckDir == RTURN_DIR_STOP && pstcDev->u8LastDesiredDir != RTURN_DIR_STOP) {
@@ -168,11 +178,11 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
             uint8_t u8Alarm = RTurn_ReadSensorAlarm(pstcDev);
             
             if (u8Alarm) {
-                // �����澯�ҷ�����Ч����������
+                // 锟斤拷锟斤拷锟芥警锟揭凤拷锟斤拷锟斤拷效锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
                 uint8_t u8LimitDir = (u8CheckDir == RTURN_DIR_FORWARD) ? RTURN_LIMIT_FORWARD : RTURN_LIMIT_REVERSE;
                 
                 if (u8CheckDir == RTURN_DIR_REVERSE) {
-                    /* �ر�ʱ���������ýǶ�Ϊ����λ�Ƕȣ������Ϊ��У׼ */
+                    /* 锟截憋拷时锟斤拷锟斤拷锟斤拷锟斤拷锟矫角讹拷为锟斤拷锟斤拷位锟角度ｏ拷锟斤拷锟斤拷锟轿拷锟叫Ｗ� */
                                         if (RunAngle_TryCalibrate()) {
                         g_s32HallPulseAccum = 0;
                         pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
@@ -182,10 +192,11 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
                         }
                         RunAngle_OnCalibration();
                     } else {
-                        RealTime_SetFault(FAULT_BIT_OVERCURRENT);
+                        RealTime_SetFault(FAULT_BIT_OVERCURRENT_REV);
+                        RTurn_PublishBidirectionalOvercurrent(1);
                     }
                 }
-                /* ��ʱ�����������ýǶȣ����ֵ�ǰ�Ƕ� */
+                /* 锟斤拷时锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟矫角度ｏ拷锟斤拷锟街碉拷前锟角讹拷 */
                 
                 pstcDev->stcLockState.u8LockedDir = u8CheckDir;
                 pstcDev->stcLockState.u8LockActive = 1;
@@ -207,7 +218,7 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
         }
     }
     
-    // ========== ��������߼���������У׼״̬�� ==========
+    // ========== 锟斤拷锟斤拷锟斤拷锟斤拷呒锟斤拷锟斤拷锟斤拷锟斤拷锟叫Ｗ甲刺拷锟� ==========
     if (pstcDev->stcLockState.u8LockActive) {
         if ((pstcDev->stcLockState.u8LockedDir == RTURN_DIR_FORWARD && u8DesiredRTurnDir == RTURN_DIR_REVERSE) ||
             (pstcDev->stcLockState.u8LockedDir == RTURN_DIR_REVERSE && u8DesiredRTurnDir == RTURN_DIR_FORWARD)) {
@@ -226,27 +237,28 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
             stcEvent.u8IsActive = 0;
             EventBus_Publish(TOPIC_RTURN_LIMIT, &stcEvent);
             
-            // �������������澯״̬��������У׼״̬��
+            // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟芥警状态锟斤拷锟斤拷锟斤拷锟斤拷校准状态锟斤拷
             if (u8DesiredRTurnDir != RTURN_DIR_STOP) {
                 uint8_t u8Alarm = RTurn_ReadSensorAlarm(pstcDev);
                 
                 if (u8Alarm) {
-                    // ��Ȼ�����������·���
+                    // 锟斤拷然锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟铰凤拷锟斤拷
                     uint8_t u8NewLimitDir = (u8DesiredRTurnDir == RTURN_DIR_FORWARD) ? RTURN_LIMIT_FORWARD : RTURN_LIMIT_REVERSE;
                     
                     if (u8DesiredRTurnDir == RTURN_DIR_REVERSE) {
-                        /* �ر�ʱ���������ýǶ�Ϊ����λ�Ƕȣ�����У׼״̬�²����ã� */
+                        /* 锟截憋拷时锟斤拷锟斤拷锟斤拷锟斤拷锟矫角讹拷为锟斤拷锟斤拷位锟角度ｏ拷锟斤拷锟斤拷校准状态锟铰诧拷锟斤拷锟矫ｏ拷 */
                         if (pstcDev->u8Calibrated) {
                             if (RunAngle_TryCalibrate()) {
                                 g_s32HallPulseAccum = 0;
                                 pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
                                 RunAngle_OnCalibration();
                             } else {
-                                RealTime_SetFault(FAULT_BIT_OVERCURRENT);
+                                RealTime_SetFault(FAULT_BIT_OVERCURRENT_REV);
+                                RTurn_PublishBidirectionalOvercurrent(1);
                             }
                         }
                     }
-                    /* ��ʱ�����������ýǶȣ����ֵ�ǰ�Ƕ� */
+                    /* 锟斤拷时锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟矫角度ｏ拷锟斤拷锟街碉拷前锟角讹拷 */
 
                     pstcDev->stcLockState.u8LockedDir = u8DesiredRTurnDir;
                     pstcDev->stcLockState.u8LockActive = 1;
@@ -268,16 +280,16 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
         }
     }
     
-    // ========== У׼����߼����ǶȻ��֡���λ���ȣ� ==========
+    // ========== 校准锟斤拷锟斤拷呒锟斤拷锟斤拷嵌然锟斤拷帧锟斤拷锟轿伙拷锟斤拷龋锟� ==========
     if (pstcDev->u8Calibrated) {
-        // ����������������ǰ�˶���������
-        // - �رգ���ת�������������ǶȻ��֣��Ƕȶ����� fMinAngle
-        // - �򿪣���ת�������������������֣��������������ۼӣ���ֱ�����ֹͣ
+        // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷前锟剿讹拷锟斤拷锟斤拷锟斤拷锟斤拷
+        // - 锟截闭ｏ拷锟斤拷转锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟角度伙拷锟街ｏ拷锟角度讹拷锟斤拷锟斤拷 fMinAngle
+        // - 锟津开ｏ拷锟斤拷转锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟街ｏ拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟桔加ｏ拷锟斤拷直锟斤拷锟斤拷锟酵Ｖ�
         if (pstcDev->stcLockState.u8LockActive && 
             pstcDev->stcLockState.u8LockedDir == pstcDev->u8CurrentDir) {
             
             if (pstcDev->stcLockState.u8LockedDir == RTURN_DIR_REVERSE) {
-                /* �ر������������ǶȻ��֣��Ƕȶ��� */
+                /* 锟截憋拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟角度伙拷锟街ｏ拷锟角度讹拷锟斤拷 */
                 if (u32Now - s_u32LastLockDebugPrintTime >= LOCK_DEBUG_PRINT_INTERVAL_MS) {
                     s_u32LastLockDebugPrintTime = u32Now;
                     RTURN_DEBUG("Direction %d is locked (REVERSE), ignore angle change\r\n", pstcDev->u8CurrentDir);
@@ -285,7 +297,7 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
                 pstcDev->u32LastAngleTime = u32Now;
                 return;
             }
-            /* �������������������֣�ֱ�����ֹͣ */
+            /* 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟街ｏ拷直锟斤拷锟斤拷锟酵Ｖ� */
             if (u32Now - s_u32LastLockDebugPrintTime >= LOCK_DEBUG_PRINT_INTERVAL_MS) {
                 s_u32LastLockDebugPrintTime = u32Now;
                 RTURN_DEBUG("Direction %d is locked (FORWARD), allow angle integration\r\n", pstcDev->u8CurrentDir);
@@ -298,20 +310,20 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
         pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle +
             (float)g_s32HallPulseAccum * 360.0f / 12.0f / pstcDev->stcConfig.fReductionRatio;
         
-        // ��ת�Ƕ����޼�⣨�Ƕȵ�λ������
+        // 锟斤拷转锟角讹拷锟斤拷锟睫硷拷猓拷嵌鹊锟轿伙拷锟斤拷锟斤拷锟�
         if (pstcDev->fCurrentAngle >= pstcDev->stcConfig.fMaxAngle) {
-            // NOTE: ��ǯλ�Ƕȣ���������������ʵֵ����ȡ
+            // NOTE: 锟斤拷钳位锟角度ｏ拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷实值锟斤拷锟斤拷取
             
-            // ֻ�е���λδ������ʱ�ŷ����¼�
+            // 只锟叫碉拷锟斤拷位未锟斤拷锟斤拷锟斤拷时锟脚凤拷锟斤拷锟铰硷拷
             if (!pstcDev->u8LimitTriggered) {
                 pstcDev->u8LimitTriggered = 1;
                 
-                // ��������״̬����
+                // 锟斤拷锟斤拷锟斤拷锟斤拷状态锟斤拷锟斤拷
                 pstcDev->stcLockState.u8LockedDir = RTURN_DIR_FORWARD;
                 pstcDev->stcLockState.u8LockActive = 1;
                 
                 RTurn_LimitEvent_t stcEvent;
-                stcEvent.u8Direction = RTURN_LIMIT_FORWARD;  // ��ת��λ
+                stcEvent.u8Direction = RTURN_LIMIT_FORWARD;  // 锟斤拷转锟斤拷位
                 stcEvent.fAngle = pstcDev->fCurrentAngle;
                 stcEvent.u8IsActive = 1;
                 EventBus_Publish(TOPIC_RTURN_LIMIT, &stcEvent);
@@ -320,59 +332,62 @@ static void RTurn_UpdateAngle(RTurn_Device_t* pstcDev) {
             }
         }
         
-        // ��ת�Ƕ����޼�⣺ֻ�����Ƕȣ���������λ����
-        // ��ת��λ��������������������ɽǶȴ���
+        // 锟斤拷转锟角讹拷锟斤拷锟睫硷拷猓褐伙拷锟斤拷锟斤拷嵌龋锟斤拷锟斤拷锟斤拷锟斤拷锟轿伙拷锟斤拷锟�
+        // 锟斤拷转锟斤拷位锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷山嵌却锟斤拷锟�
         if (pstcDev->fCurrentAngle <= pstcDev->stcConfig.fMinAngle) {
             pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
-            // ע�⣺���ﲻ������λ�¼�������������״̬
+            // 注锟解：锟斤拷锟斤不锟斤拷锟斤拷锟斤拷位锟铰硷拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷状态
         }
     }
     
     pstcDev->u32LastAngleTime = u32Now;
 }
 
-// ========== �����¼����� ==========
-// �� EventBus �ص� RTurn_OnCurrentAlarm ����
-// �յ������¼���ֱ��������ǰ�������򣬲����ж���ֵ����ֵ�ж��� dev_sensor ����ɣ�
+// ========== 锟斤拷锟斤拷锟铰硷拷锟斤拷锟斤拷 ==========
+// 锟斤拷 EventBus 锟截碉拷 RTurn_OnCurrentAlarm 锟斤拷锟斤拷
+// 锟秸碉拷锟斤拷锟斤拷锟铰硷拷锟斤拷直锟斤拷锟斤拷锟斤拷锟斤拷前锟斤拷锟斤拷锟斤拷锟津，诧拷锟斤拷锟叫讹拷锟斤拷值锟斤拷锟斤拷值锟叫讹拷锟斤拷 dev_sensor 锟斤拷锟斤拷桑锟�
 static void RTurn_HandleOvercurrent(RTurn_Device_t* pstcDev) {
     if (!pstcDev) return;
     
-    // ����Ѿ���������λ�Ѵ����������ظ�����
+    // 锟斤拷锟斤拷丫锟斤拷锟斤拷锟斤拷锟斤拷锟轿伙拷汛锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷馗锟斤拷锟斤拷锟�
     if (pstcDev->stcLockState.u8LockActive || pstcDev->u8LimitTriggered) {
         return;
     }
     
-    // ֻʹ�����������ٲ�������ķ������ж���λ����
+    // 只使锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟劫诧拷锟斤拷锟斤拷锟斤拷姆锟斤拷锟斤拷锟斤拷卸锟斤拷锟轿伙拷锟斤拷锟�
     uint8_t u8DesiredDir = MOTOR_DIRECTION_NONE;
     RTurn_GetDesiredDirection(pstcDev, &u8DesiredDir);
     uint8_t u8CurrentDir = RTurn_ConvertMotorDirToRTurnDir(u8DesiredDir, pstcDev->stcConfig.u8ReverseOutput);
     
-    // ����������Чʱ�Ŵ���
+    // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷效时锟脚达拷锟斤拷
     if (u8CurrentDir != RTURN_DIR_STOP) {
         
         uint8_t u8LimitDir = (u8CurrentDir == RTURN_DIR_FORWARD) ? RTURN_LIMIT_FORWARD : RTURN_LIMIT_REVERSE;
         
         if (!pstcDev->u8Calibrated) {
-            /* ========== δУ׼״̬ ========== */
+            /* ========== 未校准状态 ========== */
             if (u8CurrentDir == RTURN_DIR_FORWARD) {
-                /* �򿪹�������У׼�������ýǶȣ���������ת����Ӱ���ٲ����� */
-                RTURN_OUT("LIMIT TRIGGERED (uncalibrated, FORWARD)! Lock direction, no calibration\r\n");
+                /* 开窗过流: 锁方向 + 报正转过流故障 + 双向封锁电机 */
+                RealTime_SetFault(FAULT_BIT_OVERCURRENT_FWD);
+                RTurn_PublishBidirectionalOvercurrent(1);
+                RTURN_OUT("LIMIT TRIGGERED (uncalibrated, FORWARD)! Lock direction, set fault FWD\r\n");
             } else {
-                /* �رչ�����У׼�ɹ������ýǶ�Ϊ����λ�Ƕ� */
+                /* 锟截闭癸拷锟斤拷锟斤拷校准锟缴癸拷锟斤拷锟斤拷锟矫角讹拷为锟斤拷锟斤拷位锟角讹拷 */
                 if (RunAngle_TryCalibrate()) {
                     g_s32HallPulseAccum = 0;
                     pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
                     pstcDev->u8Calibrated = 1;
                     RunAngle_OnCalibration();
                 } else {
-                    RealTime_SetFault(FAULT_BIT_OVERCURRENT);
+                    RealTime_SetFault(FAULT_BIT_OVERCURRENT_REV);
+                    RTurn_PublishBidirectionalOvercurrent(1);
                 }
                 RTURN_OUT("LIMIT TRIGGERED (uncalibrated, REVERSE)! Calibrated=1, Angle=%ld.%02ld deg\r\n",
                           (long)((int32_t)(pstcDev->fCurrentAngle * 100) / 100),
                           (long)((int32_t)(pstcDev->fCurrentAngle * 100) % 100));
             }
             
-            /* δУ׼״̬�£��򿪺͹رչ�������������Ӱ���ٲ����� */
+            /* 未校准状态锟铰ｏ拷锟津开和关闭癸拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷影锟斤拷锟劫诧拷锟斤拷锟斤拷 */
             pstcDev->stcLockState.u8LockedDir = u8CurrentDir;
             pstcDev->stcLockState.u8LockActive = 1;
             pstcDev->u8LimitTriggered = 1;
@@ -383,18 +398,23 @@ static void RTurn_HandleOvercurrent(RTurn_Device_t* pstcDev) {
             stcEvent.u8IsActive = 1;
             EventBus_Publish(TOPIC_RTURN_LIMIT, &stcEvent);
         } else {
-            /* ========== ��У׼״̬ ========== */
+            /* ========== 锟斤拷校准状态 ========== */
             if (u8CurrentDir == RTURN_DIR_REVERSE) {
-                /* �ر�ʱ���������ýǶ�Ϊ����λ�Ƕ� */
+                /* 关窗过流: 校准或报故障 + 双向封锁电机 */
                 if (RunAngle_TryCalibrate()) {
                     pstcDev->fCurrentAngle = pstcDev->stcConfig.fMinAngle;
                     g_s32HallPulseAccum = 0;
                     RunAngle_OnCalibration();
                 } else {
-                    RealTime_SetFault(FAULT_BIT_OVERCURRENT);
+                    RealTime_SetFault(FAULT_BIT_OVERCURRENT_REV);
+                    RTurn_PublishBidirectionalOvercurrent(1);
                 }
+            } else {
+                /* 开窗过流: 锁方向 + 报正转过流故障 + 双向封锁电机 */
+                RealTime_SetFault(FAULT_BIT_OVERCURRENT_FWD);
+                RTurn_PublishBidirectionalOvercurrent(1);
             }
-            /* ��ʱ�����������ýǶȣ����ֵ�ǰ�Ƕ� */
+            /* 锁方向, 保持当前角度 */
 
             pstcDev->stcLockState.u8LockedDir = u8CurrentDir;
             pstcDev->stcLockState.u8LockActive = 1;
@@ -425,14 +445,14 @@ static void RTurn_ClearLock(RTurn_Device_t* pstcDev) {
     RTURN_OUT("Lock cleared\r\n");
 }
 
-// ========== EventBus�ص����� ==========
+// ========== EventBus锟截碉拷锟斤拷锟斤拷 ==========
 
 void RTurn_OnCurrentAlarm(void* payload) {
     Current_AlarmEvent_t* pstcEvent = (Current_AlarmEvent_t*)payload;
     
     if (!pstcEvent->u8IsActive) return;
     
-    // ���������豸��ͨ�� ops.init ����ָ���ҵ� RTurn �豸
+    // 锟斤拷锟斤拷锟斤拷锟斤拷锟借备锟斤拷通锟斤拷 ops.init 锟斤拷锟斤拷指锟斤拷锟揭碉拷 RTurn 锟借备
     for (uint8_t i = 0; i < MAX_DEVICES; i++) {
         DeviceNode_t* pstcNode = DeviceManager_Get(i);
         if (pstcNode && pstcNode->used && pstcNode->ops.init == RTurn_Device_Init) {
@@ -443,7 +463,7 @@ void RTurn_OnCurrentAlarm(void* payload) {
     }
 }
 
-// ========== ��׼�豸����ʵ�� ==========
+// ========== 锟斤拷准锟借备锟斤拷锟斤拷实锟斤拷 ==========
 
 DeviceResult_t RTurn_Device_Init(void* handle) {
     RTurn_Device_t* pstcDev = (RTurn_Device_t*)handle;
@@ -602,7 +622,7 @@ DeviceResult_t RTurn_Device_Update(void* handle) {
     
     RTurn_UpdateAngle(pstcDev);
     
-    // ========== ˢ��Keil Watch����ȫ�ֱ��� ==========
+    // ========== 刷锟斤拷Keil Watch锟斤拷锟斤拷全锟街憋拷锟斤拷 ==========
     g_fDbgRTurnAngle       = pstcDev->fCurrentAngle;
     g_fDbgRTurnSpeed       = pstcDev->fCurrentSpeed;
     g_u8DbgRTurnDir        = pstcDev->u8CurrentDir;
@@ -611,14 +631,14 @@ DeviceResult_t RTurn_Device_Update(void* handle) {
     g_u8DbgRTurnCalibrated = pstcDev->u8Calibrated;
     g_u8DbgRTurnLimitTrig  = pstcDev->u8LimitTriggered;
     
-    // ��ȡ���������ٲ����������ˢ�µ�ȫ�ֱ���
+    // 锟斤拷取锟斤拷锟斤拷锟斤拷锟斤拷锟劫诧拷锟斤拷锟斤拷锟斤拷锟斤拷锟剿拷碌锟饺拷直锟斤拷锟�
     {
         uint8_t u8DesiredDir = MOTOR_DIRECTION_NONE;
         RTurn_GetDesiredDirection(pstcDev, &u8DesiredDir);
         g_u8DbgRTurnDesiredDir = RTurn_ConvertMotorDirToRTurnDir(u8DesiredDir, pstcDev->stcConfig.u8ReverseOutput);
     }
     
-    // ========== ÿ2000ms��ӡһ����������״̬ ==========
+    // ========== 每2000ms锟斤拷印一锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷状态 ==========
     if (u32Now - s_u32LastLockPrintTime >= LOCK_PRINT_INTERVAL_MS) {
         s_u32LastLockPrintTime = u32Now;
         
@@ -641,7 +661,7 @@ DeviceResult_t RTurn_Device_Update(void* handle) {
         }
     }
     
-    // ========== ÿ4000ms��ӡһ�ε�ǰ�Ƕ� ==========
+    // ========== 每4000ms锟斤拷印一锟轿碉拷前锟角讹拷 ==========
     if (pstcDev->u8Calibrated && (u32Now - s_u32LastLimitPrintTime >= LIMIT_PRINT_INTERVAL_MS)) {
         s_u32LastLimitPrintTime = u32Now;
         int32_t s32AngleInt = (int32_t)(pstcDev->fCurrentAngle * 100);
@@ -654,7 +674,7 @@ DeviceResult_t RTurn_Device_Update(void* handle) {
     return RESULT_OK;
 }
 
-// ========== Բ��ת�������ض��ӿ� ==========
+// ========== 圆锟斤拷转锟斤拷锟斤拷锟斤拷锟截讹拷锟接匡拷 ==========
 
 float RTurn_Device_GetAngle(RTurn_Device_t* pstcDev) {
     if (!pstcDev || !pstcDev->u8Initialized) return 0;
@@ -720,7 +740,7 @@ RTurn_Device_t* RTurn_Device_Create(const RTurn_Config_t* pstcConfig) {
     return pstcDev;
 }
 
-// ========== ȫ�ֲ��������� ==========
+// ========== 全锟街诧拷锟斤拷锟斤拷锟斤拷锟斤拷 ==========
 const DeviceOps_t g_rturn_ops = {
     .init = RTurn_Device_Init,
     .deinit = RTurn_Device_Deinit,

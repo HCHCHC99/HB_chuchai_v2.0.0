@@ -6,8 +6,8 @@
 #include "rtt_manager.h"
 
 /*=============================================================================
- * µ÷ÊÔºê¶¨Òå
- * Í³Ò»ÔÚ rtt_manager.h ÖĞÍ³Ò»¿ØÖÆ APP_PARAMS_DBG
+ * ï¿½ï¿½ï¿½Ôºê¶¨ï¿½ï¿½
+ * Í³Ò»ï¿½ï¿½ rtt_manager.h ï¿½ï¿½Í³Ò»ï¿½ï¿½ï¿½ï¿½ APP_PARAMS_DBG
  *============================================================================*/
 #ifdef APP_PARAMS_DBG
     #define PARAMS_DBG(fmt, ...)    MAIN_D("[PARAMS] " fmt, ##__VA_ARGS__)
@@ -22,268 +22,268 @@
 #endif
 
 /*=============================================================================
- * ¿Í»§Ğ­Òé¼Ä´æÆ÷µØÖ·¶¨Òå
- * ±£³Ö¼Ä´æÆ÷ (Holding Register, ¹¦ÄÜÂë 03/06/10)
+ * ï¿½Í»ï¿½Ğ­ï¿½ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½
+ * ï¿½ï¿½ï¿½Ö¼Ä´ï¿½ï¿½ï¿½ (Holding Register, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 03/06/10)
  *============================================================================*/
 
-/* --- ÅäÖÃ²ÎÊı (µôµç±£´æ, Flash ´æ´¢) --- */
-#define REG_NODE_ID                 (0x2710U)   /* Éè±¸µØÖ· 1~247 (uint16_t) */
-#define REG_TARGET_SPEED            (0x2711U)   /* ×ªËÙ r/min (int16_t) */
-#define REG_TARGET_ANGLE            (0x2712U)   /* ½Ç¶È 0.1¶È (int16_t) */
-#define REG_VOLTAGE_UPPER_LIMIT     (0x2714U)   /* ¹ıÑ¹ãĞÖµ 0.1V (uint16_t) */
-#define REG_VOLTAGE_LOWER_LIMIT     (0x2715U)   /* Ç·Ñ¹ãĞÖµ 0.1V (uint16_t) */
-#define REG_CURRENT_UPPER_LIMIT     (0x2716U)   /* ¹ıÁ÷ãĞÖµ 1mA (uint16_t) */
-#define REG_CLOSE_LIMIT_ANGLE       (0x271CU)   /* ¹Ø´°¼«ÏŞ½Ç¶È 0.1¶È (int16_t) */
-#define REG_OPEN_LIMIT_ANGLE        (0x271DU)   /* ¿ª´°¼«ÏŞ½Ç¶È 0.1¶È (int16_t) */
-#define REG_CURRENT_DETECT_MS       (0x271EU)   /* ¹ıÁ÷ÅĞ¶¨Ê±¼ä 1ms (uint16_t) */
+/* --- ï¿½ï¿½ï¿½Ã²ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ç±£ï¿½ï¿½, Flash ï¿½æ´¢) --- */
+#define REG_NODE_ID                 (0x2710U)   /* ï¿½è±¸ï¿½ï¿½Ö· 1~247 (uint16_t) */
+#define REG_TARGET_SPEED            (0x2711U)   /* ×ªï¿½ï¿½ r/min (int16_t) */
+#define REG_TARGET_ANGLE            (0x2712U)   /* ï¿½Ç¶ï¿½ 0.1ï¿½ï¿½ (int16_t) */
+#define REG_VOLTAGE_UPPER_LIMIT     (0x2714U)   /* ï¿½ï¿½Ñ¹ï¿½ï¿½Öµ 0.1V (uint16_t) */
+#define REG_VOLTAGE_LOWER_LIMIT     (0x2715U)   /* Ç·Ñ¹ï¿½ï¿½Öµ 0.1V (uint16_t) */
+#define REG_CURRENT_UPPER_LIMIT     (0x2716U)   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ 1mA (uint16_t) */
+#define REG_CLOSE_LIMIT_ANGLE       (0x271CU)   /* ï¿½Ø´ï¿½ï¿½ï¿½ï¿½Ş½Ç¶ï¿½ 0.1ï¿½ï¿½ (int16_t) */
+#define REG_OPEN_LIMIT_ANGLE        (0x271DU)   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ş½Ç¶ï¿½ 0.1ï¿½ï¿½ (int16_t) */
+#define REG_CURRENT_DETECT_MS       (0x271EU)   /* ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¶ï¿½Ê±ï¿½ï¿½ 1ms (uint16_t) */
 
 
-/* --- ¸ß¼¶²ÎÊıÅäÖÃ¼Ä´æÆ÷ (²»ÔÚ Flash ±£´æ·¶Î§ÄÚµ«ÔÚ RAM ÓĞĞ§) --- */
-#define REG_MOTOR_HALL_DIR          (0x3710U)   /* »ô¶û·½Ïò: 0=Õı³£, 1=·´×ª (uint16_t) */
-#define REG_MOTOR_DIR               (0x3711U)   /* µç»ú·½Ïò: 0=Õı³£, 1=·´×ª (uint16_t) */
-#define REG_RTURN_REDUCTION_RATIO   (0x3712U)   /* ¼õËÙ±È (uint16_t) */
-#define REG_MOTOR_HALL_POLE_PAIRS   (0x3713U)   /* µç»ú¼«¶ÔÊı (uint16_t) */
-#define REG_MOTOR_HALL_COUNT_LO     (0x3714U)   /* »ô¶ûÂö³åÀÛ¼ÆµÍ16Î» (int32_tÀÛ¼ÆÖµ) */
-#define REG_MOTOR_HALL_COUNT_HI     (0x3715U)   /* »ô¶ûÂö³åÀÛ¼Æ¸ß16Î» */
+/* --- ï¿½ß¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¼Ä´ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ Flash ï¿½ï¿½ï¿½æ·¶Î§ï¿½Úµï¿½ï¿½ï¿½ RAM ï¿½ï¿½Ğ§) --- */
+#define REG_MOTOR_HALL_DIR          (0x3710U)   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: 0=ï¿½ï¿½ï¿½ï¿½, 1=ï¿½ï¿½×ª (uint16_t) */
+#define REG_MOTOR_DIR               (0x3711U)   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: 0=ï¿½ï¿½ï¿½ï¿½, 1=ï¿½ï¿½×ª (uint16_t) */
+#define REG_RTURN_REDUCTION_RATIO   (0x3712U)   /* ï¿½ï¿½ï¿½Ù±ï¿½ (uint16_t) */
+#define REG_MOTOR_HALL_POLE_PAIRS   (0x3713U)   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (uint16_t) */
+#define REG_MOTOR_HALL_COUNT_LO     (0x3714U)   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Û¼Æµï¿½16Î» (int32_tï¿½Û¼ï¿½Öµ) */
+#define REG_MOTOR_HALL_COUNT_HI     (0x3715U)   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Û¼Æ¸ï¿½16Î» */
 
-/* --- ¾ø¶Ô½Ç¶È (0x2721~0x2726) --- */
-#define REG_ABS_ANGLE_LO            (0x2721U)   /* RAMÊµÊ±Æ«ÒÆµÍ16Î» (int32_t, 0.1¶È) */
-#define REG_ABS_ANGLE_HI            (0x2722U)   /* RAMÊµÊ±Æ«ÒÆ¸ß16Î» */
-#define REG_FLASH_ABS_LO            (0x2723U)   /* FlashÒÑ±£´æÆ«ÒÆµÍ16Î» (int32_t, 0.1¶È) */
-#define REG_FLASH_ABS_HI            (0x2724U)   /* FlashÒÑ±£´æÆ«ÒÆ¸ß16Î» */
-#define REG_ABS_CMD                 (0x2725U)   /* W: 0=Éè»ù×¼µã²¢±£´æ, 1=»Ø»ù×¼µã, 2=±£´æ, 3=Éè»ù×¼µã */
-#define REG_ABS_THRESHOLD           (0x2726U)   /* R/W: »Ø»ù×¼µã/»ØÄ¿±êÍ£Ö¹ãĞÖµ (0.1¶È, Ä¬ÈÏ1, 0~200) */
-#define REG_ABS_TARGET_LO           (0x2727U)   /* R/W: Ä¿±ê½Ç¶È int32 µÍ16Î» (0.1¶È); 0x10Á¬ĞøĞ´´¥·¢ */
-#define REG_ABS_TARGET_HI           (0x2728U)   /* R/W: Ä¿±ê½Ç¶È int32 ¸ß16Î» (0.1¶È) */
-#define REG_CALIB_UPPER_X10         (0x2729U)   /* R/W: ¹Ø´°¹ıÁ÷Ğ£×¼½Ç¶ÈÉÏÏŞ 0.1¶È (Ä¬ÈÏ200=20.0¡ã) */
-#define REG_CALIB_LOWER_X10         (0x272AU)   /* R/W: ¹Ø´°¹ıÁ÷Ğ£×¼½Ç¶ÈÏÂÏŞ 0.1¶È (Ä¬ÈÏ-20=-2.0¡ã) */
+/* --- ï¿½ï¿½ï¿½Ô½Ç¶ï¿½ (0x2721~0x2726) --- */
+#define REG_ABS_ANGLE_LO            (0x2721U)   /* RAMÊµÊ±Æ«ï¿½Æµï¿½16Î» (int32_t, 0.1ï¿½ï¿½) */
+#define REG_ABS_ANGLE_HI            (0x2722U)   /* RAMÊµÊ±Æ«ï¿½Æ¸ï¿½16Î» */
+#define REG_FLASH_ABS_LO            (0x2723U)   /* Flashï¿½Ñ±ï¿½ï¿½ï¿½Æ«ï¿½Æµï¿½16Î» (int32_t, 0.1ï¿½ï¿½) */
+#define REG_FLASH_ABS_HI            (0x2724U)   /* Flashï¿½Ñ±ï¿½ï¿½ï¿½Æ«ï¿½Æ¸ï¿½16Î» */
+#define REG_ABS_CMD                 (0x2725U)   /* W: 0=ï¿½ï¿½ï¿½×¼ï¿½ã²¢ï¿½ï¿½ï¿½ï¿½, 1=ï¿½Ø»ï¿½×¼ï¿½ï¿½, 2=ï¿½ï¿½ï¿½ï¿½, 3=ï¿½ï¿½ï¿½×¼ï¿½ï¿½ */
+#define REG_ABS_THRESHOLD           (0x2726U)   /* R/W: ï¿½Ø»ï¿½×¼ï¿½ï¿½/ï¿½ï¿½Ä¿ï¿½ï¿½Í£Ö¹ï¿½ï¿½Öµ (0.1ï¿½ï¿½, Ä¬ï¿½ï¿½1, 0~200) */
+#define REG_ABS_TARGET_LO           (0x2727U)   /* R/W: Ä¿ï¿½ï¿½Ç¶ï¿½ int32 ï¿½ï¿½16Î» (0.1ï¿½ï¿½); 0x10ï¿½ï¿½ï¿½ï¿½Ğ´ï¿½ï¿½ï¿½ï¿½ */
+#define REG_ABS_TARGET_HI           (0x2728U)   /* R/W: Ä¿ï¿½ï¿½Ç¶ï¿½ int32 ï¿½ï¿½16Î» (0.1ï¿½ï¿½) */
+#define REG_CALIB_UPPER_X10         (0x2729U)   /* R/W: ï¿½Ø´ï¿½ï¿½ï¿½ï¿½ï¿½Ğ£×¼ï¿½Ç¶ï¿½ï¿½ï¿½ï¿½ï¿½ 0.1ï¿½ï¿½ (Ä¬ï¿½ï¿½200=20.0ï¿½ï¿½) */
+#define REG_CALIB_LOWER_X10         (0x272AU)   /* R/W: ï¿½Ø´ï¿½ï¿½ï¿½ï¿½ï¿½Ğ£×¼ï¿½Ç¶ï¿½ï¿½ï¿½ï¿½ï¿½ 0.1ï¿½ï¿½ (Ä¬ï¿½ï¿½-20=-2.0ï¿½ï¿½) */
 
-/* --- ĞÄÌø°ü (Ö»¶Á, ²»´æ Flash) --- */
-#define REG_HEARTBEAT               (0x271FU)   /* ĞÄÌø°ü: ¶Á»ØÖµ = Éè±¸µØÖ· (0x2710) */
+/* --- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (Ö»ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ Flash) --- */
+#define REG_HEARTBEAT               (0x271FU)   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½Öµ = ï¿½è±¸ï¿½ï¿½Ö· (0x2710) */
 
-/* ×¢Òâ: 0x2713, 0x2717-0x271B Îª±£ÁôµØÖ·, ²»±©Â¶¸ø Modbus */
+/* ×¢ï¿½ï¿½: 0x2713, 0x2717-0x271B Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö·, ï¿½ï¿½ï¿½ï¿½Â¶ï¿½ï¿½ Modbus */
 
-/* --- ¿ØÖÆÃüÁî (Ğ´Á¢¼´Ö´ĞĞ, ²»±£´æ Flash) --- */
-#define REG_CTRL_CMD                (0x2720U)   /* ¿ØÖÆÃüÁî¼Ä´æÆ÷ (uint16_t) */
+/* --- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (Ğ´ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Flash) --- */
+#define REG_CTRL_CMD                (0x2720U)   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä´ï¿½ï¿½ï¿½ (uint16_t) */
 
-/* REG_CTRL_CMD (0x2720) Î»¶¨Òå:
- * Ğ´·½ÏòÃüÁî:
- *   bit0 = 1: ¼¤»îRS485¿ØÖÆ, Î´¼¤»îÊ±ºöÂÔºóÃæÖ¸Áî
- *   bit1 = 1: Í£Ö¹(¹Ø±Õ RS485 ¿ØÖÆ)
- *   bit2 = 1: ¼±Í£(È¡ÏûÕı×ª/·´×ª, ¹Ø±Õ RS485 ¿ØÖÆ)
- *   bit4 = 1: Õı×ª(¼´Ê¹ÔÚÔËĞĞ×´Ì¬Ò²ÓĞĞ§, Óë bit5 »¥³â)
- *   bit5 = 1: ·´×ª(¼´Ê¹ÔÚÔËĞĞ×´Ì¬Ò²ÓĞĞ§, Óë bit4 »¥³â)
- * ¶Áµ±Ç°×´Ì¬:
- *   bit4 = 1: µ±Ç°ÕıÔÚÕı×ª
- *   bit5 = 1: µ±Ç°ÕıÔÚ·´×ª
- *   bit4=0 ÇÒ bit5=0: µ±Ç°Í£Ö¹
+/* REG_CTRL_CMD (0x2720) Î»ï¿½ï¿½ï¿½ï¿½:
+ * Ğ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:
+ *   bit0 = 1: ï¿½ï¿½ï¿½ï¿½RS485ï¿½ï¿½ï¿½ï¿½, Î´ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ôºï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
+ *   bit1 = 1: Í£Ö¹(ï¿½Ø±ï¿½ RS485 ï¿½ï¿½ï¿½ï¿½)
+ *   bit2 = 1: ï¿½ï¿½Í£(È¡ï¿½ï¿½ï¿½ï¿½×ª/ï¿½ï¿½×ª, ï¿½Ø±ï¿½ RS485 ï¿½ï¿½ï¿½ï¿½)
+ *   bit4 = 1: ï¿½ï¿½×ª(ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬Ò²ï¿½ï¿½Ğ§, ï¿½ï¿½ bit5 ï¿½ï¿½ï¿½ï¿½)
+ *   bit5 = 1: ï¿½ï¿½×ª(ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬Ò²ï¿½ï¿½Ğ§, ï¿½ï¿½ bit4 ï¿½ï¿½ï¿½ï¿½)
+ * ï¿½ï¿½ï¿½ï¿½Ç°×´Ì¬:
+ *   bit4 = 1: ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ª
+ *   bit5 = 1: ï¿½ï¿½Ç°ï¿½ï¿½ï¿½Ú·ï¿½×ª
+ *   bit4=0 ï¿½ï¿½ bit5=0: ï¿½ï¿½Ç°Í£Ö¹
  */
-#define CTRL_CMD_START              (0x0001U)   /* bit0: Æô¶¯Ö¸Áî */
-#define CTRL_CMD_STOP               (0x0002U)   /* bit1: Í£Ö¹Ö¸Áî */
-#define CTRL_CMD_ESTOP              (0x0004U)   /* bit2: ¼±Í£Ö¸Áî */
-#define CTRL_CMD_ABS_SAVE           (0x0040U)   /* bit6: ±£´æ¾ø¶ÔÎ»ÖÃµ½Flash */
-#define CTRL_CMD_FWD                (0x0010U)   /* bit4: Õı×ªÖ¸Áî/×´Ì¬ */
-#define CTRL_CMD_REV                (0x0020U)   /* bit5: ·´×ªÖ¸Áî/×´Ì¬ */
+#define CTRL_CMD_START              (0x0001U)   /* bit0: ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ */
+#define CTRL_CMD_STOP               (0x0002U)   /* bit1: Í£Ö¹Ö¸ï¿½ï¿½ */
+#define CTRL_CMD_ESTOP              (0x0004U)   /* bit2: ï¿½ï¿½Í£Ö¸ï¿½ï¿½ */
+#define CTRL_CMD_ABS_SAVE           (0x0040U)   /* bit6: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½Ãµï¿½Flash */
+#define CTRL_CMD_FWD                (0x0010U)   /* bit4: ï¿½ï¿½×ªÖ¸ï¿½ï¿½/×´Ì¬ */
+#define CTRL_CMD_REV                (0x0020U)   /* bit5: ï¿½ï¿½×ªÖ¸ï¿½ï¿½/×´Ì¬ */
 
-/* --- ÊµÊ±Êı¾İ (Ö»¶Á, ²»´æ Flash) --- */
-#define REG_REAL_SPEED              (0x2730U)   /* ÊµÊ±×ªËÙ r/min (int16_t) */
-#define REG_REAL_ANGLE              (0x2731U)   /* ÊµÊ±½Ç¶È 0.1¶È (int16_t) */
-#define REG_REAL_VOLTAGE            (0x2732U)   /* µçÑ¹ 0.1V (uint16_t) */
-#define REG_REAL_CURRENT            (0x2733U)   /* µçÁ÷ 1mA (uint16_t) */
-#define REG_REAL_DIRECTION          (0x2737U)   /* ÊµÊ±·½Ïò (int16_t) */
+/* --- ÊµÊ±ï¿½ï¿½ï¿½ï¿½ (Ö»ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ Flash) --- */
+#define REG_REAL_SPEED              (0x2730U)   /* ÊµÊ±×ªï¿½ï¿½ r/min (int16_t) */
+#define REG_REAL_ANGLE              (0x2731U)   /* ÊµÊ±ï¿½Ç¶ï¿½ 0.1ï¿½ï¿½ (int16_t) */
+#define REG_REAL_VOLTAGE            (0x2732U)   /* ï¿½ï¿½Ñ¹ 0.1V (uint16_t) */
+#define REG_REAL_CURRENT            (0x2733U)   /* ï¿½ï¿½ï¿½ï¿½ 1mA (uint16_t) */
+#define REG_REAL_DIRECTION          (0x2737U)   /* ÊµÊ±ï¿½ï¿½ï¿½ï¿½ (int16_t) */
 
-/* --- ÊµÊ±¹ÊÕÏ (Ö»¶Á, ²»´æ Flash) --- */
-#define REG_FAULT_STATUS            (0x2740U)   /* ¹ÊÕÏ×´Ì¬ (uint16_t) */
+/* --- ÊµÊ±ï¿½ï¿½ï¿½ï¿½ (Ö»ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ Flash) --- */
+#define REG_FAULT_STATUS            (0x2740U)   /* ï¿½ï¿½ï¿½ï¿½×´Ì¬ (uint16_t) */
 
 /*=============================================================================
- * ¹ÊÕÏ×´Ì¬Î»¶¨Òå (REG_FAULT_STATUS, 0x2740)
- * 1=¹ÊÕÏ, 0=Õı³£
+ * ï¿½ï¿½ï¿½ï¿½×´Ì¬Î»ï¿½ï¿½ï¿½ï¿½ (REG_FAULT_STATUS, 0x2740)
+ * 1=ï¿½ï¿½ï¿½ï¿½, 0=ï¿½ï¿½ï¿½ï¿½
  *============================================================================*/
-#define FAULT_BIT_OVERVOLTAGE       (0x0001U)   /* bit0: ¹ıÑ¹ */
-#define FAULT_BIT_OVERCURRENT       (0x0002U)   /* bit1: ¹ıÁ÷ */
-#define FAULT_BIT_OVERTEMP          (0x0004U)   /* bit2: ¹ıÈÈ(Ó²¼şÖ§³Ö, µ±Ç°Î´Ê¹ÓÃ) */
-#define FAULT_BIT_RESET             (0x0008U)   /* bit3: ¸´Î» */
-#define FAULT_BIT_OVERLOAD          (0x0010U)   /* bit4: ¹ıÔØ */
-#define FAULT_BIT_STALL             (0x0020U)   /* bit5: ¶Â×ª */
+#define FAULT_BIT_OVERVOLTAGE       (0x0001U)   /* bit0: ï¿½ï¿½Ñ¹ */
+#define FAULT_BIT_OVERCURRENT_FWD   (0x0002U)   /* bit1: æ­£è½¬(å¼€çª—)è¿‡æµ */
+#define FAULT_BIT_OVERCURRENT_REV   (0x0004U)   /* bit2: åè½¬(å…³çª—)è¿‡æµ */
+#define FAULT_BIT_RESET             (0x0008U)   /* bit3: ï¿½ï¿½Î» */
+#define FAULT_BIT_OVERLOAD          (0x0010U)   /* bit4: ï¿½ï¿½ï¿½ï¿½ */
+#define FAULT_BIT_STALL             (0x0020U)   /* bit5: ï¿½ï¿½×ª */
 #define FAULT_BIT_UNDERVOLTAGE      (0x0040U)   /* bit6: Ç·Ñ¹ */
 
 /*=============================================================================
- * Flash ´æ´¢²ÎÊıÄ¬ÈÏÖµºê¶¨Òå
- * ¶ÔÓ¦ AppParamRecord_t ½á¹¹Ìå×Ö¶Î, µôµç Flash ±£´æ
- * ×¢Òâ: µçÑ¹ãĞÖµµ¥Î» 0.1V, µçÁ÷ãĞÖµµ¥Î» mA
+ * Flash ï¿½æ´¢ï¿½ï¿½ï¿½ï¿½Ä¬ï¿½ï¿½Öµï¿½ê¶¨ï¿½ï¿½
+ * ï¿½ï¿½Ó¦ AppParamRecord_t ï¿½á¹¹ï¿½ï¿½ï¿½Ö¶ï¿½, ï¿½ï¿½ï¿½ï¿½ Flash ï¿½ï¿½ï¿½ï¿½
+ * ×¢ï¿½ï¿½: ï¿½ï¿½Ñ¹ï¿½ï¿½Öµï¿½ï¿½Î» 0.1V, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½Î» mA
  *============================================================================*/
 
-/* --- Modbus Ğ­ÒéÏà¹Ø²ÎÊı (µôµç±£´æ, ±©Â¶¸ø Modbus) --- */
-#define PARAM_DEFAULT_NODE_ID                   (1U)        /* Éè±¸µØÖ· 1~247 */
-#define PARAM_DEFAULT_TARGET_SPEED              (0)         /* ×ªËÙ r/min */
-#define PARAM_DEFAULT_TARGET_ANGLE              (0)         /* ½Ç¶È 0.1¶È */
-#define PARAM_DEFAULT_VOLTAGE_UPPER_LIMIT       (270U)      /* ¹ıÑ¹ãĞÖµ 0.1V (26.0V) */
-#define PARAM_DEFAULT_VOLTAGE_LOWER_LIMIT       (210U)      /* Ç·Ñ¹ãĞÖµ 0.1V (21.0V) */
-#define PARAM_DEFAULT_CURRENT_UPPER_LIMIT       (2300)       /* ¹ıÁ÷ãĞÖµ 1mA (5A) */
-#define PARAM_DEFAULT_CURRENT_DETECT_MS         (100)        /* ¹ıÁ÷ÅĞ¶¨Ê±¼ä 1ms */
-#define PARAM_DEFAULT_MOTOR_HALL_DIR            (0)   /* »ô¶û·½Ïò 0=Õı³£, 1=·´×ª */
-#define PARAM_DEFAULT_MOTOR_DIR                 (1)   /* µç»ú·½Ïò 0=Õı³£, 1=·´×ª */
-#define PARAM_DEFAULT_RTURN_REDUCTION_RATIO     (11830)  /* ¼õËÙ±È x0.1 */
-#define PARAM_DEFAULT_MOTOR_HALL_POLE_PAIRS     (3)       /* µç»ú¼«¶ÔÊı */
-#define PARAM_DEFAULT_CLOSE_LIMIT_ANGLE         (-20)       /* ¹Ø´°¼«ÏŞ½Ç¶È 0.1¶È */
-#define PARAM_DEFAULT_OPEN_LIMIT_ANGLE          (880)       /* ¿ª´°¼«ÏŞ½Ç¶È 0.1¶È */
-#define PARAM_DEFAULT_BAUD_RATE                 (9600UL)    /* Ä¬ÈÏ²¨ÌØÂÊ */
+/* --- Modbus Ğ­ï¿½ï¿½ï¿½ï¿½Ø²ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ç±£ï¿½ï¿½, ï¿½ï¿½Â¶ï¿½ï¿½ Modbus) --- */
+#define PARAM_DEFAULT_NODE_ID                   (1U)        /* ï¿½è±¸ï¿½ï¿½Ö· 1~247 */
+#define PARAM_DEFAULT_TARGET_SPEED              (0)         /* ×ªï¿½ï¿½ r/min */
+#define PARAM_DEFAULT_TARGET_ANGLE              (0)         /* ï¿½Ç¶ï¿½ 0.1ï¿½ï¿½ */
+#define PARAM_DEFAULT_VOLTAGE_UPPER_LIMIT       (270U)      /* ï¿½ï¿½Ñ¹ï¿½ï¿½Öµ 0.1V (26.0V) */
+#define PARAM_DEFAULT_VOLTAGE_LOWER_LIMIT       (210U)      /* Ç·Ñ¹ï¿½ï¿½Öµ 0.1V (21.0V) */
+#define PARAM_DEFAULT_CURRENT_UPPER_LIMIT       (2300)       /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ 1mA (5A) */
+#define PARAM_DEFAULT_CURRENT_DETECT_MS         (100)        /* ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¶ï¿½Ê±ï¿½ï¿½ 1ms */
+#define PARAM_DEFAULT_MOTOR_HALL_DIR            (0)   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 0=ï¿½ï¿½ï¿½ï¿½, 1=ï¿½ï¿½×ª */
+#define PARAM_DEFAULT_MOTOR_DIR                 (1)   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 0=ï¿½ï¿½ï¿½ï¿½, 1=ï¿½ï¿½×ª */
+#define PARAM_DEFAULT_RTURN_REDUCTION_RATIO     (11830)  /* ï¿½ï¿½ï¿½Ù±ï¿½ x0.1 */
+#define PARAM_DEFAULT_MOTOR_HALL_POLE_PAIRS     (3)       /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+#define PARAM_DEFAULT_CLOSE_LIMIT_ANGLE         (-20)       /* ï¿½Ø´ï¿½ï¿½ï¿½ï¿½Ş½Ç¶ï¿½ 0.1ï¿½ï¿½ */
+#define PARAM_DEFAULT_OPEN_LIMIT_ANGLE          (880)       /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ş½Ç¶ï¿½ 0.1ï¿½ï¿½ */
+#define PARAM_DEFAULT_BAUD_RATE                 (9600UL)    /* Ä¬ï¿½Ï²ï¿½ï¿½ï¿½ï¿½ï¿½ */
 
-/* --- ÄÚ²¿²ÎÊı (²»±©Â¶¸ø Modbus, µ« Flash ´æ´¢, µôµç±£Áô) --- */
-#define PARAM_DEFAULT_VOLTAGE_UPPER_HYSTERESIS  (20U)       /* ¹ıÑ¹ÖÍ»Ø 0.1V (2.0V) */
-#define PARAM_DEFAULT_VOLTAGE_LOWER_HYSTERESIS  (20U)       /* Ç·Ñ¹ÖÍ»Ø 0.1V (2.0V) */
-#define PARAM_DEFAULT_OVERVOLTAGE_TRIGGER_CNT   (1U)        /* ¹ıÑ¹´¥·¢´ÎÊı */
-#define PARAM_DEFAULT_UNDERVOLTAGE_TRIGGER_CNT  (1U)        /* Ç·Ñ¹´¥·¢´ÎÊı */
-#define PARAM_DEFAULT_CURRENT_HYSTERESIS_MA     (0U)        /* µçÁ÷ÖÍ»Ø 1mA (0A) - ÉèÎª0ÎŞÖÍ»Ø */
-#define PARAM_DEFAULT_CURRENT_RELEASE_MS        (200U)      /* ¹ıÁ÷ÊÍ·ÅÊ±¼ä´°¿Ú 1ms (0.2s) */
-#define PARAM_DEFAULT_OVERCURRENT_TRIGGER_CNT   (1U)        /* ¹ıÁ÷´¥·¢´ÎÊı(Ê±¼ä´°¿ÚÄ£Ê½ÏÂ¿ÉÑ¡Ê¹ÓÃ) */
-#define PARAM_DEFAULT_CALIB_UPPER_X10           (-10)       /* ¹Ø´°¹ıÁ÷Ğ£×¼½Ç¶ÈÉÏÏŞ 0.1¶È  */
-#define PARAM_DEFAULT_CALIB_LOWER_X10           (-30)       /* ¹Ø´°¹ıÁ÷Ğ£×¼½Ç¶ÈÏÂÏŞ 0.1¶È  */
+/* --- ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½Â¶ï¿½ï¿½ Modbus, ï¿½ï¿½ Flash ï¿½æ´¢, ï¿½ï¿½ï¿½ç±£ï¿½ï¿½) --- */
+#define PARAM_DEFAULT_VOLTAGE_UPPER_HYSTERESIS  (20U)       /* ï¿½ï¿½Ñ¹ï¿½Í»ï¿½ 0.1V (2.0V) */
+#define PARAM_DEFAULT_VOLTAGE_LOWER_HYSTERESIS  (20U)       /* Ç·Ñ¹ï¿½Í»ï¿½ 0.1V (2.0V) */
+#define PARAM_DEFAULT_OVERVOLTAGE_TRIGGER_CNT   (1U)        /* ï¿½ï¿½Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+#define PARAM_DEFAULT_UNDERVOLTAGE_TRIGGER_CNT  (1U)        /* Ç·Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+#define PARAM_DEFAULT_CURRENT_HYSTERESIS_MA     (0U)        /* ï¿½ï¿½ï¿½ï¿½ï¿½Í»ï¿½ 1mA (0A) - ï¿½ï¿½Îª0ï¿½ï¿½ï¿½Í»ï¿½ */
+#define PARAM_DEFAULT_CURRENT_RELEASE_MS        (200U)      /* ï¿½ï¿½ï¿½ï¿½ï¿½Í·ï¿½Ê±ï¿½ä´°ï¿½ï¿½ 1ms (0.2s) */
+#define PARAM_DEFAULT_OVERCURRENT_TRIGGER_CNT   (1U)        /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(Ê±ï¿½ä´°ï¿½ï¿½Ä£Ê½ï¿½Â¿ï¿½Ñ¡Ê¹ï¿½ï¿½) */
+#define PARAM_DEFAULT_CALIB_UPPER_X10           (-10)       /* ï¿½Ø´ï¿½ï¿½ï¿½ï¿½ï¿½Ğ£×¼ï¿½Ç¶ï¿½ï¿½ï¿½ï¿½ï¿½ 0.1ï¿½ï¿½  */
+#define PARAM_DEFAULT_CALIB_LOWER_X10           (-30)       /* ï¿½Ø´ï¿½ï¿½ï¿½ï¿½ï¿½Ğ£×¼ï¿½Ç¶ï¿½ï¿½ï¿½ï¿½ï¿½ 0.1ï¿½ï¿½  */
 
 /*=============================================================================
- * ÔËĞĞÊ±ÅäÖÃºê¶¨Òå (²»´æ Flash, Í¨¹ıºê¶¨Òå¿ª¹Ø)
+ * ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ãºê¶¨ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ Flash, Í¨ï¿½ï¿½ï¿½ê¶¨ï¿½å¿ªï¿½ï¿½)
  *============================================================================*/
 
-/* --- µ÷ÊÔ¿ª¹Ø --- */
-#define APP_PARAMS_REALTIME_DBG                 /* ¿ªÆôÊµÊ±Êı¾İµ÷ÊÔ´òÓ¡(Ã¿5ÃëÒ»´Î) */
-// #define APP_PARAMS_REALTIME_SIMULATE          /* ¿ªÆôÊµÊ±Êı¾İÄ£Äâ(Ã¿5ÃëÊı¾İ+1) */
-#define APP_PARAMS_SIM_DBG                      /* ¿ªÆôÄ£ÄâÊµÊ±Êı¾İµ÷ÊÔ´òÓ¡ */
+/* --- ï¿½ï¿½ï¿½Ô¿ï¿½ï¿½ï¿½ --- */
+#define APP_PARAMS_REALTIME_DBG                 /* ï¿½ï¿½ï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½İµï¿½ï¿½Ô´ï¿½Ó¡(Ã¿5ï¿½ï¿½Ò»ï¿½ï¿½) */
+// #define APP_PARAMS_REALTIME_SIMULATE          /* ï¿½ï¿½ï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½(Ã¿5ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½+1) */
+#define APP_PARAMS_SIM_DBG                      /* ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½İµï¿½ï¿½Ô´ï¿½Ó¡ */
 
-/* --- ÊµÊ±Êı¾İÔ´Ñ¡Ôñ --- */
-/* ×¢ÊÍµô½«Ê¹ÓÃÄ£ÄâÊµÊ±Êı¾İ(SimRealtimeData, Keil Debug ¿ÉĞŞ¸Ä);
- * È¡Ïû×¢ÊÍ½«Ê¹ÓÃÊµ¼ÊµÄ dev_rturn Éè±¸»ñÈ¡ÊµÊ±Êı¾İ */
+/* --- ÊµÊ±ï¿½ï¿½ï¿½ï¿½Ô´Ñ¡ï¿½ï¿½ --- */
+/* ×¢ï¿½Íµï¿½ï¿½ï¿½Ê¹ï¿½ï¿½Ä£ï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½ï¿½(SimRealtimeData, Keil Debug ï¿½ï¿½ï¿½Ş¸ï¿½);
+ * È¡ï¿½ï¿½×¢ï¿½Í½ï¿½Ê¹ï¿½ï¿½Êµï¿½Êµï¿½ dev_rturn ï¿½è±¸ï¿½ï¿½È¡ÊµÊ±ï¿½ï¿½ï¿½ï¿½ */
 #define APP_PARAMS_USE_DEV_RTURN
 
 /*=============================================================================
- * ºËĞÄ²ÎÊı¼ÇÂ¼½á¹¹Ìå (¿Í»§ Modbus Ğ­Òé¶¨Òå)
- * ×¢Òâ: ½á¹¹Ìå²¼¾Ö±ØĞëÓë Flash ÖĞ´æ´¢µÄ²¼¾ÖÒ»ÖÂ
- *       head_magic ºÍ tail_magic ÓÃÓÚ Flash Ê¶±ğ
- *       checksum ÓÃÓÚÍêÕûĞÔĞ£Ñé
+ * ï¿½ï¿½ï¿½Ä²ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½á¹¹ï¿½ï¿½ (ï¿½Í»ï¿½ Modbus Ğ­ï¿½é¶¨ï¿½ï¿½)
+ * ×¢ï¿½ï¿½: ï¿½á¹¹ï¿½å²¼ï¿½Ö±ï¿½ï¿½ï¿½ï¿½ï¿½ Flash ï¿½Ğ´æ´¢ï¿½Ä²ï¿½ï¿½ï¿½Ò»ï¿½ï¿½
+ *       head_magic ï¿½ï¿½ tail_magic ï¿½ï¿½ï¿½ï¿½ Flash Ê¶ï¿½ï¿½
+ *       checksum ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ£ï¿½ï¿½
  *============================================================================*/
 #pragma pack(4)
 typedef struct {
-    /* Í·²¿ĞÅÏ¢ */
-    uint32_t head_magic;        /* Í·²¿Ä§Êı (0x55AA55AA) */
-    uint32_t sequence_id;       /* ĞòÁĞºÅ(Ã¿´ÎĞŞ¸ÄµİÔö) */
-    uint32_t erase_count;       /* Flash²Á³ı´ÎÊı¼ÇÂ¼ */
+    /* Í·ï¿½ï¿½ï¿½ï¿½Ï¢ */
+    uint32_t head_magic;        /* Í·ï¿½ï¿½Ä§ï¿½ï¿½ (0x55AA55AA) */
+    uint32_t sequence_id;       /* ï¿½ï¿½ï¿½Ğºï¿½(Ã¿ï¿½ï¿½ï¿½Ş¸Äµï¿½ï¿½ï¿½) */
+    uint32_t erase_count;       /* Flashï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ */
 
-    /* ¿Í»§ Modbus Ğ­Òé²ÎÊı (±£³Ö¼Ä´æÆ÷, µôµç±£´æ, ±©Â¶¸ø Modbus) */
-    uint16_t node_id;               /* 0x2710: Éè±¸µØÖ· 1~247 */
-    int16_t  target_speed;          /* 0x2711: ×ªËÙ (r/min) */
-    int16_t  target_angle;          /* 0x2712: ½Ç¶È (0.1¶È) */
-    uint16_t voltage_upper_limit;   /* 0x2714: ¹ıÑ¹ãĞÖµ (0.1V) */
-    uint16_t voltage_lower_limit;   /* 0x2715: Ç·Ñ¹ãĞÖµ (0.1V) */
-    uint16_t current_upper_limit;   /* 0x2716: ¹ıÁ÷ãĞÖµ (1mA) */
-    uint16_t current_detect_ms;     /* 0x271E: ¹ıÁ÷ÅĞ¶¨Ê±¼ä (1ms) */
-    int16_t  close_limit_angle;     /* 0x271C: ¹Ø´°¼«ÏŞ½Ç¶È (0.1¶È) */
-    int16_t  open_limit_angle;      /* 0x271D: ¿ª´°¼«ÏŞ½Ç¶È (0.1¶È) */
-    uint32_t baud_rate;             /* ²¨ÌØÂÊ (ÄÚ²¿²ÎÊı, ²»±©Â¶¸øModbus) */
+    /* ï¿½Í»ï¿½ Modbus Ğ­ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½Ö¼Ä´ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ç±£ï¿½ï¿½, ï¿½ï¿½Â¶ï¿½ï¿½ Modbus) */
+    uint16_t node_id;               /* 0x2710: ï¿½è±¸ï¿½ï¿½Ö· 1~247 */
+    int16_t  target_speed;          /* 0x2711: ×ªï¿½ï¿½ (r/min) */
+    int16_t  target_angle;          /* 0x2712: ï¿½Ç¶ï¿½ (0.1ï¿½ï¿½) */
+    uint16_t voltage_upper_limit;   /* 0x2714: ï¿½ï¿½Ñ¹ï¿½ï¿½Öµ (0.1V) */
+    uint16_t voltage_lower_limit;   /* 0x2715: Ç·Ñ¹ï¿½ï¿½Öµ (0.1V) */
+    uint16_t current_upper_limit;   /* 0x2716: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ (1mA) */
+    uint16_t current_detect_ms;     /* 0x271E: ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¶ï¿½Ê±ï¿½ï¿½ (1ms) */
+    int16_t  close_limit_angle;     /* 0x271C: ï¿½Ø´ï¿½ï¿½ï¿½ï¿½Ş½Ç¶ï¿½ (0.1ï¿½ï¿½) */
+    int16_t  open_limit_angle;      /* 0x271D: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ş½Ç¶ï¿½ (0.1ï¿½ï¿½) */
+    uint32_t baud_rate;             /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½Â¶ï¿½ï¿½Modbus) */
 
-    /* ÄÚ²¿²ÎÊı (²»±©Â¶¸ø Modbus, µ« Flash ´æ´¢, µôµç±£Áô) */
-    uint16_t voltage_upper_hysteresis;   /* ¹ıÑ¹ÖÍ»Ø (0.1V) */
-    uint16_t voltage_lower_hysteresis;   /* Ç·Ñ¹ÖÍ»Ø (0.1V) */
-    uint8_t  overvoltage_trigger_count;  /* ¹ıÑ¹´¥·¢´ÎÊı */
-    uint8_t  undervoltage_trigger_count; /* Ç·Ñ¹´¥·¢´ÎÊı */
-    uint16_t current_hysteresis_ma;      /* µçÁ÷ÖÍ»Ø (mA) */
-    uint16_t current_release_ms;         /* ¹ıÁ÷ÊÍ·ÅÊ±¼ä´°¿Ú (ms) */
-    uint8_t  overcurrent_trigger_count;  /* ¹ıÁ÷´¥·¢´ÎÊı(Ê±¼ä´°¿ÚÄ£Ê½ÏÂ¿ÉÑ¡Ê¹ÓÃ) */
-    uint16_t  motor_hall_dir;               /* 0x3710: »ô¶û·½Ïò 0=Õı³£ 1=·´×ª */
-    uint16_t  motor_dir;                    /* 0x3711: µç»ú·½Ïò 0=Õı³£ 1=·´×ª */
-    uint16_t  rturn_reduction_ratio;          /* 0x3712: ¼õËÙ±Èx10 */
-    uint16_t  motor_hall_pole_pairs;          /* 0x3713: µç»ú¼«¶ÔÊı */
-    int16_t   calib_upper_x10;                /* 0x2729: ¹Ø´°¹ıÁ÷Ğ£×¼½Ç¶ÈÉÏÏŞ (0.1¶È) */
-    int16_t   calib_lower_x10;                /* 0x272A: ¹Ø´°¹ıÁ÷Ğ£×¼½Ç¶ÈÏÂÏŞ (0.1¶È) */
+    /* ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½Â¶ï¿½ï¿½ Modbus, ï¿½ï¿½ Flash ï¿½æ´¢, ï¿½ï¿½ï¿½ç±£ï¿½ï¿½) */
+    uint16_t voltage_upper_hysteresis;   /* ï¿½ï¿½Ñ¹ï¿½Í»ï¿½ (0.1V) */
+    uint16_t voltage_lower_hysteresis;   /* Ç·Ñ¹ï¿½Í»ï¿½ (0.1V) */
+    uint8_t  overvoltage_trigger_count;  /* ï¿½ï¿½Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+    uint8_t  undervoltage_trigger_count; /* Ç·Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+    uint16_t current_hysteresis_ma;      /* ï¿½ï¿½ï¿½ï¿½ï¿½Í»ï¿½ (mA) */
+    uint16_t current_release_ms;         /* ï¿½ï¿½ï¿½ï¿½ï¿½Í·ï¿½Ê±ï¿½ä´°ï¿½ï¿½ (ms) */
+    uint8_t  overcurrent_trigger_count;  /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(Ê±ï¿½ä´°ï¿½ï¿½Ä£Ê½ï¿½Â¿ï¿½Ñ¡Ê¹ï¿½ï¿½) */
+    uint16_t  motor_hall_dir;               /* 0x3710: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 0=ï¿½ï¿½ï¿½ï¿½ 1=ï¿½ï¿½×ª */
+    uint16_t  motor_dir;                    /* 0x3711: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 0=ï¿½ï¿½ï¿½ï¿½ 1=ï¿½ï¿½×ª */
+    uint16_t  rturn_reduction_ratio;          /* 0x3712: ï¿½ï¿½ï¿½Ù±ï¿½x10 */
+    uint16_t  motor_hall_pole_pairs;          /* 0x3713: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+    int16_t   calib_upper_x10;                /* 0x2729: ï¿½Ø´ï¿½ï¿½ï¿½ï¿½ï¿½Ğ£×¼ï¿½Ç¶ï¿½ï¿½ï¿½ï¿½ï¿½ (0.1ï¿½ï¿½) */
+    int16_t   calib_lower_x10;                /* 0x272A: ï¿½Ø´ï¿½ï¿½ï¿½ï¿½ï¿½Ğ£×¼ï¿½Ç¶ï¿½ï¿½ï¿½ï¿½ï¿½ (0.1ï¿½ï¿½) */
 
-    /* Î²²¿ĞÅÏ¢ */
-    uint32_t checksum;              /* CRC32Ğ£Ñé */
-    uint32_t tail_magic;            /* Î²²¿Ä§Êı (0xAA44AA44) */
+    /* Î²ï¿½ï¿½ï¿½ï¿½Ï¢ */
+    uint32_t checksum;              /* CRC32Ğ£ï¿½ï¿½ */
+    uint32_t tail_magic;            /* Î²ï¿½ï¿½Ä§ï¿½ï¿½ (0xAA44AA44) */
 } AppParamRecord_t;
 #pragma pack()
 
 /*=============================================================================
- * ÊµÊ±Êı¾İ½á¹¹Ìå (²»´æ Flash, ½öÔËĞĞÊ±Ê¹ÓÃ)
+ * ÊµÊ±ï¿½ï¿½ï¿½İ½á¹¹ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ Flash, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±Ê¹ï¿½ï¿½)
  *============================================================================*/
 typedef struct {
-    int16_t  real_speed;        /* 0x2730: ÊµÊ±×ªËÙ (r/min) */
-    int16_t  real_angle;        /* 0x2731: ÊµÊ±½Ç¶È (0.1¶È) */
-    uint16_t real_voltage;      /* 0x2732: µçÑ¹ (0.1V) */
-    uint16_t real_current;      /* 0x2733: µçÁ÷ (1mA) */
-    int16_t  real_direction;    /* 0x2737: ÊµÊ±·½Ïò */
-    uint16_t fault_status;      /* 0x2740: ¹ÊÕÏ×´Ì¬ (¼û FAULT_BIT_xxx ¶¨Òå) */
+    int16_t  real_speed;        /* 0x2730: ÊµÊ±×ªï¿½ï¿½ (r/min) */
+    int16_t  real_angle;        /* 0x2731: ÊµÊ±ï¿½Ç¶ï¿½ (0.1ï¿½ï¿½) */
+    uint16_t real_voltage;      /* 0x2732: ï¿½ï¿½Ñ¹ (0.1V) */
+    uint16_t real_current;      /* 0x2733: ï¿½ï¿½ï¿½ï¿½ (1mA) */
+    int16_t  real_direction;    /* 0x2737: ÊµÊ±ï¿½ï¿½ï¿½ï¿½ */
+    uint16_t fault_status;      /* 0x2740: ï¿½ï¿½ï¿½ï¿½×´Ì¬ (ï¿½ï¿½ FAULT_BIT_xxx ï¿½ï¿½ï¿½ï¿½) */
 } AppRealTimeData_t;
 
 /*=============================================================================
- * Ä£ÄâÊµÊ±Êı¾İ½á¹¹Ìå (ÓÃÓÚ Keil Debug ´°¿ÚĞŞ¸Ä)
+ * Ä£ï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½İ½á¹¹ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ Keil Debug ï¿½ï¿½ï¿½ï¿½ï¿½Ş¸ï¿½)
  *============================================================================*/
 typedef struct {
-    volatile int16_t  speed;        /* ÊµÊ±×ªËÙ r/min */
-    volatile int16_t  angle;        /* ÊµÊ±½Ç¶È 0.1¶È */
-    volatile uint16_t voltage;      /* µçÑ¹ 0.1V */
-    volatile uint16_t current;      /* µçÁ÷ 1mA */
-    volatile int16_t  direction;    /* ÊµÊ±·½Ïò */
-    volatile uint16_t fault_set;    /* ¹ÊÕÏÉèÖÃ: Ğ´ FAULT_BIT_xxx ¿ÉÉèÖÃ¶ÔÓ¦¹ÊÕÏÎ» */
-    volatile uint16_t fault_clear;  /* ¹ÊÕÏÇå³ı: Ğ´ FAULT_BIT_xxx ¿ÉÇå³ı¶ÔÓ¦¹ÊÕÏÎ» */
+    volatile int16_t  speed;        /* ÊµÊ±×ªï¿½ï¿½ r/min */
+    volatile int16_t  angle;        /* ÊµÊ±ï¿½Ç¶ï¿½ 0.1ï¿½ï¿½ */
+    volatile uint16_t voltage;      /* ï¿½ï¿½Ñ¹ 0.1V */
+    volatile uint16_t current;      /* ï¿½ï¿½ï¿½ï¿½ 1mA */
+    volatile int16_t  direction;    /* ÊµÊ±ï¿½ï¿½ï¿½ï¿½ */
+    volatile uint16_t fault_set;    /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: Ğ´ FAULT_BIT_xxx ï¿½ï¿½ï¿½ï¿½ï¿½Ã¶ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½Î» */
+    volatile uint16_t fault_clear;  /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: Ğ´ FAULT_BIT_xxx ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½Î» */
 } SimRealtimeData_t;
 
 /*=============================================================================
- * È«¾Ö±äÁ¿ÉùÃ÷
+ * È«ï¿½Ö±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
  *============================================================================*/
-extern AppParamRecord_t g_AppParam;         /* Ó¦ÓÃ²ÎÊı(Flash ´æ´¢) */
-extern AppRealTimeData_t g_RealTimeData;    /* ÊµÊ±Êı¾İ(²»´æ Flash) */
-extern volatile int32_t g_s32HallPulseAccum;  /* »ô¶ûÂö³åÀÛ¼ÆÖµ */
-extern SimRealtimeData_t g_SimRealtimeData; /* Ä£ÄâÊµÊ±Êı¾İ(Keil Debug ĞŞ¸Ä) */
+extern AppParamRecord_t g_AppParam;         /* Ó¦ï¿½Ã²ï¿½ï¿½ï¿½(Flash ï¿½æ´¢) */
+extern AppRealTimeData_t g_RealTimeData;    /* ÊµÊ±ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ Flash) */
+extern volatile int32_t g_s32HallPulseAccum;  /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Û¼ï¿½Öµ */
+extern SimRealtimeData_t g_SimRealtimeData; /* Ä£ï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½ï¿½(Keil Debug ï¿½Ş¸ï¿½) */
 
 /*=============================================================================
- * ¼Ä´æÆ÷¶ÁĞ´½Ó¿Úº¯Êı
+ * ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½Ğ´ï¿½Ó¿Úºï¿½ï¿½ï¿½
  *============================================================================*/
 
 /**
- * @brief  ¸ù¾İ¼Ä´æÆ÷µØÖ·¶ÁÈ¡²ÎÊıÖµ
- * @param  regAddr  ¼Ä´æÆ÷µØÖ· (REG_xxx)
- * @param  pValue   ·µ»ØÖµÖ¸Õë
- * @return 0 ³É¹¦; -3 ÎŞĞ§µØÖ·
+ * @brief  ï¿½ï¿½ï¿½İ¼Ä´ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½Öµ
+ * @param  regAddr  ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½Ö· (REG_xxx)
+ * @param  pValue   ï¿½ï¿½ï¿½ï¿½ÖµÖ¸ï¿½ï¿½
+ * @return 0 ï¿½É¹ï¿½; -3 ï¿½ï¿½Ğ§ï¿½ï¿½Ö·
  */
 int32_t Param_ReadByReg(uint16_t regAddr, uint16_t *pValue);
 
 /**
- * @brief  ¸ù¾İ¼Ä´æÆ÷µØÖ·Ğ´Èë²ÎÊıÖµ
- * @param  regAddr  ¼Ä´æÆ÷µØÖ· (REG_xxx)
- * @param  value    ÒªĞ´ÈëµÄÖµ
- * @return 0 ³É¹¦; -3 ÎŞĞ§µØÖ·
+ * @brief  ï¿½ï¿½ï¿½İ¼Ä´ï¿½ï¿½ï¿½ï¿½ï¿½Ö·Ğ´ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
+ * @param  regAddr  ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½Ö· (REG_xxx)
+ * @param  value    ÒªĞ´ï¿½ï¿½ï¿½Öµ
+ * @return 0 ï¿½É¹ï¿½; -3 ï¿½ï¿½Ğ§ï¿½ï¿½Ö·
  */
 int32_t Param_WriteByReg(uint16_t regAddr, uint16_t value);
 
 /*=============================================================================
- * ÊµÊ±Êı¾İ²Ù×÷º¯Êı
+ * ÊµÊ±ï¿½ï¿½ï¿½İ²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
  *============================================================================*/
 
 /**
- * @brief  °Ñ¹ÊÕÏÎ»ÉèÎª1(ÖÃÎ»)
- * @param  bitMask  ¹ÊÕÏÎ»ÑÚÂë (FAULT_BIT_xxx)
+ * @brief  ï¿½Ñ¹ï¿½ï¿½ï¿½Î»ï¿½ï¿½Îª1(ï¿½ï¿½Î»)
+ * @param  bitMask  ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ (FAULT_BIT_xxx)
  */
 void RealTime_SetFault(uint16_t bitMask);
 
 /**
- * @brief  °Ñ¹ÊÕÏÎ»ÉèÎª0(Çå³ı)
- * @param  bitMask  ¹ÊÕÏÎ»ÑÚÂë (FAULT_BIT_xxx)
+ * @brief  ï¿½Ñ¹ï¿½ï¿½ï¿½Î»ï¿½ï¿½Îª0(ï¿½ï¿½ï¿½)
+ * @param  bitMask  ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ (FAULT_BIT_xxx)
  */
 void RealTime_ClearFault(uint16_t bitMask);
 
 /**
- * @brief  ¼ì²é¹ÊÕÏÎ»
- * @param  bitMask  ¹ÊÕÏÎ»ÑÚÂë (FAULT_BIT_xxx)
- * @retval true     ¸Ã¹ÊÕÏÎ»Îª 1
- * @retval false    ¸Ã¹ÊÕÏÎ»Îª 0
+ * @brief  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»
+ * @param  bitMask  ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ (FAULT_BIT_xxx)
+ * @retval true     ï¿½Ã¹ï¿½ï¿½ï¿½Î»Îª 1
+ * @retval false    ï¿½Ã¹ï¿½ï¿½ï¿½Î»Îª 0
  */
 bool RealTime_CheckFault(uint16_t bitMask);
 
 /**
- * @brief  ¸üĞÂÊµÊ±Êı¾İ(ÓÉ¸÷Éè±¸Ä£¿éµ÷ÓÃ)
- * @param  speed      ÊµÊ±×ªËÙ (r/min), ´« NULL ±íÊ¾²»¸üĞÂ
- * @param  angle      ÊµÊ±½Ç¶È (0.1¶È), ´« NULL ±íÊ¾²»¸üĞÂ
- * @param  voltage    µçÑ¹ (0.1V), ´« NULL ±íÊ¾²»¸üĞÂ
- * @param  current    µçÁ÷ (1mA), ´« NULL ±íÊ¾²»¸üĞÂ
- * @param  direction  ÊµÊ±·½Ïò, ´« NULL ±íÊ¾²»¸üĞÂ
+ * @brief  ï¿½ï¿½ï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½ï¿½(ï¿½É¸ï¿½ï¿½è±¸Ä£ï¿½ï¿½ï¿½ï¿½ï¿½)
+ * @param  speed      ÊµÊ±×ªï¿½ï¿½ (r/min), ï¿½ï¿½ NULL ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+ * @param  angle      ÊµÊ±ï¿½Ç¶ï¿½ (0.1ï¿½ï¿½), ï¿½ï¿½ NULL ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+ * @param  voltage    ï¿½ï¿½Ñ¹ (0.1V), ï¿½ï¿½ NULL ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+ * @param  current    ï¿½ï¿½ï¿½ï¿½ (1mA), ï¿½ï¿½ NULL ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+ * @param  direction  ÊµÊ±ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ NULL ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
  */
 void RealTime_Update(const int16_t  *speed,
                      const int16_t  *angle,
@@ -292,63 +292,63 @@ void RealTime_Update(const int16_t  *speed,
                      const int16_t  *direction);
 
 /**
- * @brief  ´ÓÉè±¸¶ÁÈ¡ÊµÊ±Êı¾İ²¢¸üĞÂµ½ g_RealTimeData
- *         Ğë APP_PARAMS_USE_DEV_RTURN ºê¿ªÆôÊ±ÓĞĞ§
- * @param  u8RTurnDevId   dev_rturn Éè±¸ ID
- * @param  u8VoltageDevId dev_voltage Éè±¸ ID
- * @param  u8SensorDevId  dev_sensor Éè±¸ ID
+ * @brief  ï¿½ï¿½ï¿½è±¸ï¿½ï¿½È¡ÊµÊ±ï¿½ï¿½ï¿½İ²ï¿½ï¿½ï¿½ï¿½Âµï¿½ g_RealTimeData
+ *         ï¿½ï¿½ APP_PARAMS_USE_DEV_RTURN ï¿½ê¿ªï¿½ï¿½Ê±ï¿½ï¿½Ğ§
+ * @param  u8RTurnDevId   dev_rturn ï¿½è±¸ ID
+ * @param  u8VoltageDevId dev_voltage ï¿½è±¸ ID
+ * @param  u8SensorDevId  dev_sensor ï¿½è±¸ ID
  */
 void RealTime_UpdateFromDevice(uint8_t u8RTurnDevId,
                                uint8_t u8VoltageDevId,
                                uint8_t u8SensorDevId);
 
 /**
- * @brief  ´òÓ¡ÊµÊ±Êı¾İ(µ÷ÊÔÓÃ)
+ * @brief  ï¿½ï¿½Ó¡ÊµÊ±ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
  */
 void RealTime_PrintDebug(void);
 
 /**
- * @brief  ÊµÊ±Êı¾İÄ£Äâ(Ã¿5ÃëÊı¾İ+1, ÓÃÓÚ²âÊÔ¹ÊÕÏÎ»·­×ª)
- *         Ğë APP_PARAMS_REALTIME_SIMULATE ºê¿ªÆôÊ±ÓĞĞ§
+ * @brief  ÊµÊ±ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½(Ã¿5ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½+1, ï¿½ï¿½ï¿½Ú²ï¿½ï¿½Ô¹ï¿½ï¿½ï¿½Î»ï¿½ï¿½×ª)
+ *         ï¿½ï¿½ APP_PARAMS_REALTIME_SIMULATE ï¿½ê¿ªï¿½ï¿½Ê±ï¿½ï¿½Ğ§
  */
 void RealTime_Simulate(void);
 
 /*=============================================================================
- * Ä£ÄâÊµÊ±Êı¾İ²Ù×÷º¯Êı (ÅäºÏ Keil Debug ´°¿ÚĞŞ¸Ä)
+ * Ä£ï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½İ²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ Keil Debug ï¿½ï¿½ï¿½ï¿½ï¿½Ş¸ï¿½)
  *============================================================================*/
 
 /**
- * @brief  ³õÊ¼»¯Ä£ÄâÊµÊ±Êı¾İ
+ * @brief  ï¿½ï¿½Ê¼ï¿½ï¿½Ä£ï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½ï¿½
  */
 void SimRealtime_Init(void);
 
 /**
- * @brief  Í¬²½Ä£ÄâÊı¾İµ½Êµ¼ÊÊµÊ±Êı¾İ(Ö÷Ñ­»·ÖĞµ÷ÓÃ)
- *         ½« g_SimRealtimeData ÖĞµÄÖµÍ¬²½µ½ g_RealTimeData
+ * @brief  Í¬ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½İµï¿½Êµï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½Ğµï¿½ï¿½ï¿½)
+ *         ï¿½ï¿½ g_SimRealtimeData ï¿½Ğµï¿½ÖµÍ¬ï¿½ï¿½ï¿½ï¿½ g_RealTimeData
  */
 void SimRealtime_Sync(void);
 
 /**
- * @brief  ´òÓ¡Ä£ÄâÊµÊ±Êı¾İµ±Ç°Öµ(µ÷ÊÔÓÃ)
+ * @brief  ï¿½ï¿½Ó¡Ä£ï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½İµï¿½Ç°Öµ(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
  */
 void SimRealtime_PrintDebug(void);
 
 /*=============================================================================
- * ¿ØÖÆËø×´Ì¬²éÑ¯ (¹©¾ø¶Ô½Ç¶È»ØÁãµÈÄ£¿éÊ¹ÓÃ)
+ * ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½Ñ¯ (ï¿½ï¿½ï¿½ï¿½ï¿½Ô½Ç¶È»ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½Ê¹ï¿½ï¿½)
  *============================================================================*/
 
 /**
- * @brief  ²éÑ¯ RS485 ¿ØÖÆÊÇ·ñÒÑ½âËø
- * @retval true   ÒÑ½âËø (bit3~bit5 ¿ÉĞ´Èë)
- * @retval false  ÒÑÉÏËø (bit3~bit5 ±»ºöÂÔ)
+ * @brief  ï¿½ï¿½Ñ¯ RS485 ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ñ½ï¿½ï¿½ï¿½
+ * @retval true   ï¿½Ñ½ï¿½ï¿½ï¿½ (bit3~bit5 ï¿½ï¿½Ğ´ï¿½ï¿½)
+ * @retval false  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (bit3~bit5 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
  */
 bool Param_IsCtrlUnlocked(void);
 
 /**
- * @brief  ²éÑ¯µç»úÊÇ·ñ´¦ÓÚÍ£×ª×´Ì¬
- *         Í¬Ê±¼ì²é dev_motor_hall ·½Ïò ºÍ dev_motor ÆÚÍû·½Ïò
- * @retval true   µç»úÍ£×ªÖĞ
- * @retval false  µç»úÕıÔÚÕı×ª»ò·´×ª
+ * @brief  ï¿½ï¿½Ñ¯ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½Í£×ª×´Ì¬
+ *         Í¬Ê±ï¿½ï¿½ï¿½ dev_motor_hall ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ dev_motor ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+ * @retval true   ï¿½ï¿½ï¿½Í£×ªï¿½ï¿½
+ * @retval false  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½×ª
  */
 bool Param_IsMotorStopped(void);
 

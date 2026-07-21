@@ -1,47 +1,47 @@
 #include "dev_motor.h"
 #include "App_Params.h"
-#include "dev_pwm.h"          // PWMÉè±¸²ã
-#include "dev_voltage.h"      // µçÑ¹¸æ¾¯ÊÂ¼þÀàÐÍ
-#include "dev_sensor.h"       // µçÁ÷¸æ¾¯ÊÂ¼þÀàÐÍ
+#include "dev_pwm.h"          // PWMï¿½è±¸ï¿½ï¿½
+#include "dev_voltage.h"      // ï¿½ï¿½Ñ¹ï¿½æ¾¯ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½
+#include "dev_sensor.h"       // ï¿½ï¿½ï¿½ï¿½ï¿½æ¾¯ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½
 #include "device_manager.h"
 #include "TickTimer.h"
 #include <string.h>
 #include "rtt_log.h"
-#include "dev_rturn.h"          // Ìí¼ÓÕâÐÐ£¬ÓÃÓÚ RTurn_LimitEvent_t
-#include "Template_Pwm.h"       // PWMÅäÖÃ£¨TMRA_4, PB6/PB7£©
-#include "hc32_ll_tmra.h"      // TMRA¼Ä´æÆ÷²Ù×÷
+#include "dev_rturn.h"          // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð£ï¿½ï¿½ï¿½ï¿½ï¿½ RTurn_LimitEvent_t
+#include "Template_Pwm.h"       // PWMï¿½ï¿½ï¿½Ã£ï¿½TMRA_4, PB6/PB7ï¿½ï¿½
+#include "hc32_ll_tmra.h"      // TMRAï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 #if MOTOR_CONTROL_MODE == 1
-#include "Pwm.h"                // PWM »ºÆô¶¯¿â
+#include "Pwm.h"                // PWM ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-/* PWM È«¾ÖÊµÀý£¨ÔÚ main.c ÖÐ¶¨Òå£©*/
+/* PWM È«ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ main.c ï¿½Ð¶ï¿½ï¿½å£©*/
 extern pwm_t g_motor_pwm_ch1;   // PB6
 extern pwm_t g_motor_pwm_ch2;   // PB7
 extern pwm_t g_motor_pwm_ch3;   // PB8
 extern pwm_t g_motor_pwm_ch4;   // PB9
 
-/* PWM Ä£Ê½¾²Ì¬×´Ì¬±äÁ¿ */
+/* PWM Ä£Ê½ï¿½ï¿½Ì¬×´Ì¬ï¿½ï¿½ï¿½ï¿½ */
 static MotorDir_t s_eLastArbitrationDir = DIR_NONE;
 static uint16_t s_u16LastTargetDuty = 0;
-static bool s_bPolaritySwitchPending = false;   /* »º½µµ½0ºóÐèÇÐ¼«ÐÔ */
-static uint16_t s_u16PendingTargetDuty = 0;      /* ´ý»ºÉýµÄÄ¿±êÕ¼¿Õ±È */
-static uint8_t s_u8PendingDirection = 0;          /* ´ý»ºÉýµÄ·½Ïò: 1=FWD 2=REV */
+static bool s_bPolaritySwitchPending = false;   /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½0ï¿½ï¿½ï¿½ï¿½ï¿½Ð¼ï¿½ï¿½ï¿½ */
+static uint16_t s_u16PendingTargetDuty = 0;      /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½Õ¼ï¿½Õ±ï¿½ */
+static uint8_t s_u8PendingDirection = 0;          /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä·ï¿½ï¿½ï¿½: 1=FWD 2=REV */
 
-/* »ºÆô¶¯/»ºÍ£Ê±¼ä£¨ºÁÃë£©*/
+/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½Í£Ê±ï¿½ä£¨ï¿½ï¿½ï¿½ë£©*/
 #define MOTOR_RAMP_TIME_MS      800
 
-/* Õ¼¿Õ±ÈÏÞÖÆ£¨2%-98%£©*/
+/* Õ¼ï¿½Õ±ï¿½ï¿½ï¿½ï¿½Æ£ï¿½2%-98%ï¿½ï¿½*/
 #define MOTOR_DUTY_MIN          2
 #define MOTOR_DUTY_MAX          98
 
-/* Õ¼¿Õ±ÈÏÞ·ù */
+/* Õ¼ï¿½Õ±ï¿½ï¿½Þ·ï¿½ */
 static uint16_t Motor_LimitDuty(uint16_t duty) {
     if (duty < MOTOR_DUTY_MIN) return MOTOR_DUTY_MIN;
     if (duty > MOTOR_DUTY_MAX) return MOTOR_DUTY_MAX;
     return duty;
 }
 
-/* Í£Ö¹£ºPB6~PB9 È« 98% ¸ßÓÐÐ§ */
+/* Í£Ö¹ï¿½ï¿½PB6~PB9 È« 98% ï¿½ï¿½ï¿½ï¿½Ð§ */
 static void Motor_SetStopDuty(void) {
     stc_tmra_pwm_init_t stcPwmInit;
     (void)TMRA_PWM_StructInit(&stcPwmInit);
@@ -64,7 +64,7 @@ static void Motor_SetStopDuty(void) {
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH4, ENABLE);
 }
 
-/* ÔËÐÐ¼«ÐÔ£ºÈ«²¿ÉèÎª¸ßÓÐÐ§ */
+/* ï¿½ï¿½ï¿½Ð¼ï¿½ï¿½Ô£ï¿½È«ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½Ð§ */
 static void Motor_SetRunPolarity(void) {
     stc_tmra_pwm_init_t stcPwmInit;
     (void)TMRA_PWM_StructInit(&stcPwmInit);
@@ -84,7 +84,7 @@ static void Motor_SetRunPolarity(void) {
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH4, ENABLE);
 }
 
-/* Ö±½ÓÉèÖÃ4Í¨µÀÕ¼¿Õ±È£¨ÔËÐÐÌ¬£¬È«¸ßÓÐÐ§£©*/
+/* Ö±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½4Í¨ï¿½ï¿½Õ¼ï¿½Õ±È£ï¿½ï¿½ï¿½ï¿½ï¿½Ì¬ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½*/
 static void Motor_SetRunDutyDirect(uint16_t ch1, uint16_t ch2, uint16_t ch3, uint16_t ch4) {
     uint32_t u32Period = TMRA_GetPeriodValue(CM_TMRA_4);
     TMRA_SetCompareValue(CM_TMRA_4, TMRA_CH1, (u32Period * ch1) / 100U);
@@ -93,7 +93,7 @@ static void Motor_SetRunDutyDirect(uint16_t ch1, uint16_t ch2, uint16_t ch3, uin
     TMRA_SetCompareValue(CM_TMRA_4, TMRA_CH4, (u32Period * ch4) / 100U);
 }
 
-/* »ºÆô¶¯-Õý×ª£ºCH1/2 µÍÕ¼¿Õ±È£¬CH3/4 ¸ßÕ¼¿Õ±È */
+/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½-ï¿½ï¿½×ªï¿½ï¿½CH1/2 ï¿½ï¿½Õ¼ï¿½Õ±È£ï¿½CH3/4 ï¿½ï¿½Õ¼ï¿½Õ±ï¿½ */
 static void Motor_RampForward(uint16_t target_duty) {
     uint16_t limited_duty = Motor_LimitDuty(target_duty);
     uint16_t duty_low = limited_duty;
@@ -101,7 +101,7 @@ static void Motor_RampForward(uint16_t target_duty) {
     uint16_t current_duty_ch1 = PWM_GetDuty(&g_motor_pwm_ch1);
 
     if (current_duty_ch1 != 0) {
-        /* ÏÈ»º½µµ½0£¨·Ç×èÈû£©£¬Íê³ÉºóÓÉ Motor_Update ÇÐ¼«ÐÔÔÙ»ºÉý */
+        /* ï¿½È»ï¿½ï¿½ï¿½ï¿½ï¿½0ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Éºï¿½ï¿½ï¿? Motor_Update ï¿½Ð¼ï¿½ï¿½ï¿½ï¿½Ù»ï¿½ï¿½ï¿½ */
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch1, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch2, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch3, 100 - current_duty_ch1, 0, 50);
@@ -112,7 +112,7 @@ static void Motor_RampForward(uint16_t target_duty) {
         return;
     }
 
-    /* µ±Ç°ÒÑÎª0%£¬Ö±½ÓÇÐ¼«ÐÔ»ºÉý */
+    /* ï¿½ï¿½Ç°ï¿½ï¿½Îª0%ï¿½ï¿½Ö±ï¿½ï¿½ï¿½Ð¼ï¿½ï¿½Ô»ï¿½ï¿½ï¿½ */
     Motor_SetRunPolarity();
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch1, 0, duty_low, MOTOR_RAMP_TIME_MS);
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch2, 0, duty_low, MOTOR_RAMP_TIME_MS);
@@ -120,7 +120,7 @@ static void Motor_RampForward(uint16_t target_duty) {
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch4, 0, duty_high, MOTOR_RAMP_TIME_MS);
 }
 
-/* »ºÆô¶¯-·´×ª£ºCH1/2 ¸ßÕ¼¿Õ±È£¬CH3/4 µÍÕ¼¿Õ±È */
+/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½-ï¿½ï¿½×ªï¿½ï¿½CH1/2 ï¿½ï¿½Õ¼ï¿½Õ±È£ï¿½CH3/4 ï¿½ï¿½Õ¼ï¿½Õ±ï¿½ */
 static void Motor_RampReverse(uint16_t target_duty) {
     uint16_t limited_duty = Motor_LimitDuty(target_duty);
     uint16_t duty_low = 100 - limited_duty;
@@ -128,7 +128,7 @@ static void Motor_RampReverse(uint16_t target_duty) {
     uint16_t current_duty_ch1 = PWM_GetDuty(&g_motor_pwm_ch1);
 
     if (current_duty_ch1 != 0) {
-        /* ÏÈ»º½µµ½0£¨·Ç×èÈû£©£¬Íê³ÉºóÓÉ Motor_Update ÇÐ¼«ÐÔÔÙ»ºÉý */
+        /* ï¿½È»ï¿½ï¿½ï¿½ï¿½ï¿½0ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Éºï¿½ï¿½ï¿? Motor_Update ï¿½Ð¼ï¿½ï¿½ï¿½ï¿½Ù»ï¿½ï¿½ï¿½ */
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch1, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch2, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch3, 100 - current_duty_ch1, 0, 50);
@@ -139,7 +139,7 @@ static void Motor_RampReverse(uint16_t target_duty) {
         return;
     }
 
-    /* µ±Ç°ÒÑÎª0%£¬Ö±½ÓÇÐ¼«ÐÔ»ºÉý */
+    /* ï¿½ï¿½Ç°ï¿½ï¿½Îª0%ï¿½ï¿½Ö±ï¿½ï¿½ï¿½Ð¼ï¿½ï¿½Ô»ï¿½ï¿½ï¿½ */
     Motor_SetRunPolarity();
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch1, 0, duty_low, MOTOR_RAMP_TIME_MS);
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch2, 0, duty_low, MOTOR_RAMP_TIME_MS);
@@ -147,7 +147,7 @@ static void Motor_RampReverse(uint16_t target_duty) {
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch4, 0, duty_high, MOTOR_RAMP_TIME_MS);
 }
 
-/* Á¢¼´Õý×ª£¨ÎÞ»ºÆô¶¯£©*/
+/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½Þ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½*/
 static void Motor_RunForwardImmediate(uint16_t duty) {
     uint16_t limited_duty = Motor_LimitDuty(duty);
     uint16_t duty_low = limited_duty;
@@ -160,7 +160,7 @@ static void Motor_RunForwardImmediate(uint16_t duty) {
     PWM_SetDuty(&g_motor_pwm_ch4, duty_high);
 }
 
-/* Á¢¼´·´×ª£¨ÎÞ»ºÆô¶¯£©*/
+/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½Þ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½*/
 static void Motor_RunReverseImmediate(uint16_t duty) {
     uint16_t limited_duty = Motor_LimitDuty(duty);
     uint16_t duty_low = 100 - limited_duty;
@@ -175,39 +175,39 @@ static void Motor_RunReverseImmediate(uint16_t duty) {
 #endif /* MOTOR_CONTROL_MODE == 1 */
 
 
-// ÔÚÎÄ¼þ¿ªÍ·£¬ÆäËû include Ö®ºóÌí¼Ó
-// ´òÓ¡¼ä¸ô¿ØÖÆ
+// ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½Í·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ include Ö®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+// ï¿½ï¿½Ó¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿?
 volatile int motor_state = 0;
 static uint32_t s_u32LastMotorPrintTime = 0;
 #define MOTOR_PRINT_INTERVAL_MS   500
 
-// ========== Keil Watch µ÷ÊÔÈ«¾Ö±äÁ¿ ==========
-// µç»úÖÙ²Ã²ãµ÷ÊÔ±äÁ¿ - ÔÚ Watch ´°¿ÚÌí¼ÓÕâÐ©±äÁ¿¼´¿ÉÊµÊ±²é¿´µç»úÖÙ²Ã×´Ì¬
-MotorDevice_t* volatile g_pMotor_Dev_Watch = NULL;      // µç»úÉè±¸Ö¸Õë£¨¿ÉÕ¹¿ª²é¿´ËùÓÐ³ÉÔ±£©
-MotorDebugInfo_t volatile g_stcMotorDebug = {0};     // µ÷ÊÔÐÅÏ¢¸±±¾£¨½á¹¹ÌåÐÎÊ½£©
-// ÎªÁË·½±ã²é¿´£¬ÔÙµ¼³öÒ»Ð©µ¥¶ÀµÄ±äÁ¿
-volatile uint8_t  g_u8MotorDebug_BlockFwdCount = 0;   // Õý×ª×èÈû¶ÓÁÐÊýÁ¿
-volatile uint8_t  g_u8MotorDebug_BlockRevCount = 0;   // ·´×ª×èÈû¶ÓÁÐÊýÁ¿
-volatile uint8_t  g_u8MotorDebug_AllowFwdCount = 0;   // Õý×ªÔÊÐí¶ÓÁÐÊýÁ¿
-volatile uint8_t  g_u8MotorDebug_AllowRevCount = 0;   // ·´×ªÔÊÐí¶ÓÁÐÊýÁ¿
-volatile uint8_t  g_u8MotorDebug_ActiveDeviceId = 0;  // µ±Ç°»î¶¯Éè±¸ID
-volatile uint8_t  g_u8MotorDebug_ActiveDir = 0;       // µ±Ç°»î¶¯·½Ïò(0=Í£Ö¹,1=Õý×ª,2=·´×ª)
-volatile uint8_t  g_u8MotorDebug_State = 0;           // µç»ú×´Ì¬(0=IDLE,1=RAMPING,2=RUNNING)
-volatile float    g_fMotorDebug_CurrentDuty = 0.0f;   // µ±Ç°Õ¼¿Õ±È
-volatile uint8_t  g_u8MotorDebug_ConflictFault = 0;   // ³åÍ»¹ÊÕÏ±êÖ¾
+// ========== Keil Watch ï¿½ï¿½ï¿½ï¿½È«ï¿½Ö±ï¿½ï¿½ï¿½ ==========
+// ï¿½ï¿½ï¿½ï¿½Ù²Ã²ï¿½ï¿½ï¿½Ô±ï¿½ï¿½ï¿½ - ï¿½ï¿½ Watch ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð©ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÊµÊ±ï¿½é¿´ï¿½ï¿½ï¿½ï¿½Ù²ï¿½×´Ì?
+MotorDevice_t* volatile g_pMotor_Dev_Watch = NULL;      // ï¿½ï¿½ï¿½ï¿½è±¸Ö¸ï¿½ë£¨ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½é¿´ï¿½ï¿½ï¿½Ð³ï¿½Ô±ï¿½ï¿?
+MotorDebugInfo_t volatile g_stcMotorDebug = {0};     // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½á¹¹ï¿½ï¿½ï¿½ï¿½Ê½ï¿½ï¿½
+// Îªï¿½Ë·ï¿½ï¿½ï¿½é¿´ï¿½ï¿½ï¿½Ùµï¿½ï¿½ï¿½Ò»Ð©ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿?
+volatile uint8_t  g_u8MotorDebug_BlockFwdCount = 0;   // ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+volatile uint8_t  g_u8MotorDebug_BlockRevCount = 0;   // ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+volatile uint8_t  g_u8MotorDebug_AllowFwdCount = 0;   // ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+volatile uint8_t  g_u8MotorDebug_AllowRevCount = 0;   // ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+volatile uint8_t  g_u8MotorDebug_ActiveDeviceId = 0;  // ï¿½ï¿½Ç°ï¿½î¶¯ï¿½è±¸ID
+volatile uint8_t  g_u8MotorDebug_ActiveDir = 0;       // ï¿½ï¿½Ç°ï¿½î¶¯ï¿½ï¿½ï¿½ï¿½(0=Í£Ö¹,1=ï¿½ï¿½×ª,2=ï¿½ï¿½×ª)
+volatile uint8_t  g_u8MotorDebug_State = 0;           // ï¿½ï¿½ï¿½×´Ì?(0=IDLE,1=RAMPING,2=RUNNING)
+volatile float    g_fMotorDebug_CurrentDuty = 0.0f;   // ï¿½ï¿½Ç°Õ¼ï¿½Õ±ï¿½
+volatile uint8_t  g_u8MotorDebug_ConflictFault = 0;   // ï¿½ï¿½Í»ï¿½ï¿½ï¿½Ï±ï¿½Ö¾
 
-// ========== Éè±¸ID¶¨Òå ==========
-#define DEV_PWM_MOTOR_ID    1   // µç»úPWMÉè±¸ID
-#define DEV_MOTOR_ID        0   // µç»úÉè±¸ID£¨Óë App_Motor_Project.h ÖÐµÄ ID_MOTOR ±£³ÖÒ»ÖÂ£©
+// ========== ï¿½è±¸IDï¿½ï¿½ï¿½ï¿½ ==========
+#define DEV_PWM_MOTOR_ID    1   // ï¿½ï¿½ï¿½PWMï¿½è±¸ID
+#define DEV_MOTOR_ID        0   // ï¿½ï¿½ï¿½ï¿½è±¸IDï¿½ï¿½ï¿½ï¿½ App_Motor_Project.h ï¿½Ðµï¿½ ID_MOTOR ï¿½ï¿½ï¿½ï¿½Ò»ï¿½Â£ï¿½
 
-// ========== Éè±¸»ùÒò¶¨Òå ==========
+// ========== ï¿½è±¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ==========
 typedef struct {
     MotorDeviceId_t id;
     MotorPriority_t priority;
     uint32_t capability;
 } MotorDeviceGene_t;
 
-// ¸ù¾ÝÓÅÏÈ¼¶Ä£Ê½¶¯Ì¬¶¨ÒåÓÅÏÈ¼¶Öµ
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½Ä£Ê½ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½Öµ
 #if MOTOR_PRIORITY_IO_HIGH
     #define MANUAL_PRIORITY  3
     #define CAN_PRIORITY     4
@@ -216,7 +216,7 @@ typedef struct {
     #define CAN_PRIORITY     3
 #endif
 
-// Éè±¸»ùÒò±í
+// ï¿½è±¸ï¿½ï¿½ï¿½ï¿½ï¿?
 static const MotorDeviceGene_t c_device_genes[] = {
 #if MOTOR_MODE_BIPOLAR
     { DEV_ID_POWER_POS,  PRIO_POWER,     CAP_ALLOW },
@@ -224,28 +224,29 @@ static const MotorDeviceGene_t c_device_genes[] = {
 #endif
     // { DEV_ID_LIMIT_FWD,  PRIO_LIMIT,     CAP_BLOCK },
     // { DEV_ID_LIMIT_REV,  PRIO_LIMIT,     CAP_BLOCK },
-    { DEV_ID_RTURN_FWD,         PRIO_LIMIT,     CAP_BLOCK },
-    { DEV_ID_RTURN_REV,         PRIO_LIMIT,     CAP_BLOCK },
+    { DEV_ID_RTURN_FWD,         PRIO_LIMIT,     CAP_ALLOW },
+    { DEV_ID_RTURN_REV,         PRIO_LIMIT,     CAP_ALLOW },
     { DEV_ID_OVERVOLTAGE_FWD,   PRIO_LIMIT,     CAP_BLOCK },
     { DEV_ID_OVERVOLTAGE_REV,   PRIO_LIMIT,     CAP_BLOCK },
     { DEV_ID_UNDERVOLTAGE_FWD,  PRIO_LIMIT,     CAP_BLOCK },
     { DEV_ID_UNDERVOLTAGE_REV,  PRIO_LIMIT,     CAP_BLOCK },
 	{ DEV_ID_OVERCUR_FWD,       PRIO_LIMIT,     CAP_BLOCK },
+	{ DEV_ID_OVERCUR_REV,       PRIO_LIMIT,     CAP_BLOCK },
     // { DEV_ID_CAN,        (MotorPriority_t)CAN_PRIORITY,   MOTOR_CAN_CAPABILITY },
     { DEV_ID_IO_FWD,     (MotorPriority_t)MANUAL_PRIORITY, MOTOR_MANUAL_CAPABILITY },
     { DEV_ID_IO_REV,     (MotorPriority_t)MANUAL_PRIORITY, MOTOR_MANUAL_CAPABILITY },
     // { DEV_ID_EMERGENCY,  PRIO_EMERGENCY, CAP_BLOCK }
 };
 
-// ========== µç»úÖÙ²Ã½á¹û»Øµ÷º¯Êý£¨Èõ¶¨Òå£¬ÓÃ»§¿ÉÖØÐ´£© ==========
-// Ê¹ÓÃ Template_Pwm.h ÖÐ APP_FUNC_FOUR_CH_LOW_PWM Ä£Ê½µÄÅäÖÃ£º
+// ========== ï¿½ï¿½ï¿½ï¿½Ù²Ã½ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½å£¬ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ð´ï¿½ï¿½ ==========
+// Ê¹ï¿½ï¿½ Template_Pwm.h ï¿½ï¿½ APP_FUNC_FOUR_CH_LOW_PWM Ä£Ê½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½
 //   TMRA_UNIT = CM_TMRA_4, CH1=PB6, CH2=PB7, CH3=PB8, CH4=PB9
-// Õý×ª£ºPB6=20%, PB7=20%, PB8=80%, PB9=80%£¨È«²¿µÍÓÐÐ§£©
-// ·´×ª£ºPB6=80%, PB7=80%, PB8=20%, PB9=20%£¨È«²¿µÍÓÐÐ§£©
-// Í£Ö¹£ºPB6=50%(¸ßÓÐÐ§), PB7=50%(µÍÓÐÐ§), PB8=50%(¸ßÓÐÐ§), PB9=50%(µÍÓÐÐ§)
+// ï¿½ï¿½×ªï¿½ï¿½PB6=20%, PB7=20%, PB8=80%, PB9=80%ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½
+// ï¿½ï¿½×ªï¿½ï¿½PB6=80%, PB7=80%, PB8=20%, PB9=20%ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½
+// Í£Ö¹ï¿½ï¿½PB6=50%(ï¿½ï¿½ï¿½ï¿½Ð§), PB7=50%(ï¿½ï¿½ï¿½ï¿½Ð§), PB8=50%(ï¿½ï¿½ï¿½ï¿½Ð§), PB9=50%(ï¿½ï¿½ï¿½ï¿½Ð§)
 
 #if 0  // Disabled: superseded by Motor_SetRunDutyDirect/Motor_SetStopDuty/Motor_SetRunPolarity in PWM block above
-// ÄÚ²¿¸¨Öú£ºÉèÖÃ TMRA_4 ËÄÍ¨µÀÕ¼¿Õ±È£¨È«²¿µÍÓÐÐ§£©
+// ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ TMRA_4 ï¿½ï¿½Í¨ï¿½ï¿½Õ¼ï¿½Õ±È£ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½
 static void Motor_SetPwmDuty(uint32_t u32Ch1Pct, uint32_t u32Ch2Pct, uint32_t u32Ch3Pct, uint32_t u32Ch4Pct) {
     uint32_t u32Period = TMRA_GetPeriodValue(CM_TMRA_4);
     TMRA_SetCompareValue(CM_TMRA_4, TMRA_CH1, (u32Period * u32Ch1Pct) / 100U);  // PB6
@@ -256,14 +257,14 @@ static void Motor_SetPwmDuty(uint32_t u32Ch1Pct, uint32_t u32Ch2Pct, uint32_t u3
 #endif
 
 #if 0  // Disabled: superseded by Motor_SetRunDutyDirect/Motor_SetStopDuty/Motor_SetRunPolarity in PWM block above
-// ÄÚ²¿¸¨Öú£ºÍ£Ö¹Ê±ÉèÖÃÌØÊâ¼«ÐÔ£¨PB6/PB8¸ßÓÐÐ§£¬PB7/PB9µÍÓÐÐ§£©
+// ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í£Ö¹Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½â¼«ï¿½Ô£ï¿½PB6/PB8ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½PB7/PB9ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½
 static void Motor_SetStopPolarity(void) {
     stc_tmra_pwm_init_t stcPwmInit;
     (void)TMRA_PWM_StructInit(&stcPwmInit);
     uint32_t u32Period = TMRA_GetPeriodValue(CM_TMRA_4);
     uint32_t u32Compare = (u32Period * 50U) / 100U;
 
-    /* CH1(PB6) - ¸ßÓÐÐ§£¬50% */
+    /* CH1(PB6) - ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½50% */
     stcPwmInit.u32CompareValue        = u32Compare;
     stcPwmInit.u16StartPolarity       = TMRA_PWM_LOW;
     stcPwmInit.u16StopPolarity        = TMRA_PWM_LOW;
@@ -272,7 +273,7 @@ static void Motor_SetStopPolarity(void) {
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH1, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH1, ENABLE);
 
-    /* CH2(PB7) - µÍÓÐÐ§£¬50% */
+    /* CH2(PB7) - ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½50% */
     stcPwmInit.u32CompareValue        = u32Compare;
     stcPwmInit.u16StartPolarity       = TMRA_PWM_HIGH;
     stcPwmInit.u16StopPolarity        = TMRA_PWM_HIGH;
@@ -281,7 +282,7 @@ static void Motor_SetStopPolarity(void) {
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH2, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH2, ENABLE);
 
-    /* CH3(PB8) - ¸ßÓÐÐ§£¬50% */
+    /* CH3(PB8) - ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½50% */
     stcPwmInit.u32CompareValue        = u32Compare;
     stcPwmInit.u16StartPolarity       = TMRA_PWM_LOW;
     stcPwmInit.u16StopPolarity        = TMRA_PWM_LOW;
@@ -290,7 +291,7 @@ static void Motor_SetStopPolarity(void) {
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH3, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH3, ENABLE);
 
-    /* CH4(PB9) - µÍÓÐÐ§£¬50% */
+    /* CH4(PB9) - ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½50% */
     stcPwmInit.u32CompareValue        = u32Compare;
     stcPwmInit.u16StartPolarity       = TMRA_PWM_HIGH;
     stcPwmInit.u16StopPolarity        = TMRA_PWM_HIGH;
@@ -302,12 +303,12 @@ static void Motor_SetStopPolarity(void) {
 #endif
 
 #if 0  // Disabled: superseded by Motor_SetRunDutyDirect/Motor_SetStopDuty/Motor_SetRunPolarity in PWM block above
-// ÄÚ²¿¸¨Öú£ºÉèÖÃÔËÐÐÊ±µÄµÍÓÐÐ§¼«ÐÔ£¨È«²¿µÍÓÐÐ§£©
+// ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½Äµï¿½ï¿½ï¿½Ð§ï¿½ï¿½ï¿½Ô£ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½
 static void Motor_SetRunPolarity(void) {
     stc_tmra_pwm_init_t stcPwmInit;
     (void)TMRA_PWM_StructInit(&stcPwmInit);
 
-    /* CH1(PB6) - µÍÓÐÐ§ */
+    /* CH1(PB6) - ï¿½ï¿½ï¿½ï¿½Ð§ */
     stcPwmInit.u16StartPolarity       = TMRA_PWM_HIGH;
     stcPwmInit.u16StopPolarity        = TMRA_PWM_HIGH;
     stcPwmInit.u16CompareMatchPolarity = TMRA_PWM_LOW;
@@ -315,15 +316,15 @@ static void Motor_SetRunPolarity(void) {
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH1, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH1, ENABLE);
 
-    /* CH2(PB7) - µÍÓÐÐ§ */
+    /* CH2(PB7) - ï¿½ï¿½ï¿½ï¿½Ð§ */
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH2, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH2, ENABLE);
 
-    /* CH3(PB8) - µÍÓÐÐ§ */
+    /* CH3(PB8) - ï¿½ï¿½ï¿½ï¿½Ð§ */
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH3, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH3, ENABLE);
 
-    /* CH4(PB9) - µÍÓÐÐ§ */
+    /* CH4(PB9) - ï¿½ï¿½ï¿½ï¿½Ð§ */
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH4, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH4, ENABLE);
 }
@@ -339,7 +340,7 @@ __weak void Motor_OnArbitrationStop(MotorDevice_t* motor) {
     motor_state = 0;
 
 #elif MOTOR_CONTROL_MODE == 1
-    // === PWM Ä£Ê½£º¼±Í££¬Á¢¼´ÉèÖÃÍ£Ö¹¼«ÐÔ ===
+    // === PWM Ä£Ê½ï¿½ï¿½ï¿½ï¿½Í£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í£Ö¹ï¿½ï¿½ï¿½ï¿½ ===
     Motor_SetStopDuty();
 
     s_bPolaritySwitchPending = false;
@@ -419,7 +420,7 @@ if (g_AppParam.motor_dir != 0) {
 }
 
 
-// ========== ÄÚ²¿º¯ÊýÉùÃ÷ ==========
+// ========== ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ==========
 static const MotorDeviceGene_t* Motor_GetGene(MotorDeviceId_t id);
 static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id);
 static void Motor_CmdList_SetAllow(MotorCommandList_t* q, MotorControlCommand_t cmd);
@@ -427,7 +428,7 @@ static void Motor_CmdList_SetBlock(MotorCommandList_t* q, MotorControlCommand_t 
 static void Motor_ArbitrationDecision(MotorDevice_t* motor);
 static void Motor_UpdateDebugInfo(MotorDevice_t* motor);
 
-// ========== ÄÚ²¿º¯ÊýÊµÏÖ ==========
+// ========== ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ ==========
 
 static const MotorDeviceGene_t* Motor_GetGene(MotorDeviceId_t id) {
     for(int i = 0; i < sizeof(c_device_genes)/sizeof(MotorDeviceGene_t); i++) {
@@ -440,7 +441,7 @@ static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id) {
     if (id == DEV_ID_RTURN_FWD || id == DEV_ID_RTURN_REV) {
         MAIN_D("[REMOVE_DEBUG] Trying to remove id=%d from queue at 0x%p, current count=%d\r\n", 
                id, q, q->count);
-        // ´òÓ¡µ÷ÓÃÕ»»òµ±Ç°Î»ÖÃ
+        // ï¿½ï¿½Ó¡ï¿½ï¿½ï¿½ï¿½Õ»ï¿½ï¿½Ç°Î»ï¿½ï¿½
     }    
     for (int i = 0; i < q->count; i++) {
         if (q->commands[i].device_id == id) {
@@ -449,7 +450,7 @@ static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id) {
                 q->commands[j] = q->commands[j + 1];
             }
             q->count--;
-            // Çå¿Õ±»ÒÆ³ýµÄÎ»ÖÃ
+            // ï¿½ï¿½Õ±ï¿½ï¿½Æ³ï¿½ï¿½ï¿½Î»ï¿½ï¿?
             if (q->count < MAX_COMMANDS_PER_DIRECTION) {
                 q->commands[q->count].device_id = DEV_ID_NONE;
                 q->commands[q->count].priority = PRIO_NONE;
@@ -457,7 +458,7 @@ static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id) {
                 q->commands[q->count].param = 0.0f;
                 q->commands[q->count].timestamp = 0;
             }
-            // ÊµÊ±¸üÐÂ Keil Watch ¶ÀÁ¢±äÁ¿
+            // ÊµÊ±ï¿½ï¿½ï¿½ï¿½ Keil Watch ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             if (q == &g_pMotor_Dev_Watch->block_fwd) {
                 g_u8MotorDebug_BlockFwdCount = q->count;
             } else if (q == &g_pMotor_Dev_Watch->block_rev) {
@@ -488,7 +489,7 @@ static void Motor_CmdList_SetAllow(MotorCommandList_t* q, MotorControlCommand_t 
     q->commands[idx] = cmd;
     q->count++;
     
-    // ÊµÊ±¸üÐÂ Keil Watch ¶ÀÁ¢±äÁ¿
+    // ÊµÊ±ï¿½ï¿½ï¿½ï¿½ Keil Watch ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     if (g_pMotor_Dev_Watch != NULL) {
         if (q == &g_pMotor_Dev_Watch->allow_fwd) {
             g_u8MotorDebug_AllowFwdCount = q->count;
@@ -505,7 +506,7 @@ static void Motor_CmdList_SetBlock(MotorCommandList_t* q, MotorControlCommand_t 
     if (q->count >= MAX_COMMANDS_PER_DIRECTION) return;
     q->commands[q->count++] = cmd;
     
-    // ÊµÊ±¸üÐÂ Keil Watch ¶ÀÁ¢±äÁ¿
+    // ÊµÊ±ï¿½ï¿½ï¿½ï¿½ Keil Watch ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     if (g_pMotor_Dev_Watch != NULL) {
         if (q == &g_pMotor_Dev_Watch->block_fwd) {
             g_u8MotorDebug_BlockFwdCount = q->count;
@@ -518,7 +519,7 @@ static void Motor_CmdList_SetBlock(MotorCommandList_t* q, MotorControlCommand_t 
 static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
     MotorDebugInfo_t* d = &motor->debug_info;
 
-    // Í¬²½block_fwdÊý×é
+    // Í¬ï¿½ï¿½block_fwdï¿½ï¿½ï¿½ï¿½
     d->block_fwd.count = motor->block_fwd.count;
     for(int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         if (i < d->block_fwd.count) {
@@ -528,7 +529,7 @@ static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
         }
     }
 
-    // Í¬²½block_revÊý×é
+    // Í¬ï¿½ï¿½block_revï¿½ï¿½ï¿½ï¿½
     d->block_rev.count = motor->block_rev.count;
     for(int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         if (i < d->block_rev.count) {
@@ -538,7 +539,7 @@ static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
         }
     }
 
-    // Í¬²½allow_fwdÊý×é
+    // Í¬ï¿½ï¿½allow_fwdï¿½ï¿½ï¿½ï¿½
     d->allow_fwd.count = motor->allow_fwd.count;
     for(int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         if (i < d->allow_fwd.count) {
@@ -550,7 +551,7 @@ static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
         }
     }
 
-    // Í¬²½allow_revÊý×é
+    // Í¬ï¿½ï¿½allow_revï¿½ï¿½ï¿½ï¿½
     d->allow_rev.count = motor->allow_rev.count;
     for(int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         if (i < d->allow_rev.count) {
@@ -568,10 +569,10 @@ static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
     d->current_duty = motor->last_sent_duty;
     d->conflict_fault = motor->debug_info.conflict_fault;
     
-    // ========== Í¬²½µ½È«¾Öµ÷ÊÔ±äÁ¿£¨¹© Keil Watch ²é¿´£© ==========
+    // ========== Í¬ï¿½ï¿½ï¿½ï¿½È«ï¿½Öµï¿½ï¿½Ô±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Keil Watch ï¿½é¿´ï¿½ï¿½ ==========
     memcpy((void*)&g_stcMotorDebug, &motor->debug_info, sizeof(MotorDebugInfo_t));
     
-    // Í¬²½µ½µ¥¶À±äÁ¿
+    // Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     g_u8MotorDebug_BlockFwdCount = motor->block_fwd.count;
     g_u8MotorDebug_BlockRevCount = motor->block_rev.count;
     g_u8MotorDebug_AllowFwdCount = motor->allow_fwd.count;
@@ -586,7 +587,7 @@ static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
 static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
     if (!motor->enable) return;
 
-    // 1. Ö¸ÁîºòÑ¡Ñ¡Ôñ
+    // 1. Ö¸ï¿½ï¿½ï¿½Ñ¡Ñ¡ï¿½ï¿?
     MotorControlCommand_t* fwd_cmd = NULL;
     MotorControlCommand_t* rev_cmd = NULL;
 
@@ -598,7 +599,7 @@ static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
         rev_cmd = &motor->allow_rev.commands[0];
     }
 
-    // 2. ³åÍ»ÅÐ¶¨
+    // 2. ï¿½ï¿½Í»ï¿½Ð¶ï¿½
     MotorControlCommand_t* final = NULL;
     motor->debug_info.conflict_fault = false;
 
@@ -617,7 +618,7 @@ static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
         final = fwd_cmd ? fwd_cmd : rev_cmd;
     }
 
-    // 3. Ö´ÐÐ¾ö²ß - µ÷ÊÔ´òÓ¡
+    // 3. Ö´ï¿½Ð¾ï¿½ï¿½ï¿½ - ï¿½ï¿½ï¿½Ô´ï¿½Ó¡
     if (final) {
         MOTOR_DEBUG("Arbitration: Selected %s (prio=%d), dir=%s, duty=%.1f%%\r\n",
                     (final->device_id == DEV_ID_IO_FWD) ? "IO_FWD" :
@@ -637,21 +638,21 @@ static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
         motor->last_sent_duty = final->param;
         motor->state = (final->type == CMD_TYPE_RAMP_FWD || final->type == CMD_TYPE_RAMP_REV) ? MS_RAMPING : MS_RUNNING;
 
-        // µ÷ÓÃÖÙ²Ã½á¹û»Øµ÷
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Ù²Ã½ï¿½ï¿½ï¿½Øµï¿?
         if (motor->active_dir == DIR_FWD) {
             Motor_OnArbitrationFwd(motor, motor->last_sent_duty);
         } else {
             Motor_OnArbitrationRev(motor, motor->last_sent_duty);
         }
 
-        // µ÷ÓÃPWMÉè±¸¿ØÖÆ
+        // ï¿½ï¿½ï¿½ï¿½PWMï¿½è±¸ï¿½ï¿½ï¿½ï¿½
         DeviceCommandData_t cmd_data;
         PWM_RampCmd_t ramp_cmd;
 
         if (final->type == CMD_TYPE_RAMP_FWD || final->type == CMD_TYPE_RAMP_REV) {
             cmd_data.cmd = CMD_PWM_SET_DUTY_SLOW;
             ramp_cmd.targetDuty = (uint16_t)(final->param);
-            ramp_cmd.rampTimeMs = 2000;  // 2Ãë»ºÆô¶¯
+            ramp_cmd.rampTimeMs = 2000;  // 2ï¿½ë»ºï¿½ï¿½ï¿½ï¿½
             cmd_data.params = &ramp_cmd;
             cmd_data.param_size = sizeof(PWM_RampCmd_t);
         } else {
@@ -668,7 +669,7 @@ static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
         motor->active_dir = DIR_NONE;
         motor->active_device_id = DEV_ID_NONE;
 
-        // µ÷ÓÃÖÙ²ÃÍ£Ö¹»Øµ÷
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Ù²ï¿½Í£Ö¹ï¿½Øµï¿½
         Motor_OnArbitrationStop(motor);
 
         // Í£Ö¹PWM
@@ -681,14 +682,14 @@ static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
     Motor_UpdateDebugInfo(motor);
 }
 
-// ========== EventBus»Øµ÷º¯Êý ==========
+// ========== EventBusï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ ==========
 
 void Motor_OnOvercurrent(void* payload) {
     MotorOvercurrentEvent_t* ev = (MotorOvercurrentEvent_t*)payload;
     MAIN_D("Motor: Overcurrent event! ADC=%d, Current=%d mA, Threshold=%d mA, Duration=%lu ms\r\n",
            ev->adc_id, ev->current_ma, ev->threshold_ma, ev->duration_ms);
 
-    // Ö´ÐÐ½ô¼±Í£Ö¹
+    // Ö´ï¿½Ð½ï¿½ï¿½ï¿½Í£Ö¹
     DeviceNode_t* node = DeviceManager_Get(DEV_MOTOR_ID);
     if (node && node->private_data) {
         MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
@@ -697,7 +698,7 @@ void Motor_OnOvercurrent(void* payload) {
     }
 }
 
-// ========== µçÑ¹¸æ¾¯»Øµ÷ ==========
+// ========== ï¿½ï¿½Ñ¹ï¿½æ¾¯ï¿½Øµï¿½ ==========
 void Motor_OnVoltageAlarm(void* payload) {
     Voltage_AlarmEvent_t* ev = (Voltage_AlarmEvent_t*)payload;
 
@@ -707,8 +708,8 @@ void Motor_OnVoltageAlarm(void* payload) {
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
     if (ev->u8IsActive) {
-        // ¸æ¾¯´¥·¢ - ¸ù¾Ý¸æ¾¯ÀàÐÍÊ¹ÓÃ¶ÔÓ¦µÄÉè±¸IDÏò block_fwd/block_rev Ìí¼Ó×èÈûÖ¸Áî
-        // Ê¹ÓÃ PRIO_LIMIT ÓÅÏÈ¼¶£¬ÓëÏÞÎ»¿ª¹ØÍ¬¼¶£¬È·±£ÆäËûÉè±¸ÎÞ·¨¸²¸Ç
+        // ï¿½æ¾¯ï¿½ï¿½ï¿½ï¿½ - ï¿½ï¿½ï¿½Ý¸æ¾¯ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ã¶ï¿½Ó¦ï¿½ï¿½ï¿½è±¸IDï¿½ï¿½ block_fwd/block_rev ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
+        // Ê¹ï¿½ï¿½ PRIO_LIMIT ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½è±¸ï¿½Þ·ï¿½ï¿½ï¿½ï¿½ï¿½
         MotorDeviceId_t dev_id_fwd, dev_id_rev;
         const char* alarm_name;
 
@@ -728,7 +729,7 @@ void Motor_OnVoltageAlarm(void* payload) {
             .type = CMD_TYPE_BLOCK_FWD,
             .timestamp = tickTimer_GetCount()
         };
-        Motor_CmdList_SetBlock(&motor->block_fwd, block_fwd_cmd);
+        // Motor_CmdList_SetBlock(&motor->block_fwd, block_fwd_cmd);
 
         MotorControlCommand_t block_rev_cmd = {
             .device_id = dev_id_rev,
@@ -736,12 +737,12 @@ void Motor_OnVoltageAlarm(void* payload) {
             .type = CMD_TYPE_BLOCK_REV,
             .timestamp = tickTimer_GetCount()
         };
-        Motor_CmdList_SetBlock(&motor->block_rev, block_rev_cmd);
+        // Motor_CmdList_SetBlock(&motor->block_rev, block_rev_cmd);
 
         MAIN_D("Motor: %s alarm! Bus=%lu mV, Threshold=%lu mV - Block both directions!\r\n",
                alarm_name, ev->u32BusVoltageMv, ev->u32ThresholdMv);
     } else {
-        // ¸æ¾¯½â³ý - ¸ù¾Ý¸æ¾¯ÀàÐÍÊ¹ÓÃ¶ÔÓ¦µÄÉè±¸ID´Ó block_fwd/block_rev ÒÆ³ý×èÈûÖ¸Áî
+        // ï¿½æ¾¯ï¿½ï¿½ï¿? - ï¿½ï¿½ï¿½Ý¸æ¾¯ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ã¶ï¿½Ó¦ï¿½ï¿½ï¿½è±¸IDï¿½ï¿½ block_fwd/block_rev ï¿½Æ³ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
         MotorDeviceId_t dev_id_fwd, dev_id_rev;
         const char* alarm_name;
 
@@ -774,7 +775,7 @@ void Motor_OnRTurnLimit(void* payload) {
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
     if (ev->u8IsActive) {
-        // ÏÞÎ»´¥·¢£¬Ìí¼Ó BLOCK Ö¸Áî£¨Ê¹ÓÃ RTurn ×¨ÓÃÉè±¸ID£©
+        // ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ BLOCK Ö¸ï¿½î£¨Ê¹ï¿½ï¿½ RTurn ×¨ï¿½ï¿½ï¿½è±¸IDï¿½ï¿½
         MotorControlCommand_t cmd = {
             .device_id = (ev->u8Direction == RTURN_LIMIT_FORWARD) ? DEV_ID_RTURN_FWD : DEV_ID_RTURN_REV,
             .priority = PRIO_LIMIT,
@@ -784,18 +785,18 @@ void Motor_OnRTurnLimit(void* payload) {
         if (ev->u8Direction == RTURN_LIMIT_FORWARD) {
             cmd.type = CMD_TYPE_BLOCK_FWD;
             Motor_CmdList_SetBlock(&motor->block_fwd, cmd);
-            // Í¬Ê±Çå³ý allow_fwd£¬È·±£¼´Ê¹ block ±»ÒÆ³ý£¬µç»úÒ²²»»á¼ÌÐøÕý×ª
+            // Í¬Ê±ï¿½ï¿½ï¿? allow_fwdï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½Ê¹ block ï¿½ï¿½ï¿½Æ³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ª
             Motor_ClearAllowFwd(motor);
             MAIN_D("Motor: RTurn forward limit triggered, block forward + clear allow_fwd\r\n");
         } else {
             cmd.type = CMD_TYPE_BLOCK_REV;
             Motor_CmdList_SetBlock(&motor->block_rev, cmd);
-            // Í¬Ê±Çå³ý allow_rev£¬È·±£¼´Ê¹ block ±»ÒÆ³ý£¬µç»úÒ²²»»á¼ÌÐø·´×ª
+            // Í¬Ê±ï¿½ï¿½ï¿? allow_revï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½Ê¹ block ï¿½ï¿½ï¿½Æ³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ª
             Motor_ClearAllowRev(motor);
             MAIN_D("Motor: RTurn reverse limit triggered, block reverse + clear allow_rev\r\n");
         }
     } else {
-        // ÏÞÎ»½â³ý£¬ÒÆ³ý BLOCK Ö¸Áî£¨Ê¹ÓÃ RTurn ×¨ÓÃÉè±¸ID£©
+        // ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ³ï¿? BLOCK Ö¸ï¿½î£¨Ê¹ï¿½ï¿½ RTurn ×¨ï¿½ï¿½ï¿½è±¸IDï¿½ï¿½
         MotorDeviceId_t id = (ev->u8Direction == RTURN_LIMIT_FORWARD) ? DEV_ID_RTURN_FWD : DEV_ID_RTURN_REV;
         if (ev->u8Direction == RTURN_LIMIT_FORWARD) {
             Motor_CmdList_Remove(&motor->block_fwd, id);
@@ -804,7 +805,7 @@ void Motor_OnRTurnLimit(void* payload) {
             Motor_CmdList_Remove(&motor->block_rev, id);
             MAIN_D("Motor: RTurn reverse limit released\r\n");
         } else {
-            // ·½ÏòÎª0Ê±£¬Çå³ýËùÓÐÏÞÎ»
+            // ï¿½ï¿½ï¿½ï¿½Îª0Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î?
             Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_RTURN_FWD);
             Motor_CmdList_Remove(&motor->block_rev, DEV_ID_RTURN_REV);
         }
@@ -813,7 +814,7 @@ void Motor_OnRTurnLimit(void* payload) {
     Motor_ArbitrationDecision(motor);
 }
 
-// ========== µçÁ÷¸æ¾¯»Øµ÷ ==========
+// ========== ï¿½ï¿½ï¿½ï¿½ï¿½æ¾¯ï¿½Øµï¿½ ==========
 void Motor_OnCurrentAlarm(void* payload) {
     Current_AlarmEvent_t* ev = (Current_AlarmEvent_t*)payload;
 
@@ -823,13 +824,13 @@ void Motor_OnCurrentAlarm(void* payload) {
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
     if (ev->u8IsActive) {
-        /* ÅÐ¶Ïµ±Ç°µç»ú·½Ïò£º½öÕý×ªÊ±¹ýÁ÷²Å×èÈûÕý×ª
-         * ·´×ª¶Â×ªÊôÓÚÔ¤ÆÚ¹¤¿ö£¨Èç·§ÃÅ¹Ø±Õµ½Î»£©£¬²»×èÈûÕý×ª */
+        /* ï¿½Ð¶Ïµï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ò£º½ï¿½ï¿½ï¿½×ªÊ±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×?
+         * ï¿½ï¿½×ªï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½Ô¤ï¿½Ú¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ç·§ï¿½Å¹Ø±Õµï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ª */
         MotorDir_t eDesiredDir = Motor_GetDesiredDirection(motor);
         
         if (eDesiredDir == DIR_FWD)
         {
-            // Õý×ªÊ±¹ýÁ÷ ¡ú Ïò block_fwd Ìí¼Ó DEV_ID_OVERCUR_FWD ×èÈûÖ¸Áî
+            // ï¿½ï¿½×ªÊ±ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ block_fwd ï¿½ï¿½ï¿½ï¿½ DEV_ID_OVERCUR_FWD ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
             MotorControlCommand_t block_fwd_cmd = {
                 .device_id = DEV_ID_OVERCUR_FWD,
                 .priority = PRIO_LIMIT,
@@ -843,15 +844,73 @@ void Motor_OnCurrentAlarm(void* payload) {
         }
         else
         {
-            // ·´×ª»òÍ£Ö¹Ê±¹ýÁ÷ ¡ú ²»×èÈûÕý×ª£¨·´×ª¶Â×ªÊôÓÚÔ¤ÆÚ¹¤¿ö£©
+            // ï¿½ï¿½×ªï¿½ï¿½Í£Ö¹Ê±ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½Ô¤ï¿½Ú¹ï¿½ï¿½ï¿½ï¿½ï¿½
             MAIN_D("Motor: OVERCURRENT alarm (dir=%d, REV/STOP is normal stall)! Current=%ld mA, Threshold=%ld mA - Skip block forward\r\n",
                    (int)eDesiredDir, (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
         }
     } else {
-        // ¹ýÁ÷¸æ¾¯½â³ý - ´Ó block_fwd ÒÆ³ý DEV_ID_OVERCUR_FWD
+        // ï¿½ï¿½ï¿½ï¿½ï¿½æ¾¯ï¿½ï¿½ï¿? - ï¿½ï¿½ block_fwd ï¿½Æ³ï¿½ DEV_ID_OVERCUR_FWD
         Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_OVERCUR_FWD);
 
         MAIN_D("Motor: OVERCURRENT released! Current=%ld mA - Unblock forward\r\n",
+               (long)ev->s32CurrentMa);
+    }
+
+    Motor_ArbitrationDecision(motor);
+}
+
+
+// ========== æ­£è½¬(å¼€çª?)è¿‡æµå›žè°ƒ ==========
+void Motor_OnOvercurrentFwd(void* payload) {
+    Current_AlarmEvent_t* ev = (Current_AlarmEvent_t*)payload;
+    if (!ev) return;
+
+    DeviceNode_t* node = DeviceManager_Get(DEV_MOTOR_ID);
+    if (!node || !node->private_data) return;
+    MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
+
+    if (ev->u8IsActive) {
+        MotorControlCommand_t block_cmd = {
+            .device_id = DEV_ID_OVERCUR_FWD,
+            .priority = PRIO_LIMIT,
+            .type = CMD_TYPE_BLOCK_FWD,
+            .timestamp = tickTimer_GetCount()
+        };
+        Motor_CmdList_SetBlock(&motor->block_fwd, block_cmd);
+        MAIN_D("Motor: OVERCURRENT FWD alarm! Current=%ld mA, Threshold=%ld mA - Block forward!\r\n",
+               (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
+    } else {
+        Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_OVERCUR_FWD);
+        MAIN_D("Motor: OVERCURRENT FWD released! Current=%ld mA - Unblock forward\r\n",
+               (long)ev->s32CurrentMa);
+    }
+
+    Motor_ArbitrationDecision(motor);
+}
+
+
+// ========== åè½¬(å…³çª—)è¿‡æµå›žè°ƒ ==========
+void Motor_OnOvercurrentRev(void* payload) {
+    Current_AlarmEvent_t* ev = (Current_AlarmEvent_t*)payload;
+    if (!ev) return;
+
+    DeviceNode_t* node = DeviceManager_Get(DEV_MOTOR_ID);
+    if (!node || !node->private_data) return;
+    MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
+
+    if (ev->u8IsActive) {
+        MotorControlCommand_t block_cmd = {
+            .device_id = DEV_ID_OVERCUR_REV,
+            .priority = PRIO_LIMIT,
+            .type = CMD_TYPE_BLOCK_REV,
+            .timestamp = tickTimer_GetCount()
+        };
+        Motor_CmdList_SetBlock(&motor->block_rev, block_cmd);
+        MAIN_D("Motor: OVERCURRENT REV alarm! Current=%ld mA, Threshold=%ld mA - Block reverse!\r\n",
+               (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
+    } else {
+        Motor_CmdList_Remove(&motor->block_rev, DEV_ID_OVERCUR_REV);
+        MAIN_D("Motor: OVERCURRENT REV released! Current=%ld mA - Unblock reverse\r\n",
                (long)ev->s32CurrentMa);
     }
 
@@ -902,8 +961,8 @@ void Motor_OnPowerEvent(void* payload) {
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
 #if MOTOR_MODE_BIPOLAR
-    // ========== Ë«¼«ÐÔÄ£Ê½ ==========
-    // µçÔ´Éè±¸Ìá¹© ALLOW ¿ØÖÆµç»ú×ªÏò£¬²»ÉèÖÃ BLOCK
+    // ========== Ë«ï¿½ï¿½ï¿½ï¿½Ä£Ê½ ==========
+    // ï¿½ï¿½Ô´ï¿½è±¸ï¿½á¹© ALLOW ï¿½ï¿½ï¿½Æµï¿½ï¿½×ªï¿½ò£¬²ï¿½ï¿½ï¿½ï¿½ï¿? BLOCK
     MotorDeviceId_t id = (ev->power_id == 0) ? DEV_ID_POWER_POS : DEV_ID_POWER_NEG;
     const MotorDeviceGene_t* gene = Motor_GetGene(id);
     if (!gene) return;
@@ -935,9 +994,9 @@ void Motor_OnPowerEvent(void* payload) {
         }
     }
 #else
-    // ========== µ¥¼«ÐÔÄ£Ê½ ==========
-    // µ¥¼«ÐÔÄ£Ê½ÏÂµçÔ´Éè±¸²»²ÎÓëÖÙ²Ã£¬²»×öÈÎºÎ²Ù×÷
-    // ÆäËûÉè±¸£¨ÈçÊÖ¶¯IO£©Ìá¹©Ä³×ªÏòµÄALLOW¼´¿É×ª
+    // ========== ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£Ê½ ==========
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£Ê½ï¿½Âµï¿½Ô´ï¿½è±¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù²Ã£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎºÎ²ï¿½ï¿½ï¿½
+    // ï¿½ï¿½ï¿½ï¿½ï¿½è±¸ï¿½ï¿½ï¿½ï¿½ï¿½Ö¶ï¿½IOï¿½ï¿½ï¿½á¹©Ä³×ªï¿½ï¿½ï¿½ALLOWï¿½ï¿½ï¿½ï¿½×ª
     MAIN_D("[MOTOR] Unipolar mode: power_id=%d, is_on=%d - power device not involved in arbitration\r\n",
            ev->power_id, ev->is_on);
 #endif
@@ -948,13 +1007,13 @@ void Motor_OnPowerEvent(void* payload) {
 void Motor_OnManualIO(void* payload) {
     MotorManualIOEvent_t* ev = (MotorManualIOEvent_t*)payload;
     
-    // ÏÈ¼ì²éÊÂ¼þÊý¾ÝµÄÓÐÐ§ÐÔ
+    // ï¿½È¼ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½Ýµï¿½ï¿½ï¿½Ð§ï¿½ï¿?
     if (ev == NULL) {
         MAIN_D("[MOTOR] OnManualIO: NULL payload!\r\n");
         return;
     }
     
-    // ´òÓ¡Ô­Ê¼ÊÂ¼þÊý¾Ý£¨Ê¹ÓÃÊ®Áù½øÖÆ´òÓ¡¸¡µãÊý£©
+    // ï¿½ï¿½Ó¡Ô­Ê¼ï¿½Â¼ï¿½ï¿½ï¿½ï¿½Ý£ï¿½Ê¹ï¿½ï¿½Ê®ï¿½ï¿½ï¿½ï¿½ï¿½Æ´ï¿½Ó¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     uint32_t speed_raw = *(uint32_t*)&ev->speed;
     MAIN_D("[MOTOR] OnManualIO RAW: dir=%d, type=%d, speed_raw=0x%08X\r\n", 
            ev->dir, ev->type, speed_raw);
@@ -967,8 +1026,8 @@ void Motor_OnManualIO(void* payload) {
 
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
-    // ¸ù¾Ý·½ÏòÈ·¶¨ÊÇÄÄ¸öIOÉè±¸ - ±ØÐë³õÊ¼»¯Ä¬ÈÏÖµ£¡
-    MotorDeviceId_t io_dev_id = DEV_ID_NONE;  // ³õÊ¼»¯Îª NONE
+    // ï¿½ï¿½ï¿½Ý·ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½Ä¸ï¿½IOï¿½è±¸ - ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½Ä¬ï¿½ï¿½Öµï¿½ï¿?
+    MotorDeviceId_t io_dev_id = DEV_ID_NONE;  // ï¿½ï¿½Ê¼ï¿½ï¿½Îª NONE
     
     if (ev->dir == DIR_FWD) {
         io_dev_id = DEV_ID_IO_FWD;
@@ -977,7 +1036,7 @@ void Motor_OnManualIO(void* payload) {
     } else if (ev->dir == DIR_NONE) {
         io_dev_id = DEV_ID_NONE;
     } else {
-        // ÎÞÐ§µÄ dir Öµ
+        // ï¿½ï¿½Ð§ï¿½ï¿½ dir Öµ
         MAIN_D("[MOTOR] OnManualIO: Invalid dir=%d, expected 0,1,2\r\n", ev->dir);
         return;
     }
@@ -991,22 +1050,22 @@ void Motor_OnManualIO(void* payload) {
         }
     }
     
-    // ´òÓ¡µ÷ÊÔÐÅÏ¢ - ¸¡µãÊý×ª»»ÎªÕûÐÍ
+    // ï¿½ï¿½Ó¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½
     int32_t speed_int = (int32_t)(ev->speed * 10);
     MAIN_D("[MOTOR] OnManualIO: dir=%d, type=%d, speed=%ld.%ld%%, io_dev_id=%d\r\n",
            ev->dir, ev->type, (long)(speed_int / 10), (long)(speed_int % 10), io_dev_id);
     MAIN_D("[MOTOR] OnManualIO: Before - allow_fwd.count=%d, allow_rev.count=%d, block_fwd.count=%d, block_rev.count=%d\r\n",
            motor->allow_fwd.count, motor->allow_rev.count, motor->block_fwd.count, motor->block_rev.count);
 
-    // ´¦ÀíÔËÐÐÖ¸Áî
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
     if (ev->type == CMD_TYPE_RUN_FWD || ev->type == CMD_TYPE_RAMP_FWD) {
-        // ¼ì²é io_dev_id ÊÇ·ñÕýÈ·
+        // ï¿½ï¿½ï¿? io_dev_id ï¿½Ç·ï¿½ï¿½ï¿½È·
         if (io_dev_id != DEV_ID_IO_FWD) {
             MAIN_D("[MOTOR] ERROR: RUN_FWD but io_dev_id=%d (expected %d)\r\n", io_dev_id, DEV_ID_IO_FWD);
             return;
         }
         
-        // IO_FWD°´ÏÂ£ºÒÆ³ý×Ô¼ºµÄBLOCK£¬Ìí¼Ó×Ô¼ºµÄALLOW
+        // IO_FWDï¿½ï¿½ï¿½Â£ï¿½ï¿½Æ³ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½BLOCKï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ALLOW
         MotorControlCommand_t cmd = {
             .device_id = io_dev_id,
             .priority = gene->priority,
@@ -1021,13 +1080,13 @@ void Motor_OnManualIO(void* payload) {
         MAIN_D("[MOTOR] IO_FWD: RUN, removed block_fwd, added allow_fwd\r\n");
     }
     else if (ev->type == CMD_TYPE_RUN_REV || ev->type == CMD_TYPE_RAMP_REV) {
-        // ¼ì²é io_dev_id ÊÇ·ñÕýÈ·
+        // ï¿½ï¿½ï¿? io_dev_id ï¿½Ç·ï¿½ï¿½ï¿½È·
         if (io_dev_id != DEV_ID_IO_REV) {
             MAIN_D("[MOTOR] ERROR: RUN_REV but io_dev_id=%d (expected %d)\r\n", io_dev_id, DEV_ID_IO_REV);
             return;
         }
         
-        // IO_REV°´ÏÂ£ºÒÆ³ý×Ô¼ºµÄBLOCK£¬Ìí¼Ó×Ô¼ºµÄALLOW
+        // IO_REVï¿½ï¿½ï¿½Â£ï¿½ï¿½Æ³ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½BLOCKï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ALLOW
         MotorControlCommand_t cmd = {
             .device_id = io_dev_id,
             .priority = gene->priority,
@@ -1043,7 +1102,7 @@ void Motor_OnManualIO(void* payload) {
     }
     else if (ev->type == CMD_TYPE_STOP) {
         if (ev->dir == DIR_FWD) {
-            // IO_FWDÍ£Ö¹£ºÒÆ³ý×Ô¼ºµÄALLOW£¬Ìí¼Ó×Ô¼ºµÄBLOCK
+            // IO_FWDÍ£Ö¹ï¿½ï¿½ï¿½Æ³ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ALLOWï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½BLOCK
             if (gene == NULL) {
                 gene = Motor_GetGene(DEV_ID_IO_FWD);
                 if (!gene) {
@@ -1060,12 +1119,12 @@ void Motor_OnManualIO(void* payload) {
                 .type = CMD_TYPE_BLOCK_FWD,
                 .timestamp = tickTimer_GetCount()
             };
-            Motor_CmdList_SetBlock(&motor->block_fwd, block_cmd);
+            // Motor_CmdList_SetBlock(&motor->block_fwd, block_cmd);
             
             MAIN_D("[MOTOR] IO_FWD: STOP, removed allow_fwd, added block_fwd\r\n");
         }
         else if (ev->dir == DIR_REV) {
-            // IO_REVÍ£Ö¹£ºÒÆ³ý×Ô¼ºµÄALLOW£¬Ìí¼Ó×Ô¼ºµÄBLOCK
+            // IO_REVÍ£Ö¹ï¿½ï¿½ï¿½Æ³ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ALLOWï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½BLOCK
             if (gene == NULL) {
                 gene = Motor_GetGene(DEV_ID_IO_REV);
                 if (!gene) {
@@ -1082,12 +1141,12 @@ void Motor_OnManualIO(void* payload) {
                 .type = CMD_TYPE_BLOCK_REV,
                 .timestamp = tickTimer_GetCount()
             };
-            Motor_CmdList_SetBlock(&motor->block_rev, block_cmd);
+            // Motor_CmdList_SetBlock(&motor->block_rev, block_cmd);
             
             MAIN_D("[MOTOR] IO_REV: STOP, removed allow_rev, added block_rev\r\n");
         }
         else {
-            // Í£Ö¹ËùÓÐIOÉè±¸£ºÒÆ³ý¸÷×ÔµÄALLOW£¬Ìí¼Ó¸÷×ÔµÄBLOCK
+            // Í£Ö¹ï¿½ï¿½ï¿½ï¿½IOï¿½è±¸ï¿½ï¿½ï¿½Æ³ï¿½ï¿½ï¿½ï¿½Ôµï¿½ALLOWï¿½ï¿½ï¿½ï¿½ï¿½Ó¸ï¿½ï¿½Ôµï¿½BLOCK
             const MotorDeviceGene_t* gene_fwd = Motor_GetGene(DEV_ID_IO_FWD);
             const MotorDeviceGene_t* gene_rev = Motor_GetGene(DEV_ID_IO_REV);
             
@@ -1101,7 +1160,7 @@ void Motor_OnManualIO(void* payload) {
                     .type = CMD_TYPE_BLOCK_FWD,
                     .timestamp = tickTimer_GetCount()
                 };
-                Motor_CmdList_SetBlock(&motor->block_fwd, block_fwd_cmd);
+                // Motor_CmdList_SetBlock(&motor->block_fwd, block_fwd_cmd);
             }
             
             if (gene_rev) {
@@ -1111,7 +1170,7 @@ void Motor_OnManualIO(void* payload) {
                     .type = CMD_TYPE_BLOCK_REV,
                     .timestamp = tickTimer_GetCount()
                 };
-                Motor_CmdList_SetBlock(&motor->block_rev, block_rev_cmd);
+                // Motor_CmdList_SetBlock(&motor->block_rev, block_rev_cmd);
             }
             
             MAIN_D("[MOTOR] All IO: STOP, removed all allow, added all block\r\n");
@@ -1126,12 +1185,12 @@ void Motor_OnManualIO(void* payload) {
 }
 
 void Motor_OnCANEvent(void* payload) {
-    // CANÊÂ¼þ´¦Àí£¨ÔÝÊ±±£Áô½Ó¿Ú£¬Î´ÊµÏÖ£©
+    // CANï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿Ú£ï¿½Î´Êµï¿½Ö£ï¿½
     // MotorCANEvent_t* ev = (MotorCANEvent_t*)payload;
-    (void)payload;  // ±ÜÃâÎ´Ê¹ÓÃ¾¯¸æ
+    (void)payload;  // ï¿½ï¿½ï¿½ï¿½Î´Ê¹ï¿½Ã¾ï¿½ï¿½ï¿½
 }
 
-// ========== ÐÂÔö£ºµç»ú»ô¶û×ªËÙ·´À¡»Øµ÷ ==========
+// ========== ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½Ù·ï¿½ï¿½ï¿½ï¿½Øµï¿? ==========
 void Motor_OnSpeedFeedback(void* payload) {
     int32_t* speed_rpm = (int32_t*)payload;
 
@@ -1140,17 +1199,17 @@ void Motor_OnSpeedFeedback(void* payload) {
 
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
-    // ¿ÉÑ¡£º¸ù¾Ý×ªËÙ½øÐÐ±Õ»·¿ØÖÆ
-    // ÀýÈç£º¸ù¾ÝÄ¿±ê×ªËÙµ÷ÕûÕ¼¿Õ±È
+    // ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½Ù½ï¿½ï¿½Ð±Õ»ï¿½ï¿½ï¿½ï¿½ï¿½
+    // ï¿½ï¿½ï¿½ç£ºï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½×ªï¿½Ùµï¿½ï¿½ï¿½Õ¼ï¿½Õ±ï¿½
     if (motor->state == MS_RUNNING || motor->state == MS_RAMPING) {
-        // ¿ÉÒÔÔÚÕâÀïÊµÏÖ PID µ÷ËÙ
-        // Ä¿Ç°Ö»ÊÇ½ÓÊÕ×ªËÙÊý¾Ý£¬¹©µ÷ÊÔ»òºóÐøÀ©Õ¹Ê¹ÓÃ
-        (void)motor;      // ±ÜÃâÎ´Ê¹ÓÃ¾¯¸æ
-        (void)speed_rpm;  // ±ÜÃâÎ´Ê¹ÓÃ¾¯¸æ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ PID ï¿½ï¿½ï¿½ï¿½
+        // Ä¿Ç°Ö»ï¿½Ç½ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½Ý£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹Ê¹ï¿½ï¿?
+        (void)motor;      // ï¿½ï¿½ï¿½ï¿½Î´Ê¹ï¿½Ã¾ï¿½ï¿½ï¿½
+        (void)speed_rpm;  // ï¿½ï¿½ï¿½ï¿½Î´Ê¹ï¿½Ã¾ï¿½ï¿½ï¿½
     }
 }
 
-// ========== ±ê×¼Éè±¸²Ù×÷½Ó¿ÚÊµÏÖ ==========
+// ========== ï¿½ï¿½×¼ï¿½è±¸ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½Êµï¿½ï¿½ ==========
 
 DeviceResult_t Motor_Init(void* handle) {
     MotorDevice_t* motor = (MotorDevice_t*)handle;
@@ -1158,7 +1217,7 @@ DeviceResult_t Motor_Init(void* handle) {
 
     memset(motor, 0, sizeof(MotorDevice_t));
 
-    // ³õÊ¼»¯ÃüÁîÁÐ±í
+    // ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð±ï¿½
     for(int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_fwd.commands[i].device_id = DEV_ID_NONE;
         motor->allow_fwd.commands[i].priority = PRIO_NONE;
@@ -1168,15 +1227,15 @@ DeviceResult_t Motor_Init(void* handle) {
         motor->block_rev.commands[i].device_id = DEV_ID_NONE;
     }
 
-    // ³õÊ¼»¯IOÉè±¸Ä¬ÈÏ×´Ì¬£ºÃ¿¸öIOÉè±¸Ä¬ÈÏBLOCK×Ô¼ºµÄ·½Ïò
-    // IO_FWDÄ¬ÈÏBLOCKÕý×ª£¬IO_REVÄ¬ÈÏBLOCK·´×ª
+    // ï¿½ï¿½Ê¼ï¿½ï¿½IOï¿½è±¸Ä¬ï¿½ï¿½×´Ì¬ï¿½ï¿½Ã¿ï¿½ï¿½IOï¿½è±¸Ä¬ï¿½ï¿½BLOCKï¿½Ô¼ï¿½ï¿½Ä·ï¿½ï¿½ï¿½
+    // IO_FWDÄ¬ï¿½ï¿½BLOCKï¿½ï¿½×ªï¿½ï¿½IO_REVÄ¬ï¿½ï¿½BLOCKï¿½ï¿½×ª
     MotorControlCommand_t io_fwd_block = {
         .device_id = DEV_ID_IO_FWD,
         .priority = MANUAL_PRIORITY,
         .type = CMD_TYPE_BLOCK_FWD,
         .timestamp = tickTimer_GetCount()
     };
-    Motor_CmdList_SetBlock(&motor->block_fwd, io_fwd_block);
+    // Motor_CmdList_SetBlock(&motor->block_fwd, io_fwd_block);
     
     MotorControlCommand_t io_rev_block = {
         .device_id = DEV_ID_IO_REV,
@@ -1184,27 +1243,27 @@ DeviceResult_t Motor_Init(void* handle) {
         .type = CMD_TYPE_BLOCK_REV,
         .timestamp = tickTimer_GetCount()
     };
-    Motor_CmdList_SetBlock(&motor->block_rev, io_rev_block);
+    // Motor_CmdList_SetBlock(&motor->block_rev, io_rev_block);
 
     motor->enable = 1;
     motor->last_arbitration_time = tickTimer_GetCount();
 
-    // ÉèÖÃµ÷ÊÔÈ«¾ÖÖ¸Õë
+    // ï¿½ï¿½ï¿½Ãµï¿½ï¿½ï¿½È«ï¿½ï¿½Ö¸ï¿½ï¿½
     g_pMotor_Dev_Watch = motor;
     
-    // ³õÊ¼»¯µ÷ÊÔ±äÁ¿
+    // ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½Ô±ï¿½ï¿½ï¿½
     Motor_UpdateDebugInfo(motor);
 
-    // ¶©ÔÄEventBusÊÂ¼þ
-    // ×¢Òâ£º¶©ÔÄÍ³Ò»ÔÚ App_Motor_Project.c µÄ SetupEventBusSubscriptions() ÖÐ¹ÜÀí
-    // ÕâÀï²»ÔÙÖØ¸´¶©ÔÄ£¬±ÜÃâ»Øµ÷±»¶à´Î×¢²á
+    // ï¿½ï¿½ï¿½ï¿½EventBusï¿½Â¼ï¿½
+    // ×¢ï¿½â£ºï¿½ï¿½ï¿½ï¿½Í³Ò»ï¿½ï¿½ App_Motor_Project.c ï¿½ï¿½ SetupEventBusSubscriptions() ï¿½Ð¹ï¿½ï¿½ï¿½
+    // ï¿½ï¿½ï¿½ï²»ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¢ï¿½ï¿½
     
 
 #if MOTOR_CONTROL_MODE == 1
     s_eLastArbitrationDir = DIR_NONE;
     s_u16LastTargetDuty = 0;
 
-    // Í¬²½Èí¼þPWM×´Ì¬ÓëÓ²¼þ¼Ä´æÆ÷
+    // Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½PWM×´Ì¬ï¿½ï¿½Ó²ï¿½ï¿½ï¿½Ä´ï¿½ï¿½ï¿½
     uint32_t period = TMRA_GetPeriodValue(CM_TMRA_4);
     if (period > 0) {
         uint32_t cmp1 = TMRA_GetCompareValue(CM_TMRA_4, TMRA_CH1);
@@ -1244,7 +1303,7 @@ DeviceResult_t Motor_Read(void* handle, void* data, uint32_t size) {
         memcpy(data, &motor->debug_info, sizeof(MotorDebugInfo_t));
         return RESULT_OK;
     }
-    // ÐÂÔö£ºÖ§³Ö¶ÁÈ¡×´Ì¬½á¹¹Ìå
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö§ï¿½Ö¶ï¿½È¡×´Ì¬ï¿½á¹¹ï¿½ï¿½
     else if (size == sizeof(Motor_StateInfo_t)) {
         Motor_StateInfo_t* pstcState = (Motor_StateInfo_t*)data;
         pstcState->desired_dir = DIR_NONE;
@@ -1262,7 +1321,7 @@ DeviceResult_t Motor_Read(void* handle, void* data, uint32_t size) {
 }
 
 DeviceResult_t Motor_Write(void* handle, const void* data, uint32_t size) {
-    // µç»úÉè±¸Í¨³£²»ÐèÒªÖ±½ÓÐ´²Ù×÷
+    // ï¿½ï¿½ï¿½ï¿½è±¸Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÒªÖ±ï¿½ï¿½Ð´ï¿½ï¿½ï¿½ï¿?
     (void)handle;
     (void)data;
     (void)size;
@@ -1313,22 +1372,22 @@ DeviceResult_t Motor_Update(void* handle) {
     if (!motor || !motor->enable) return RESULT_ERROR;
 
 #if MOTOR_CONTROL_MODE == 1
-    // ¸üÐÂ4Í¨µÀPWM»ºÆô¶¯×´Ì¬»ú
+    // ï¿½ï¿½ï¿½ï¿½4Í¨ï¿½ï¿½PWMï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½
     PWM_Update(&g_motor_pwm_ch1);
     PWM_Update(&g_motor_pwm_ch2);
     PWM_Update(&g_motor_pwm_ch3);
     PWM_Update(&g_motor_pwm_ch4);
 
-    // ¼ì²é»º½µÊÇ·ñÍê³É£¬ÐèÒªÇÐ»»ÔËÐÐ¼«ÐÔÔÙ»ºÉý
+    // ï¿½ï¿½é»ºï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½É£ï¿½ï¿½ï¿½Òªï¿½Ð»ï¿½ï¿½ï¿½ï¿½Ð¼ï¿½ï¿½ï¿½ï¿½Ù»ï¿½ï¿½ï¿½
     if (s_bPolaritySwitchPending) {
         if (PWM_GetState(&g_motor_pwm_ch1) == PWM_STATE_IDLE &&
             PWM_GetState(&g_motor_pwm_ch2) == PWM_STATE_IDLE &&
             PWM_GetState(&g_motor_pwm_ch3) == PWM_STATE_IDLE &&
             PWM_GetState(&g_motor_pwm_ch4) == PWM_STATE_IDLE) {
-            /* »º½µÍê³É£¬ÇÐ¼«ÐÔ */
+            /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É£ï¿½ï¿½Ð¼ï¿½ï¿½ï¿? */
             Motor_SetRunPolarity();
             s_bPolaritySwitchPending = false;
-            /* ¿ªÊ¼»ºÉýµ½Ä¿±ê */
+            /* ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ */
             uint16_t duty = s_u16PendingTargetDuty;
             if (s_u8PendingDirection == 1) {
                 uint16_t dl = Motor_LimitDuty(duty);
@@ -1354,19 +1413,19 @@ DeviceResult_t Motor_Update(void* handle) {
 
     uint32_t now = tickTimer_GetCount();
 
-    // Ã¿50msÖÙ²ÃÒ»´Î
+    // Ã¿50msï¿½Ù²ï¿½Ò»ï¿½ï¿½
     if (now - motor->last_arbitration_time >= 50) {
         Motor_ArbitrationDecision(motor);
         motor->last_arbitration_time = now;
     }
 
-    // ========== Ã¿2000ms´òÓ¡Ò»´Îµç»úÖÙ²Ã×´Ì¬ ==========
+    // ========== Ã¿2000msï¿½ï¿½Ó¡Ò»ï¿½Îµï¿½ï¿½ï¿½Ù²ï¿½×´Ì? ==========
     if (now - s_u32LastMotorPrintTime >= MOTOR_PRINT_INTERVAL_MS) {
         s_u32LastMotorPrintTime = now;
 
         MOTOR_OUT("=== Motor Arbitration State ===\r\n");
 
-        // ´òÓ¡µ±Ç°×´Ì¬
+        // ï¿½ï¿½Ó¡ï¿½ï¿½Ç°×´Ì¬
         const char* state_str = (motor->state == MS_IDLE) ? "IDLE" :
                                 (motor->state == MS_RAMPING) ? "RAMPING" :
                                 (motor->state == MS_RUNNING) ? "RUNNING" : "LOCKED";
@@ -1375,7 +1434,7 @@ DeviceResult_t Motor_Update(void* handle) {
         MOTOR_OUT("  State=%s, ActiveDir=%s, Duty=%.1f%%\r\n",
                   state_str, dir_str, motor->current_duty);
 
-        // ´òÓ¡ÕýÔÚ×÷ÓÃµÄÔÊÐíÖ¸Áî
+        // ï¿½ï¿½Ó¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
         MOTOR_OUT("  Active Allow FWD: ");
         if (motor->allow_fwd.count > 0) {
             for (int i = 0; i < motor->allow_fwd.count; i++) {
@@ -1414,7 +1473,7 @@ DeviceResult_t Motor_Update(void* handle) {
         }
         MOTOR_OUT("\r\n");
 
-        // ´òÓ¡ÕýÔÚ×÷ÓÃµÄ×èÈûÖ¸Áî
+        // ï¿½ï¿½Ó¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
         MOTOR_OUT("  Active Block FWD: ");
         if (motor->block_fwd.count > 0) {
             for (int i = 0; i < motor->block_fwd.count; i++) {
@@ -1471,14 +1530,14 @@ DeviceResult_t Motor_Update(void* handle) {
         }
         MOTOR_OUT("\r\n");
 
-        // ========== ´òÓ¡ÒÑ×¢²áµ«Î´×÷ÓÃµÄÉè±¸ ==========
-        // ¸ù¾ÝÉè±¸»ùÒò±í£¬¼ì²éÄÄÐ©Éè±¸Ã»ÓÐÔÚ allow »ò block ÁÐ±íÖÐ
+        // ========== ï¿½ï¿½Ó¡ï¿½ï¿½×¢ï¿½áµ«Î´ï¿½ï¿½ï¿½Ãµï¿½ï¿½è±¸ ==========
+        // ï¿½ï¿½ï¿½ï¿½ï¿½è±¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð©ï¿½è±¸Ã»ï¿½ï¿½ï¿½ï¿½ allow ï¿½ï¿½ block ï¿½Ð±ï¿½ï¿½ï¿½
         
-        // ÊÕ¼¯ÒÑ×÷ÓÃµÄÉè±¸ID
+        // ï¿½Õ¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½ï¿½è±¸ID
         uint8_t active_devices[16] = {0};
         uint8_t active_count = 0;
         
-        // Ìí¼Ó allow_fwd ÖÐµÄÉè±¸
+        // ï¿½ï¿½ï¿½ï¿½ allow_fwd ï¿½Ðµï¿½ï¿½è±¸
         for (int i = 0; i < motor->allow_fwd.count; i++) {
             uint8_t dev_id = motor->allow_fwd.commands[i].device_id;
             bool found = false;
@@ -1488,7 +1547,7 @@ DeviceResult_t Motor_Update(void* handle) {
             if (!found) active_devices[active_count++] = dev_id;
         }
         
-        // Ìí¼Ó allow_rev ÖÐµÄÉè±¸
+        // ï¿½ï¿½ï¿½ï¿½ allow_rev ï¿½Ðµï¿½ï¿½è±¸
         for (int i = 0; i < motor->allow_rev.count; i++) {
             uint8_t dev_id = motor->allow_rev.commands[i].device_id;
             bool found = false;
@@ -1498,7 +1557,7 @@ DeviceResult_t Motor_Update(void* handle) {
             if (!found) active_devices[active_count++] = dev_id;
         }
         
-        // Ìí¼Ó block_fwd ÖÐµÄÉè±¸
+        // ï¿½ï¿½ï¿½ï¿½ block_fwd ï¿½Ðµï¿½ï¿½è±¸
         for (int i = 0; i < motor->block_fwd.count; i++) {
             uint8_t dev_id = motor->block_fwd.commands[i].device_id;
             bool found = false;
@@ -1508,7 +1567,7 @@ DeviceResult_t Motor_Update(void* handle) {
             if (!found) active_devices[active_count++] = dev_id;
         }
         
-        // Ìí¼Ó block_rev ÖÐµÄÉè±¸
+        // ï¿½ï¿½ï¿½ï¿½ block_rev ï¿½Ðµï¿½ï¿½è±¸
         for (int i = 0; i < motor->block_rev.count; i++) {
             uint8_t dev_id = motor->block_rev.commands[i].device_id;
             bool found = false;
@@ -1518,11 +1577,11 @@ DeviceResult_t Motor_Update(void* handle) {
             if (!found) active_devices[active_count++] = dev_id;
         }
         
-        // ¼ì²é»ùÒò±íÖÐµÄËùÓÐÉè±¸
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½è±?
         MOTOR_OUT("  Registered but Inactive Devices:\r\n");
         bool has_inactive = false;
         
-        // ¶¨ÒåËùÓÐ¿ÉÄÜµÄÉè±¸¼°ÆäÃû³Æ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¿ï¿½ï¿½Üµï¿½ï¿½è±¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         struct { uint8_t id; const char* name; } all_devices[] = {
             {DEV_ID_POWER_POS, "POWER_POS"},
             {DEV_ID_POWER_NEG, "POWER_NEG"},
@@ -1555,11 +1614,11 @@ DeviceResult_t Motor_Update(void* handle) {
             MOTOR_OUT("    (All registered devices are active)\r\n");
         }
         
-        // ´òÓ¡³åÍ»×´Ì¬
+        // ï¿½ï¿½Ó¡ï¿½ï¿½Í»×´Ì¬
         MOTOR_OUT("  Conflict=%d\r\n",
                   motor->debug_info.conflict_fault);
         
-        // ´òÓ¡µ±Ç°»î¶¯Éè±¸
+        // ï¿½ï¿½Ó¡ï¿½ï¿½Ç°ï¿½î¶¯ï¿½è±¸
         const char* active_dev_name = "NONE";
         switch(motor->active_device_id) {
             case DEV_ID_IO_FWD: active_dev_name = "IO_FWD"; break;
@@ -1578,7 +1637,7 @@ DeviceResult_t Motor_Update(void* handle) {
     return RESULT_OK;
 }
 
-// ========== µç»úÌØ¶¨½Ó¿ÚÊµÏÖ ==========
+// ========== ï¿½ï¿½ï¿½ï¿½Ø¶ï¿½ï¿½Ó¿ï¿½Êµï¿½ï¿? ==========
 
 void Motor_SetSpeed(MotorDevice_t* motor, float duty) {
     if (!motor || !motor->enable) return;
@@ -1594,7 +1653,7 @@ void Motor_SetSpeed(MotorDevice_t* motor, float duty) {
 void Motor_Start(MotorDevice_t* motor, MotorDir_t dir) {
     if (!motor || !motor->enable) return;
     
-    // Í¨¹ýEventBus·¢²¼Æô¶¯ÊÂ¼þ£¬ÈÃÖÙ²Ã²ã´¦Àí
+    // Í¨ï¿½ï¿½EventBusï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù²Ã²ã´¦ï¿½ï¿½
     MotorManualIOEvent_t ev = {
         .dir = dir,
         .type = CMD_TYPE_RUN_FWD,
@@ -1627,7 +1686,7 @@ void Motor_EmergencyStop(MotorDevice_t* motor) {
     
     MOTOR_DEBUG("EmergencyStop: clearing all allow commands\r\n");
     
-    // ½ô¼±Í£Ö¹£ºÕæÕýÇå¿Õ allow_fwd µÄ commands[] Êý×é
+    // ï¿½ï¿½ï¿½ï¿½Í£Ö¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿? allow_fwd ï¿½ï¿½ commands[] ï¿½ï¿½ï¿½ï¿½
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_fwd.commands[i].device_id = DEV_ID_NONE;
         motor->allow_fwd.commands[i].priority = PRIO_NONE;
@@ -1637,7 +1696,7 @@ void Motor_EmergencyStop(MotorDevice_t* motor) {
     }
     motor->allow_fwd.count = 0;
     
-    // ½ô¼±Í£Ö¹£ºÕæÕýÇå¿Õ allow_rev µÄ commands[] Êý×é
+    // ï¿½ï¿½ï¿½ï¿½Í£Ö¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿? allow_rev ï¿½ï¿½ commands[] ï¿½ï¿½ï¿½ï¿½
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_rev.commands[i].device_id = DEV_ID_NONE;
         motor->allow_rev.commands[i].priority = PRIO_NONE;
@@ -1647,9 +1706,9 @@ void Motor_EmergencyStop(MotorDevice_t* motor) {
     }
     motor->allow_rev.count = 0;
     
-    // ×¢Òâ£º²»ÇåÀí block_fwd / block_rev£¡
+    // ×¢ï¿½â£ºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ block_fwd / block_revï¿½ï¿½
     
-    // ¸üÐÂµ÷ÊÔ±äÁ¿
+    // ï¿½ï¿½ï¿½Âµï¿½ï¿½Ô±ï¿½ï¿½ï¿½
     g_u8MotorDebug_AllowFwdCount = 0;
     g_u8MotorDebug_AllowRevCount = 0;
     
@@ -1661,7 +1720,7 @@ void Motor_ClearAllowFwd(MotorDevice_t* motor) {
     
     MOTOR_DEBUG("ClearAllowFwd: clearing all allow_fwd commands\r\n");
     
-    // ÕæÕýÇå¿Õ commands[] Êý×é
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿? commands[] ï¿½ï¿½ï¿½ï¿½
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_fwd.commands[i].device_id = DEV_ID_NONE;
         motor->allow_fwd.commands[i].priority = PRIO_NONE;
@@ -1671,10 +1730,10 @@ void Motor_ClearAllowFwd(MotorDevice_t* motor) {
     }
     motor->allow_fwd.count = 0;
     
-    // ¸üÐÂµ÷ÊÔ±äÁ¿
+    // ï¿½ï¿½ï¿½Âµï¿½ï¿½Ô±ï¿½ï¿½ï¿½
     g_u8MotorDebug_AllowFwdCount = 0;
     
-    // ÖØÐÂÖÙ²Ã
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ù²ï¿½
     Motor_ArbitrationDecision(motor);
 }
 
@@ -1683,7 +1742,7 @@ void Motor_ClearAllowRev(MotorDevice_t* motor) {
     
     MOTOR_DEBUG("ClearAllowRev: clearing all allow_rev commands\r\n");
     
-    // ÕæÕýÇå¿Õ commands[] Êý×é
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿? commands[] ï¿½ï¿½ï¿½ï¿½
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_rev.commands[i].device_id = DEV_ID_NONE;
         motor->allow_rev.commands[i].priority = PRIO_NONE;
@@ -1693,10 +1752,10 @@ void Motor_ClearAllowRev(MotorDevice_t* motor) {
     }
     motor->allow_rev.count = 0;
     
-    // ¸üÐÂµ÷ÊÔ±äÁ¿
+    // ï¿½ï¿½ï¿½Âµï¿½ï¿½Ô±ï¿½ï¿½ï¿½
     g_u8MotorDebug_AllowRevCount = 0;
     
-    // ÖØÐÂÖÙ²Ã
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ù²ï¿½
     Motor_ArbitrationDecision(motor);
 }
 
@@ -1707,14 +1766,14 @@ const MotorDebugInfo_t* Motor_GetDebugInfo(MotorDevice_t* motor) {
 
 MotorDir_t Motor_GetDesiredDirection(MotorDevice_t* motor) {
     if (!motor) return DIR_NONE;
-    // Èç¹ûµ±Ç°ÓÐÕýÔÚÖ´ÐÐµÄÃüÁî£¬·µ»ØÆä·½Ïò
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½Ðµï¿½ï¿½ï¿½ï¿½î£¬ï¿½ï¿½ï¿½ï¿½ï¿½ä·½ï¿½ï¿?
     if (motor->state == MS_RUNNING || motor->state == MS_RAMPING) {
         return motor->active_dir;
     }
     return DIR_NONE;
 }
 
-// ========== ¹ýÁ÷¸æ¾¯ÊÖ¶¯Çå³ý½Ó¿Ú ==========
+// ========== ï¿½ï¿½ï¿½ï¿½ï¿½æ¾¯ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿? ==========
 void Motor_ClearOvercurrentBlock(MotorDevice_t* motor) {
     if (!motor) return;
     
@@ -1722,11 +1781,11 @@ void Motor_ClearOvercurrentBlock(MotorDevice_t* motor) {
     
     Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_OVERCUR_FWD);
     
-    // ÖØÐÂÖÙ²Ã
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ù²ï¿½
     Motor_ArbitrationDecision(motor);
 }
 
-// ========== µçÑ¹¸æ¾¯ÊÖ¶¯Çå³ý½Ó¿Ú ==========
+// ========== ï¿½ï¿½Ñ¹ï¿½æ¾¯ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿? ==========
 void Motor_ClearVoltageBlock(MotorDevice_t* motor, uint8_t u8AlarmType) {
     if (!motor) return;
     
@@ -1750,6 +1809,6 @@ void Motor_ClearVoltageBlock(MotorDevice_t* motor, uint8_t u8AlarmType) {
     Motor_CmdList_Remove(&motor->block_fwd, dev_id_fwd);
     Motor_CmdList_Remove(&motor->block_rev, dev_id_rev);
     
-    // ÖØÐÂÖÙ²Ã
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ù²ï¿½
     Motor_ArbitrationDecision(motor);
 }
