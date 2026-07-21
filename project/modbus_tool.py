@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Modbus RTU 指令生成器 v4.3 (关窗基准点+心跳包) """
+""" Modbus RTU 指令生成器 v4.4 (故障位拆分: 开窗过流/关窗过流) """
 
 def modbus_crc16(data):
     crc = 0xFFFF
@@ -89,7 +89,7 @@ REALTIME_REGS = [
 ]
 
 FAULT_BITS = [
-    (0x01, "过压"), (0x02, "过流"), (0x40, "欠压"),
+    (0x01, "过压"), (0x02, "开窗过流(正转过流)"), (0x04, "关窗过流(反转过流)"), (0x40, "欠压"),
 ]
 
 DEV_PASSWORD = "5858"
@@ -301,9 +301,10 @@ def menu_read_fault():
     req_data = [node, 0x03, 0x27, 0x40, 0x00, 0x01]
 
     print(f"\n  ▎故障状态（0x2740）")
-    print(f"  ▎bit0=过压  bit1=过流  bit6=欠压")
+    print(f"  ▎bit0=过压  bit1=开窗过流(正转)  bit2=关窗过流(反转)  bit6=欠压")
     print(f"  回令解析示例:")
-    for lb, v in [("无故障", 0), ("过压", 0x0001), ("过流", 0x0002), ("欠压", 0x0040)]:
+    for lb, v in [("无故障", 0), ("过压", 0x0001), ("开窗过流", 0x0002),
+                  ("关窗过流", 0x0004), ("欠压", 0x0040)]:
         rd = [node, 0x03, 0x02, (v>>8)&0xFF, v&0xFF]
         rcr = modbus_crc16(rd)
         rq = ' '.join(f'{b:02X}' for b in rd)
@@ -314,16 +315,21 @@ def menu_read_fault():
 # ===== 6. 清除故障 =====
 def menu_clear_fault():
     print("\n====== 清除故障（0x2740）======")
+    print("  ⚠ 清除开窗/关窗过流任一故障时，固件会同时清除两个方向的过流锁")
     for i, (bit, name) in enumerate(FAULT_BITS):
         print(f"  {i+1}. {name}")
-    print("  4. 清除全部故障")
+    print(f"  {len(FAULT_BITS)+1}. 全部清除(写0)")
     print("  0. 返回")
     c = input("选择: ").strip()
     if c == '0': return
     try:
         ci = int(c)
-        val = 0x0000 if ci == 4 else FAULT_BITS[ci-1][0] if 1 <= ci <= len(FAULT_BITS) else None
-        if val is None: print("无效"); return
+        if ci == len(FAULT_BITS)+1:
+            val = 0x0000
+        elif 1 <= ci <= len(FAULT_BITS):
+            val = FAULT_BITS[ci-1][0]
+        else:
+            print("无效"); return
     except: print("无效"); return
 
     node = ask_node()
@@ -768,7 +774,7 @@ MENU = [
 def main():
     while True:
         print("\n" + "=" * 42)
-        print("  Modbus RTU 指令生成器 v4.3")
+        print("  Modbus RTU 指令生成器 v4.4")
         print("=" * 42)
         for i, (name, _) in enumerate(MENU):
             print(f"  {i+1}. {name}")

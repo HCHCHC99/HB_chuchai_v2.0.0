@@ -101,7 +101,7 @@ static void Motor_RampForward(uint16_t target_duty) {
     uint16_t current_duty_ch1 = PWM_GetDuty(&g_motor_pwm_ch1);
 
     if (current_duty_ch1 != 0) {
-        /* �Ȼ�����0��������������ɺ���? Motor_Update �м����ٻ��� */
+        /* �Ȼ�����0��������������ɺ���? Motor_Update �м����ٻ��� */
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch1, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch2, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch3, 100 - current_duty_ch1, 0, 50);
@@ -128,7 +128,7 @@ static void Motor_RampReverse(uint16_t target_duty) {
     uint16_t current_duty_ch1 = PWM_GetDuty(&g_motor_pwm_ch1);
 
     if (current_duty_ch1 != 0) {
-        /* �Ȼ�����0��������������ɺ���? Motor_Update �м����ٻ��� */
+        /* �Ȼ�����0��������������ɺ���? Motor_Update �м����ٻ��� */
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch1, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch2, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch3, 100 - current_duty_ch1, 0, 50);
@@ -176,23 +176,23 @@ static void Motor_RunReverseImmediate(uint16_t duty) {
 
 
 // ���ļ���ͷ������ include ֮������
-// ��ӡ�������?
+// ��ӡ�������?
 volatile int motor_state = 0;
 static uint32_t s_u32LastMotorPrintTime = 0;
 #define MOTOR_PRINT_INTERVAL_MS   500
 
 // ========== Keil Watch ����ȫ�ֱ��� ==========
-// ����ٲò���Ա��� - �� Watch ����������Щ��������ʵʱ�鿴����ٲ�״�?
-MotorDevice_t* volatile g_pMotor_Dev_Watch = NULL;      // ����豸ָ�루��չ���鿴���г�Ա��?
+// ����ٲò���Ա��� - �� Watch ����������Щ��������ʵʱ�鿴����ٲ�״�?
+MotorDevice_t* volatile g_pMotor_Dev_Watch = NULL;      // ����豸ָ�루��չ���鿴���г�Ա��?
 MotorDebugInfo_t volatile g_stcMotorDebug = {0};     // ������Ϣ�������ṹ����ʽ��
-// Ϊ�˷���鿴���ٵ���һЩ�����ı���?
+// Ϊ�˷���鿴���ٵ���һЩ�����ı���?
 volatile uint8_t  g_u8MotorDebug_BlockFwdCount = 0;   // ��ת������������
 volatile uint8_t  g_u8MotorDebug_BlockRevCount = 0;   // ��ת������������
 volatile uint8_t  g_u8MotorDebug_AllowFwdCount = 0;   // ��ת������������
 volatile uint8_t  g_u8MotorDebug_AllowRevCount = 0;   // ��ת������������
 volatile uint8_t  g_u8MotorDebug_ActiveDeviceId = 0;  // ��ǰ��豸ID
 volatile uint8_t  g_u8MotorDebug_ActiveDir = 0;       // ��ǰ�����(0=ֹͣ,1=��ת,2=��ת)
-volatile uint8_t  g_u8MotorDebug_State = 0;           // ���״�?(0=IDLE,1=RAMPING,2=RUNNING)
+volatile uint8_t  g_u8MotorDebug_State = 0;           // ���״�?(0=IDLE,1=RAMPING,2=RUNNING)
 volatile float    g_fMotorDebug_CurrentDuty = 0.0f;   // ��ǰռ�ձ�
 volatile uint8_t  g_u8MotorDebug_ConflictFault = 0;   // ��ͻ���ϱ�־
 
@@ -216,7 +216,7 @@ typedef struct {
     #define CAN_PRIORITY     3
 #endif
 
-// �豸�����?
+// �豸�����?
 static const MotorDeviceGene_t c_device_genes[] = {
 #if MOTOR_MODE_BIPOLAR
     { DEV_ID_POWER_POS,  PRIO_POWER,     CAP_ALLOW },
@@ -423,7 +423,7 @@ if (g_AppParam.motor_dir != 0) {
 // ========== �ڲ��������� ==========
 static const MotorDeviceGene_t* Motor_GetGene(MotorDeviceId_t id);
 static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id);
-static void Motor_CmdList_SetAllow(MotorCommandList_t* q, MotorControlCommand_t cmd);
+static void Motor_CmdList_SetAllow(MotorCommandList_t* q, MotorCommandList_t* block_q, MotorControlCommand_t cmd);
 static void Motor_CmdList_SetBlock(MotorCommandList_t* q, MotorControlCommand_t cmd);
 static void Motor_ArbitrationDecision(MotorDevice_t* motor);
 static void Motor_UpdateDebugInfo(MotorDevice_t* motor);
@@ -450,7 +450,7 @@ static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id) {
                 q->commands[j] = q->commands[j + 1];
             }
             q->count--;
-            // ��ձ��Ƴ���λ��?
+            // ��ձ��Ƴ���λ��?
             if (q->count < MAX_COMMANDS_PER_DIRECTION) {
                 q->commands[q->count].device_id = DEV_ID_NONE;
                 q->commands[q->count].priority = PRIO_NONE;
@@ -473,7 +473,12 @@ static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id) {
     }
 }
 
-static void Motor_CmdList_SetAllow(MotorCommandList_t* q, MotorControlCommand_t cmd) {
+static void Motor_CmdList_SetAllow(MotorCommandList_t* q, MotorCommandList_t* block_q, MotorControlCommand_t cmd) {
+    // 安全检查: block非空则拒绝allow写入
+    if (block_q != NULL && block_q->count > 0) {
+        MAIN_D("[SET_ALLOW] rejected: block_q count=%d, dev_id=%d\r\n", block_q->count, cmd.device_id);
+        return;
+    }
     Motor_CmdList_Remove(q, cmd.device_id);
     if (q->count >= MAX_COMMANDS_PER_DIRECTION) return;
 
@@ -587,7 +592,7 @@ static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
 static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
     if (!motor->enable) return;
 
-    // 1. ָ���ѡѡ��?
+    // 1. ָ���ѡѡ��?
     MotorControlCommand_t* fwd_cmd = NULL;
     MotorControlCommand_t* rev_cmd = NULL;
 
@@ -638,7 +643,7 @@ static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
         motor->last_sent_duty = final->param;
         motor->state = (final->type == CMD_TYPE_RAMP_FWD || final->type == CMD_TYPE_RAMP_REV) ? MS_RAMPING : MS_RUNNING;
 
-        // �����ٲý���ص�?
+        // �����ٲý���ص�?
         if (motor->active_dir == DIR_FWD) {
             Motor_OnArbitrationFwd(motor, motor->last_sent_duty);
         } else {
@@ -742,7 +747,7 @@ void Motor_OnVoltageAlarm(void* payload) {
         MAIN_D("Motor: %s alarm! Bus=%lu mV, Threshold=%lu mV - Block both directions!\r\n",
                alarm_name, ev->u32BusVoltageMv, ev->u32ThresholdMv);
     } else {
-        // �澯���? - ���ݸ澯����ʹ�ö�Ӧ���豸ID�� block_fwd/block_rev �Ƴ�����ָ��
+        // �澯���? - ���ݸ澯����ʹ�ö�Ӧ���豸ID�� block_fwd/block_rev �Ƴ�����ָ��
         MotorDeviceId_t dev_id_fwd, dev_id_rev;
         const char* alarm_name;
 
@@ -785,18 +790,18 @@ void Motor_OnRTurnLimit(void* payload) {
         if (ev->u8Direction == RTURN_LIMIT_FORWARD) {
             cmd.type = CMD_TYPE_BLOCK_FWD;
             Motor_CmdList_SetBlock(&motor->block_fwd, cmd);
-            // ͬʱ���? allow_fwd��ȷ����ʹ block ���Ƴ������Ҳ���������ת
+            // ͬʱ���? allow_fwd��ȷ����ʹ block ���Ƴ������Ҳ���������ת
             Motor_ClearAllowFwd(motor);
             MAIN_D("Motor: RTurn forward limit triggered, block forward + clear allow_fwd\r\n");
         } else {
             cmd.type = CMD_TYPE_BLOCK_REV;
             Motor_CmdList_SetBlock(&motor->block_rev, cmd);
-            // ͬʱ���? allow_rev��ȷ����ʹ block ���Ƴ������Ҳ���������ת
+            // ͬʱ���? allow_rev��ȷ����ʹ block ���Ƴ������Ҳ���������ת
             Motor_ClearAllowRev(motor);
             MAIN_D("Motor: RTurn reverse limit triggered, block reverse + clear allow_rev\r\n");
         }
     } else {
-        // ��λ������Ƴ�? BLOCK ָ�ʹ�� RTurn ר���豸ID��
+        // ��λ������Ƴ�? BLOCK ָ�ʹ�� RTurn ר���豸ID��
         MotorDeviceId_t id = (ev->u8Direction == RTURN_LIMIT_FORWARD) ? DEV_ID_RTURN_FWD : DEV_ID_RTURN_REV;
         if (ev->u8Direction == RTURN_LIMIT_FORWARD) {
             Motor_CmdList_Remove(&motor->block_fwd, id);
@@ -805,7 +810,7 @@ void Motor_OnRTurnLimit(void* payload) {
             Motor_CmdList_Remove(&motor->block_rev, id);
             MAIN_D("Motor: RTurn reverse limit released\r\n");
         } else {
-            // ����Ϊ0ʱ������������?
+            // ����Ϊ0ʱ������������?
             Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_RTURN_FWD);
             Motor_CmdList_Remove(&motor->block_rev, DEV_ID_RTURN_REV);
         }
@@ -824,7 +829,7 @@ void Motor_OnCurrentAlarm(void* payload) {
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
     if (ev->u8IsActive) {
-        /* �жϵ�ǰ������򣺽���תʱ�������������?
+        /* �жϵ�ǰ������򣺽���תʱ�������������?
          * ��ת��ת����Ԥ�ڹ������緧�Źرյ�λ������������ת */
         MotorDir_t eDesiredDir = Motor_GetDesiredDirection(motor);
         
@@ -849,7 +854,7 @@ void Motor_OnCurrentAlarm(void* payload) {
                    (int)eDesiredDir, (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
         }
     } else {
-        // �����澯���? - �� block_fwd �Ƴ� DEV_ID_OVERCUR_FWD
+        // �����澯���? - �� block_fwd �Ƴ� DEV_ID_OVERCUR_FWD
         Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_OVERCUR_FWD);
 
         MAIN_D("Motor: OVERCURRENT released! Current=%ld mA - Unblock forward\r\n",
@@ -860,7 +865,7 @@ void Motor_OnCurrentAlarm(void* payload) {
 }
 
 
-// ========== 正转(开�?)过流回调 ==========
+// ========== 正转(开�?)过流回调 ==========
 void Motor_OnOvercurrentFwd(void* payload) {
     Current_AlarmEvent_t* ev = (Current_AlarmEvent_t*)payload;
     if (!ev) return;
@@ -962,7 +967,7 @@ void Motor_OnPowerEvent(void* payload) {
 
 #if MOTOR_MODE_BIPOLAR
     // ========== ˫����ģʽ ==========
-    // ��Դ�豸�ṩ ALLOW ���Ƶ��ת�򣬲�����? BLOCK
+    // ��Դ�豸�ṩ ALLOW ���Ƶ��ת�򣬲�����? BLOCK
     MotorDeviceId_t id = (ev->power_id == 0) ? DEV_ID_POWER_POS : DEV_ID_POWER_NEG;
     const MotorDeviceGene_t* gene = Motor_GetGene(id);
     if (!gene) return;
@@ -977,11 +982,11 @@ void Motor_OnPowerEvent(void* payload) {
     if (ev->is_on) {
         if (id == DEV_ID_POWER_POS) {
             cmd.type = CMD_TYPE_RUN_FWD;
-            Motor_CmdList_SetAllow(&motor->allow_fwd, cmd);
+            Motor_CmdList_SetAllow(&motor->allow_fwd, &motor->block_fwd, cmd);
             MAIN_D("[MOTOR] Bipolar: POWER_POS ON, added allow_fwd\r\n");
         } else {
             cmd.type = CMD_TYPE_RUN_REV;
-            Motor_CmdList_SetAllow(&motor->allow_rev, cmd);
+            Motor_CmdList_SetAllow(&motor->allow_rev, &motor->block_rev, cmd);
             MAIN_D("[MOTOR] Bipolar: POWER_NEG ON, added allow_rev\r\n");
         }
     } else {
@@ -1007,7 +1012,7 @@ void Motor_OnPowerEvent(void* payload) {
 void Motor_OnManualIO(void* payload) {
     MotorManualIOEvent_t* ev = (MotorManualIOEvent_t*)payload;
     
-    // �ȼ���¼����ݵ���Ч��?
+    // �ȼ���¼����ݵ���Ч��?
     if (ev == NULL) {
         MAIN_D("[MOTOR] OnManualIO: NULL payload!\r\n");
         return;
@@ -1026,7 +1031,7 @@ void Motor_OnManualIO(void* payload) {
 
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
-    // ���ݷ���ȷ�����ĸ�IO�豸 - �����ʼ��Ĭ��ֵ��?
+    // ���ݷ���ȷ�����ĸ�IO�豸 - �����ʼ��Ĭ��ֵ��?
     MotorDeviceId_t io_dev_id = DEV_ID_NONE;  // ��ʼ��Ϊ NONE
     
     if (ev->dir == DIR_FWD) {
@@ -1059,7 +1064,7 @@ void Motor_OnManualIO(void* payload) {
 
     // ��������ָ��
     if (ev->type == CMD_TYPE_RUN_FWD || ev->type == CMD_TYPE_RAMP_FWD) {
-        // ���? io_dev_id �Ƿ���ȷ
+        // ���? io_dev_id �Ƿ���ȷ
         if (io_dev_id != DEV_ID_IO_FWD) {
             MAIN_D("[MOTOR] ERROR: RUN_FWD but io_dev_id=%d (expected %d)\r\n", io_dev_id, DEV_ID_IO_FWD);
             return;
@@ -1075,12 +1080,12 @@ void Motor_OnManualIO(void* payload) {
         };
 
         Motor_CmdList_Remove(&motor->block_fwd, io_dev_id);
-        Motor_CmdList_SetAllow(&motor->allow_fwd, cmd);
+        Motor_CmdList_SetAllow(&motor->allow_fwd, &motor->block_fwd, cmd);
         
         MAIN_D("[MOTOR] IO_FWD: RUN, removed block_fwd, added allow_fwd\r\n");
     }
     else if (ev->type == CMD_TYPE_RUN_REV || ev->type == CMD_TYPE_RAMP_REV) {
-        // ���? io_dev_id �Ƿ���ȷ
+        // ���? io_dev_id �Ƿ���ȷ
         if (io_dev_id != DEV_ID_IO_REV) {
             MAIN_D("[MOTOR] ERROR: RUN_REV but io_dev_id=%d (expected %d)\r\n", io_dev_id, DEV_ID_IO_REV);
             return;
@@ -1096,7 +1101,7 @@ void Motor_OnManualIO(void* payload) {
         };
 
         Motor_CmdList_Remove(&motor->block_rev, io_dev_id);
-        Motor_CmdList_SetAllow(&motor->allow_rev, cmd);
+        Motor_CmdList_SetAllow(&motor->allow_rev, &motor->block_rev, cmd);
         
         MAIN_D("[MOTOR] IO_REV: RUN, removed block_rev, added allow_rev\r\n");
     }
@@ -1190,7 +1195,7 @@ void Motor_OnCANEvent(void* payload) {
     (void)payload;  // ����δʹ�þ���
 }
 
-// ========== �������������ת�ٷ����ص�? ==========
+// ========== �������������ת�ٷ����ص�? ==========
 void Motor_OnSpeedFeedback(void* payload) {
     int32_t* speed_rpm = (int32_t*)payload;
 
@@ -1203,7 +1208,7 @@ void Motor_OnSpeedFeedback(void* payload) {
     // ���磺����Ŀ��ת�ٵ���ռ�ձ�
     if (motor->state == MS_RUNNING || motor->state == MS_RAMPING) {
         // ����������ʵ�� PID ����
-        // Ŀǰֻ�ǽ���ת�����ݣ������Ի������չʹ��?
+        // Ŀǰֻ�ǽ���ת�����ݣ������Ի������չʹ��?
         (void)motor;      // ����δʹ�þ���
         (void)speed_rpm;  // ����δʹ�þ���
     }
@@ -1321,7 +1326,7 @@ DeviceResult_t Motor_Read(void* handle, void* data, uint32_t size) {
 }
 
 DeviceResult_t Motor_Write(void* handle, const void* data, uint32_t size) {
-    // ����豸ͨ������Ҫֱ��д����?
+    // ����豸ͨ������Ҫֱ��д����?
     (void)handle;
     (void)data;
     (void)size;
@@ -1384,7 +1389,7 @@ DeviceResult_t Motor_Update(void* handle) {
             PWM_GetState(&g_motor_pwm_ch2) == PWM_STATE_IDLE &&
             PWM_GetState(&g_motor_pwm_ch3) == PWM_STATE_IDLE &&
             PWM_GetState(&g_motor_pwm_ch4) == PWM_STATE_IDLE) {
-            /* ������ɣ��м���? */
+            /* ������ɣ��м���? */
             Motor_SetRunPolarity();
             s_bPolaritySwitchPending = false;
             /* ��ʼ������Ŀ�� */
@@ -1419,7 +1424,7 @@ DeviceResult_t Motor_Update(void* handle) {
         motor->last_arbitration_time = now;
     }
 
-    // ========== ÿ2000ms��ӡһ�ε���ٲ�״�? ==========
+    // ========== ÿ2000ms��ӡһ�ε���ٲ�״�? ==========
     if (now - s_u32LastMotorPrintTime >= MOTOR_PRINT_INTERVAL_MS) {
         s_u32LastMotorPrintTime = now;
 
@@ -1577,7 +1582,7 @@ DeviceResult_t Motor_Update(void* handle) {
             if (!found) active_devices[active_count++] = dev_id;
         }
         
-        // ��������е�������?
+        // ��������е�������?
         MOTOR_OUT("  Registered but Inactive Devices:\r\n");
         bool has_inactive = false;
         
@@ -1637,7 +1642,7 @@ DeviceResult_t Motor_Update(void* handle) {
     return RESULT_OK;
 }
 
-// ========== ����ض��ӿ�ʵ��? ==========
+// ========== ����ض��ӿ�ʵ��? ==========
 
 void Motor_SetSpeed(MotorDevice_t* motor, float duty) {
     if (!motor || !motor->enable) return;
@@ -1686,7 +1691,7 @@ void Motor_EmergencyStop(MotorDevice_t* motor) {
     
     MOTOR_DEBUG("EmergencyStop: clearing all allow commands\r\n");
     
-    // ����ֹͣ���������? allow_fwd �� commands[] ����
+    // ����ֹͣ���������? allow_fwd �� commands[] ����
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_fwd.commands[i].device_id = DEV_ID_NONE;
         motor->allow_fwd.commands[i].priority = PRIO_NONE;
@@ -1696,7 +1701,7 @@ void Motor_EmergencyStop(MotorDevice_t* motor) {
     }
     motor->allow_fwd.count = 0;
     
-    // ����ֹͣ���������? allow_rev �� commands[] ����
+    // ����ֹͣ���������? allow_rev �� commands[] ����
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_rev.commands[i].device_id = DEV_ID_NONE;
         motor->allow_rev.commands[i].priority = PRIO_NONE;
@@ -1720,7 +1725,7 @@ void Motor_ClearAllowFwd(MotorDevice_t* motor) {
     
     MOTOR_DEBUG("ClearAllowFwd: clearing all allow_fwd commands\r\n");
     
-    // �������? commands[] ����
+    // �������? commands[] ����
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_fwd.commands[i].device_id = DEV_ID_NONE;
         motor->allow_fwd.commands[i].priority = PRIO_NONE;
@@ -1742,7 +1747,7 @@ void Motor_ClearAllowRev(MotorDevice_t* motor) {
     
     MOTOR_DEBUG("ClearAllowRev: clearing all allow_rev commands\r\n");
     
-    // �������? commands[] ����
+    // �������? commands[] ����
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_rev.commands[i].device_id = DEV_ID_NONE;
         motor->allow_rev.commands[i].priority = PRIO_NONE;
@@ -1766,14 +1771,14 @@ const MotorDebugInfo_t* Motor_GetDebugInfo(MotorDevice_t* motor) {
 
 MotorDir_t Motor_GetDesiredDirection(MotorDevice_t* motor) {
     if (!motor) return DIR_NONE;
-    // �����ǰ������ִ�е���������䷽��?
+    // �����ǰ������ִ�е���������䷽��?
     if (motor->state == MS_RUNNING || motor->state == MS_RAMPING) {
         return motor->active_dir;
     }
     return DIR_NONE;
 }
 
-// ========== �����澯�ֶ�����ӿ�? ==========
+// ========== �����澯�ֶ�����ӿ�? ==========
 void Motor_ClearOvercurrentBlock(MotorDevice_t* motor) {
     if (!motor) return;
     
@@ -1785,7 +1790,7 @@ void Motor_ClearOvercurrentBlock(MotorDevice_t* motor) {
     Motor_ArbitrationDecision(motor);
 }
 
-// ========== ��ѹ�澯�ֶ�����ӿ�? ==========
+// ========== ��ѹ�澯�ֶ�����ӿ�? ==========
 void Motor_ClearVoltageBlock(MotorDevice_t* motor, uint8_t u8AlarmType) {
     if (!motor) return;
     
