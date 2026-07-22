@@ -1,0 +1,23 @@
+L23: /* PWM ģʽ��̬״̬���� */
+L24: static MotorDir_t s_eLastArbitrationDir = DIR_NONE;
+L25: static uint16_t s_u16LastTargetDuty = 0;
+L26: static bool s_bPolaritySwitchPending = false;   /* ������0�����м��� */
+L27: static uint16_t s_u16PendingTargetDuty = 0;      /* ��������Ŀ��ռ�ձ� */
+L28: static uint8_t s_u8PendingDirection = 0;          /* �������ķ���: 1=FWD 2=REV */
+L30: /* ������/��ͣʱ�䣨���룩*/
+L31: #define MOTOR_RAMP_TIME_MS      800
+L33: /* ռ�ձ����ƣ�2%-98%��*/
+L34: #define MOTOR_DUTY_MIN          2
+L35: #define MOTOR_DUTY_MAX          98
+L37: /* ռ�ձ��޷� */
+L38: static uint16_t Motor_LimitDuty(uint16_t duty) {
+L39:     if (duty < MOTOR_DUTY_MIN) return MOTOR_DUTY_MIN;
+L40:     if (duty > MOTOR_DUTY_MAX) return MOTOR_DUTY_MAX;
+L41:     return duty;
+L42: }
+L44: /* ֹͣ��PB6~PB9 ȫ 98% ����Ч */
+L45: static void Motor_SetStopDuty(void) {
+L46:     stc_tmra_pwm_init_t stcPwmInit;
+L47:     (void)TMRA_PWM_StructInit(&stcPwmInit);
+L48:     uint32_t u32Period = TMRA_GetPeriodValue(CM_TMRA_4);
+L49:     uint32_t u32Compare = (u32Period * 98U) / 100U;
