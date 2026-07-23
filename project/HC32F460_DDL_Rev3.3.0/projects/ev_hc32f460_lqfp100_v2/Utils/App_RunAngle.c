@@ -17,11 +17,12 @@
 /*=============================================================================
  * RAM state
  *============================================================================*/
-static int32_t s_abs_offset_x10 = 0;      /* real-time absolute angle offset (0.1 deg) */
-static int32_t s_last_accum     = 0;      /* snapshot of g_s32HallPulseAccum at last update */
-static int32_t s_target_x10     = 0;      /* goto-target angle (0.1 deg), set via 0x2727/0x2728 */
-static bool    s_goto_zero_active = false;/* goto-zero in progress */
-static bool    s_goto_zero_initial_sign;  /* sign of offset when goto-zero started */
+static int32_t s_abs_offset_x10 = -10;      /* real-time absolute angle offset (0.1 deg) */
+static int32_t s_last_accum     = 0;        /* snapshot of g_s32HallPulseAccum at last update */
+static float   s_angle_accumulator = 0.0f;  /* fractional angle accumulator (0.1 deg units) */
+static int32_t s_target_x10     = 0;        /* goto-target angle (0.1 deg), set via 0x2727/0x2728 */
+static bool    s_goto_zero_active = false;  /* goto-zero in progress */
+static bool    s_goto_zero_initial_sign;    /* sign of offset when goto-zero started */
 static bool    s_goto_target_active = false;/* goto-target in progress */
 
 AbsAngleRecord_t g_AbsAngle;              /* Flash mirror */
@@ -94,9 +95,12 @@ void RunAngle_Init(void)
     s_abs_offset_x10 = g_AbsAngle.abs_offset_x10;
 
     /* Snapshot current pulse accumulator so subsequent delta starts from zero */
-    __disable_irq();
+    // __disable_irq();
     s_last_accum = g_s32HallPulseAccum;
-    __enable_irq();
+    // __enable_irq();
+
+    /* Reset fractional accumulator on init */
+    s_angle_accumulator = 0.0f;
 
     MAIN_D("[ABSA] Init: ram=%ld (0.1deg), flash=%ld, accum_base=%ld\r\n",
            (long)s_abs_offset_x10, (long)g_AbsAngle.abs_offset_x10, (long)s_last_accum);
@@ -105,9 +109,9 @@ void RunAngle_Init(void)
 void RunAngle_Update(void)
 {
     int32_t accum;
-    __disable_irq();
+    // __disable_irq();
     accum = g_s32HallPulseAccum;
-    __enable_irq();
+    // __enable_irq();
 
     int32_t delta = accum - s_last_accum;
 
@@ -117,7 +121,15 @@ void RunAngle_Update(void)
 
         float k = DegPerPulse_x10();
         if (k != 0.0f) {
-            s_abs_offset_x10 += (int32_t)((float)delta * k);
+            /* Accumulate fractional angle with floating point precision */
+            s_angle_accumulator += (float)delta * k;
+
+            /* Extract integer part and add to offset, keep fractional remainder */
+            int32_t add_angle = (int32_t)s_angle_accumulator;
+            if (add_angle != 0) {
+                s_abs_offset_x10 += add_angle;
+                s_angle_accumulator -= (float)add_angle;
+            }
         }
     }
 
@@ -173,6 +185,8 @@ void RunAngle_Cmd(uint16_t cmd)
         int32_t ref = (int32_t)g_AppParam.close_limit_angle;
         s_abs_offset_x10 = ref;
         g_AbsAngle.abs_offset_x10 = ref;
+        /* Reset fractional accumulator when setting reference point */
+        s_angle_accumulator = 0.0f;
         Param_Save(&s_Config, &s_Runtime);
 
         MAIN_D("[ABSA] Reference set: RAM=%ld, Flash=%ld (0x271C=%ld)\r\n",
@@ -311,10 +325,12 @@ void RunAngle_OnCalibration(void)
 {
     int32_t ref = (int32_t)g_AppParam.close_limit_angle;
 
-    __disable_irq();
+    // __disable_irq();
     s_abs_offset_x10 = ref;
     s_last_accum = g_s32HallPulseAccum;   /* accum was just zeroed by dev_rturn */
-    __enable_irq();
+    /* Reset fractional accumulator on calibration */
+    s_angle_accumulator = 0.0f;
+    // __enable_irq();
 
     g_AbsAngle.abs_offset_x10 = ref;
     Param_Save(&s_Config, &s_Runtime);    /* persist to Flash sector 55 */
