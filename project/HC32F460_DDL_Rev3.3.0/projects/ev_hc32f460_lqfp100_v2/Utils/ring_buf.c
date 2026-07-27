@@ -157,13 +157,13 @@ uint32_t BUF_Read(stc_ring_buf_t *pstcBuf, uint8_t au8Data[], uint32_t u32Len)
             (void)memcpy(&au8Data[u32CopyLen], &pstcBuf->pu8Data[0], u32ReadLen - u32CopyLen);
         }
 
-        __disable_irq();
+        // __disable_irq();
         pstcBuf->u32FreeSize += u32ReadLen;
         pstcBuf->u32Out += u32ReadLen;
         if (pstcBuf->u32Out >= pstcBuf->u32Size) {
             pstcBuf->u32Out %= pstcBuf->u32Size;
         }
-        __enable_irq();
+        // __enable_irq();
     }
 
     return u32ReadLen;
@@ -196,13 +196,13 @@ uint32_t BUF_Write(stc_ring_buf_t *pstcBuf, uint8_t au8Data[], uint32_t u32Len)
             (void)memcpy(&pstcBuf->pu8Data[0], &au8Data[u32CopyLen], u32WriteLen - u32CopyLen);
         }
 
-        __disable_irq();
+        // __disable_irq();
         pstcBuf->u32FreeSize -= u32WriteLen;
         pstcBuf->u32In += u32WriteLen;
         if (pstcBuf->u32In >= pstcBuf->u32Size) {
             pstcBuf->u32In %= pstcBuf->u32Size;
         }
-        __enable_irq();
+        // __enable_irq();
     }
 
     return u32WriteLen;

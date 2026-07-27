@@ -85,12 +85,12 @@ static void UpdateRuntime(Param_Runtime_t *pRuntime, int32_t res, uint32_t param
 {
     if (pRuntime == NULL) return;
 
-    PARAM_ENTER_CRITICAL();
+    // PARAM_ENTER_CRITICAL();
     pRuntime->last_res = res;
     if (res == PARAM_OK) {
         pRuntime->save_count++;
     }
-    PARAM_EXIT_CRITICAL();
+    // PARAM_EXIT_CRITICAL();
 }
 
 /*=============================================================================

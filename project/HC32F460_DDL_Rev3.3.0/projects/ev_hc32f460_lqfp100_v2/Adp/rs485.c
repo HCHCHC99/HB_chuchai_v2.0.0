@@ -201,11 +201,11 @@ static void RS485_FrameParser(void)
     uint32_t currentTime = tickTimer_GetCount();
     uint16_t available = BUF_UsedSize(&m_stcRxRingBuf);
     uint16_t freeSpace = BUF_FreeSize(&m_stcRxRingBuf);
-    
+
     if (available == 0) {
         return;
     }
-    
+
     /* �����ջ�����ʣ��ռ䣬������ֵʱ���������ݷ�ֹ��� */
     if (freeSpace < 64U) {
         WARN_DEBUG("RxBuf nearly full! free=%d, discard old", freeSpace);
@@ -213,9 +213,9 @@ static void RS485_FrameParser(void)
         uint8_t discardBuf[32];
         while (discardLen > 0) {
             uint16_t chunk = (discardLen > sizeof(discardBuf)) ? sizeof(discardBuf) : discardLen;
-            __disable_irq();
+            // __disable_irq();
             BUF_Read(&m_stcRxRingBuf, discardBuf, chunk);
-            __enable_irq();
+            // __enable_irq();
             discardLen -= chunk;
         }
         available = BUF_UsedSize(&m_stcRxRingBuf);
@@ -224,24 +224,24 @@ static void RS485_FrameParser(void)
             return;
         }
     }
-    
+
     /* ���֡�����ʱ��3.5�ַ�ʱ�䣩*/
     uint32_t elapsed = currentTime - m_u32LastRxTime;
-    
-    if (elapsed >= MODBUS_FRAME_TIMEOUT_MS) 
+
+    if (elapsed >= MODBUS_FRAME_TIMEOUT_MS)
     {
         uint8_t frameBuf[256];
         uint16_t frameLen = available;
         if (frameLen > 256) {
             frameLen = 256;
         }
-        
-        __disable_irq();
+
+        // __disable_irq();
         BUF_Read(&m_stcRxRingBuf, frameBuf, frameLen);
-        __enable_irq();
-        
+        // __enable_irq();
+
         FRAME_DEBUG("Frame done, size=%d", frameLen);
-        
+
         /* ������֡�������֡���� */
         msg_t rxMsg;
         rxMsg.data = rxMsg.buffer;
@@ -262,7 +262,7 @@ static void SendData_RS485_Internal(uint8_t *pData, uint16_t len)
 
     RS485_TX_MODE();
     RS485_DEBUG("TX mode");
-    
+
     m_u32SendStartTime = tickTimer_GetCount();
     written = BUF_Write(&m_stcTxRingBuf, pData, len);
     if (written != len)
@@ -270,7 +270,7 @@ static void SendData_RS485_Internal(uint8_t *pData, uint16_t len)
         ERR_DEBUG("[RS485_ERR] BUF_Write failed! written=%d, expected=%d", written, len);
     }
     RS485_DEBUG("send %d bytes (written=%d)", len, written);
-    
+
     if (m_enTxCompleteFlag == SET)
     {
         m_enTxCompleteFlag = RESET;
@@ -287,11 +287,11 @@ static void RS485_OnSendComplete(void)
     if (elapsed > 500) {
         RS485_DEBUG("send timeout! elapsed=%dms", elapsed);
     }
-    
+
     RS485_RX_MODE();
     m_u8IsSending = 0;
     Lock_Unlock(&m_stcRs485Mutex, "RS485_OnSendComplete");
-    
+
     RS485_DEBUG("TX done, queued=%d", MsgQueue_GetCount(&m_stcTxQueue));
 }
 
@@ -305,7 +305,7 @@ void RS485_Init(void)
 
     /* ��ʼ�������� */
     Lock_Init(&m_stcRs485Mutex, LOCK_TYPE_MUTEX, "RS485_Mutex");
-    
+
     /* ��ʼ�����Ͷ��� */
     queue_config_t txCfg;
     txCfg.max_size = TX_QUEUE_SIZE;
@@ -313,7 +313,7 @@ void RS485_Init(void)
     txCfg.priority_enabled = false;
     txCfg.timeout_ms = 0;
     MsgQueue_Init(&m_stcTxQueue, m_au8TxQueueBuffer, TX_QUEUE_SIZE, &txCfg, "RS485_TxQ");
-    
+
     /* ��ʼ������֡���� */
     queue_config_t rxCfg;
     rxCfg.max_size = RX_FRAME_QUEUE_SIZE;
@@ -321,14 +321,14 @@ void RS485_Init(void)
     rxCfg.priority_enabled = false;
     rxCfg.timeout_ms = 0;
     MsgQueue_Init(&m_stcRxFrameQueue, m_au8RxFrameQueueBuffer, RX_FRAME_QUEUE_SIZE, &rxCfg, "RS485_RxQ");
-    
+
     /* ��ʼ�����λ����� */
     BUF_Init(&m_stcRxRingBuf, m_au8RxRawBuf, RX_RING_BUF_SIZE);
     BUF_Init(&m_stcTxRingBuf, m_au8TxBuf, TX_RING_BUF_SIZE);
-    
+
     m_u8IsSending = 0;
     m_u32LastRxTime = tickTimer_GetCount();
-    
+
     /* GPIO�������� */
     GPIO_SetFunc(USART_RX_PORT, USART_RX_PIN, USART_RX_GPIO_FUNC);
     GPIO_SetFunc(USART_TX_PORT, USART_TX_PIN, USART_TX_GPIO_FUNC);
@@ -338,7 +338,7 @@ void RS485_Init(void)
     USART_UART_StructInit(&uartCfg);
     uartCfg.u32Baudrate      = RS485_BAUDRATE;
     uartCfg.u32ClockDiv      = RS485_CLK_DIV;
-    uartCfg.u32OverSampleBit = USART_OVER_SAMPLE_16BIT;    
+    uartCfg.u32OverSampleBit = USART_OVER_SAMPLE_16BIT;
     USART_UART_Init(USART_UNIT, &uartCfg, NULL);
 
     /* �ж����� */
@@ -364,9 +364,9 @@ void RS485_Init(void)
 
     /* RS485����������ų�ʼ�� */
     RS485_DIR_Init();
-    
+
     /* ʹ��USART���� */
-    USART_FuncCmd(USART_UNIT, USART_RX | USART_INT_RX, ENABLE);    
+    USART_FuncCmd(USART_UNIT, USART_RX | USART_INT_RX, ENABLE);
 
     RS485_DEBUG("Init done");
 }
@@ -379,15 +379,15 @@ bool RS485_Send(uint8_t *pData, uint16_t len)
     if (pData == NULL || len == 0 || len > 256) {
         return false;
     }
-    
+
     if (Lock_TryLock(&m_stcRs485Mutex, "RS485_Send")) {
         m_u8IsSending = 1;
         SendData_RS485_Internal(pData, len);
         return true;
     } else {
-        RS485_DEBUG("busy, queue msg (qsz=%d)", 
+        RS485_DEBUG("busy, queue msg (qsz=%d)",
                MsgQueue_GetCount(&m_stcTxQueue) + 1);
-        
+
         msg_t txMsg;
         txMsg.data = txMsg.buffer;
         txMsg.len = len;
@@ -405,13 +405,13 @@ void RS485_Poll(void)
 {
     /* 1. ֡���� */
     RS485_FrameParser();
-    
+
     /* 2. ���Ͷ��д�����������ɺ󣬴Ӷ���ȡ����һ����Ϣ���� */
     if ((m_enTxCompleteFlag == SET) && (MsgQueue_GetCount(&m_stcTxQueue) > 0))
     {
         msg_t next_msg;
         if (MsgQueue_Receive(&m_stcTxQueue, &next_msg, 0, "RS485_Poll")) {
-            RS485_DEBUG("dequeue send, remain=%d", 
+            RS485_DEBUG("dequeue send, remain=%d",
                    MsgQueue_GetCount(&m_stcTxQueue));
             if (Lock_TryLock(&m_stcRs485Mutex, "RS485_Poll")) {
                 m_u8IsSending = 1;

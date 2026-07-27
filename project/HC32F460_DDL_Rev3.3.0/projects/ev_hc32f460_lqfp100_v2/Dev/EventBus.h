@@ -1,95 +1,1 @@
-#ifndef EVENT_BUS_H_
-#define EVENT_BUS_H_
-
-// EventBus - ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½ï¿½ï¿½Ú·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£Ê½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½
-#include <stdint.h>
-#include <stdbool.h>
-#include "rtt_manager.h"
-
-// ========== ï¿½ï¿½ï¿½Ôºê¶¨ï¿½ï¿½ ==========
-// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ rtt_manager.h ï¿½ï¿½Í³Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½DEV_EVENT_BUS / DEV_EVENT_BUS_VERBOSE
-
-#ifdef DEV_EVENT_BUS
-    #define EVENT_BUS_DEBUG_PRINT(fmt, ...)    MAIN_D("[EVENT_BUS] " fmt, ##__VA_ARGS__)
-#else
-    #define EVENT_BUS_DEBUG_PRINT(fmt, ...)    ((void)0)
-#endif
-
-#ifdef DEV_EVENT_BUS_VERBOSE
-    #define EVENT_BUS_VERBOSE_PRINT(fmt, ...)  MAIN_D("[EVENT_BUS] " fmt, ##__VA_ARGS__)
-#else
-    #define EVENT_BUS_VERBOSE_PRINT(fmt, ...)  ((void)0)
-#endif
-
-typedef enum {
-    TOPIC_POWER = 0,
-    TOPIC_LIMIT_HARD,
-    TOPIC_LIMIT_SOFT,
-    TOPIC_CAN_EVENT,
-    TOPIC_MOTOR_CMD,
-    TOPIC_MOTOR_SPEED_FEEDBACK, 
-    TOPIC_MOTOR_DRIVE_EXEC,
-    TOPIC_MANUAL_IO,
-    TOPIC_ALARM,
-    TOPIC_VOLTAGE_ALARM,
-    TOPIC_CURRENT_ALARM,
-    TOPIC_RTURN_LIMIT,
-    TOPIC_FAULT_CLEAR,
-    TOPIC_MANUAL_RS485,
-    TOPIC_OVERCURRENT_FWD,
-    TOPIC_OVERCURRENT_REV,
-    TOPIC_MAX
-} Topic_t;
-
-// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó³ï¿½ä£¨ï¿½ï¿½ï¿½Úµï¿½ï¿½Ô´ï¿½Ó¡ï¿½ï¿½
-static const char* const g_topic_names[] = {
-    [TOPIC_POWER]               = "POWER",
-    [TOPIC_LIMIT_HARD]          = "LIMIT_HARD",
-    [TOPIC_LIMIT_SOFT]          = "LIMIT_SOFT",
-    [TOPIC_CAN_EVENT]           = "CAN_EVENT",
-    [TOPIC_MOTOR_CMD]           = "MOTOR_CMD",
-    [TOPIC_MOTOR_SPEED_FEEDBACK] = "MOTOR_SPEED_FEEDBACK",
-    [TOPIC_MOTOR_DRIVE_EXEC]    = "MOTOR_DRIVE_EXEC",
-    [TOPIC_MANUAL_IO]           = "MANUAL_IO",
-    [TOPIC_ALARM]               = "ALARM",
-    [TOPIC_VOLTAGE_ALARM]       = "VOLTAGE_ALARM",
-    [TOPIC_CURRENT_ALARM]       = "CURRENT_ALARM",
-    [TOPIC_RTURN_LIMIT]         = "RTURN_LIMIT",
-    [TOPIC_FAULT_CLEAR]         = "FAULT_CLEAR",
-    [TOPIC_MANUAL_RS485]        = "MANUAL_RS485",
-    [TOPIC_OVERCURRENT_FWD]     = "OVERCURRENT_FWD",
-    [TOPIC_OVERCURRENT_REV]     = "OVERCURRENT_REV"
-};
-
-typedef void (*EventCallback)(void* payload);
-
-/**
- * @brief ï¿½ï¿½ï¿½Ä»ï¿½ï¿½â£¨ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½
- * @param topic ï¿½ï¿½×¢ï¿½Ä»ï¿½ï¿½ï¿½
- * @param callback ï¿½ï¿½ï¿½ï¿½Ê±ï¿½Ä»Øµï¿½ï¿½ï¿½ï¿½ï¿½
- * @param priority ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½0=ï¿½ï¿½ß£ï¿½ï¿½ï¿½ÖµÔ½ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½Ô½ï¿½Í£ï¿½
- * @return ï¿½Ç·ï¿½ï¿½Ä³É¹ï¿½
- * 
- * @note ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
- *       - ï¿½ï¿½ÖµÔ½Ð¡ï¿½ï¿½ï¿½È¼ï¿½Ô½ï¿½ß£ï¿½0 > 1 > 2 > ...ï¿½ï¿½
- *       - Í¬ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½Â£ï¿½ï¿½È¶ï¿½ï¿½Äµï¿½ï¿½ï¿½Ö´ï¿½ï¿½
- */
-bool EventBus_Subscribe(Topic_t topic, EventCallback callback, uint8_t priority);
-
-void EventBus_Init(void);
-void EventBus_Publish(Topic_t topic, void* payload);
-
-/**
- * @brief ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å¿Ø»ï¿½ï¿½Æ£ï¿½
- *        ï¿½ï¿½ï¿½Ã´Ëºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð»ï¿½ï¿½ï¿½ï¿½ Publish ï¿½Å»ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½Ð»Øµï¿½ï¿½ï¿½
- *        ï¿½Ú´ï¿½Ö®Ç°ï¿½ï¿½ï¿½Ãµï¿½ Publish ï¿½ï¿½ï¿½ï¿½Â¼ï¿½Â¼ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½Ö´ï¿½Ð»Øµï¿½ï¿½ï¿½
- */
-void EventBus_Enable(void);
-
-/**
- * @brief ï¿½ï¿½Ñ¯ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
- * @return true ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½false Î´ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½×¶Î£ï¿½
- */
-bool EventBus_IsEnabled(void);
-
-#endif /* EVENT_BUS_H_ */
+#ifndef EVENT_BUS_H_#define EVENT_BUS_H_// EventBus - ÊÂ¼þ×ÜÏßÏµÍ³£¬ÓÃÓÚ·¢²¼/¶©ÔÄÄ£Ê½µÄÊÂ¼þ´«µÝ#include <stdint.h>#include <stdbool.h>#include "rtt_manager.h"// ========== µ÷ÊÔºê¶¨Òå ==========// ËùÓÐµ÷ÊÔÊä³öÍ³Ò»Ê¹ÓÃ rtt_manager.h ÖÐµÄºê£¬Í¨¹ý DEV_EVENT_BUS / DEV_EVENT_BUS_VERBOSE ¿ØÖÆ¿ª¹Ø#ifdef DEV_EVENT_BUS    #define EVENT_BUS_DEBUG_PRINT(fmt, ...)    MAIN_D("[EVENT_BUS] " fmt, ##__VA_ARGS__)#else    #define EVENT_BUS_DEBUG_PRINT(fmt, ...)    ((void)0)#endif#ifdef DEV_EVENT_BUS_VERBOSE    #define EVENT_BUS_VERBOSE_PRINT(fmt, ...)  MAIN_D("[EVENT_BUS] " fmt, ##__VA_ARGS__)#else    #define EVENT_BUS_VERBOSE_PRINT(fmt, ...)  ((void)0)#endiftypedef enum {    TOPIC_POWER = 0,    TOPIC_LIMIT_HARD,    TOPIC_LIMIT_SOFT,    TOPIC_CAN_EVENT,    TOPIC_MOTOR_CMD,    TOPIC_MOTOR_SPEED_FEEDBACK,     TOPIC_MOTOR_DRIVE_EXEC,    TOPIC_MANUAL_IO,    TOPIC_ALARM,    TOPIC_VOLTAGE_ALARM,    TOPIC_CURRENT_ALARM,    TOPIC_RTURN_LIMIT,    TOPIC_FAULT_CLEAR,    TOPIC_MANUAL_RS485,    TOPIC_OVERCURRENT_FWD,    TOPIC_OVERCURRENT_REV,    TOPIC_MAX} Topic_t;// Ö÷ÌâÃû³ÆÓ³Éä£¨ÓÃÓÚµ÷ÊÔ´òÓ¡£©static const char* const g_topic_names[] = {    [TOPIC_POWER]               = "POWER",    [TOPIC_LIMIT_HARD]          = "LIMIT_HARD",    [TOPIC_LIMIT_SOFT]          = "LIMIT_SOFT",    [TOPIC_CAN_EVENT]           = "CAN_EVENT",    [TOPIC_MOTOR_CMD]           = "MOTOR_CMD",    [TOPIC_MOTOR_SPEED_FEEDBACK] = "MOTOR_SPEED_FEEDBACK",    [TOPIC_MOTOR_DRIVE_EXEC]    = "MOTOR_DRIVE_EXEC",    [TOPIC_MANUAL_IO]           = "MANUAL_IO",    [TOPIC_ALARM]               = "ALARM",    [TOPIC_VOLTAGE_ALARM]       = "VOLTAGE_ALARM",    [TOPIC_CURRENT_ALARM]       = "CURRENT_ALARM",    [TOPIC_RTURN_LIMIT]         = "RTURN_LIMIT",    [TOPIC_FAULT_CLEAR]         = "FAULT_CLEAR",    [TOPIC_MANUAL_RS485]        = "MANUAL_RS485",    [TOPIC_OVERCURRENT_FWD]     = "OVERCURRENT_FWD",    [TOPIC_OVERCURRENT_REV]     = "OVERCURRENT_REV"};typedef void (*EventCallback)(void* payload);/** * @brief ¶©ÔÄ»°Ìâ£¨´øÓÅÏÈ¼¶£© * @param topic ¹Ø×¢µÄ»°Ìâ * @param callback ´¥·¢Ê±µÄ»Øµ÷º¯Êý * @param priority ÓÅÏÈ¼¶£¨0=×î¸ß£¬ÊýÖµÔ½´óÓÅÏÈ¼¶Ô½µÍ£© * @return ÊÇ·ñ¶©ÔÄ³É¹¦ *  * @note ÓÅÏÈ¼¶ÅÅÐò¹æÔò£º *       - ÊýÖµÔ½Ð¡ÓÅÏÈ¼¶Ô½¸ß£¨0 > 1 > 2 > ...£© *       - Í¬µÈÓÅÏÈ¼¶ÏÂ£¬ÏÈ¶©ÔÄµÄÏÈÖ´ÐÐ£¨²åÈëµ½Í¬ÓÅÏÈ¼¶Ä©Î²£© */bool EventBus_Subscribe(Topic_t topic, EventCallback callback, uint8_t priority);void EventBus_Init(void);void EventBus_Publish(Topic_t topic, void* payload);/** * @brief ÆôÓÃÊÂ¼þ×ÜÏß£¨´øÃÅ¿Ø»úÖÆ£© *        µ÷ÓÃ´Ëº¯Êýºó£¬²Å»áÔÊÐí Publish ´¥·¢Ö´ÐÐ»Øµ÷¡£ *        ÔÚµ÷ÓÃÖ®Ç°·¢ËÍµÄ Publish »á¼ÇÂ¼ÈÕÖ¾µ«²»Ö´ÐÐ»Øµ÷¡£ */void EventBus_Enable(void);/** * @brief ²éÑ¯ÊÂ¼þ×ÜÏßÊÇ·ñÒÑÆôÓÃ * @return true ÒÑÆôÓÃ£¬false Î´ÆôÓÃ£¨³õÊ¼»¯½×¶Î£© */bool EventBus_IsEnabled(void);#endif /* EVENT_BUS_H_ */

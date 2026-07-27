@@ -14,8 +14,8 @@
 #include <stdbool.h>
 #include "rtt_manager.h"
 
-// ========== ï¿½ï¿½ï¿½Ôºê¶¨ï¿½ï¿½ ==========
-// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ rtt_manager.h ï¿½ï¿½Í³Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½DEV_MOTOR
+// ========== µ÷ÊÔºê¶¨Òå ==========
+// ËùÓÐµ÷ÊÔÊä³öÍ³Ò»Ê¹ÓÃ rtt_manager.h ÖÐµÄºê£¬Í¨¹ý DEV_MOTOR ¿ØÖÆ¿ª¹Ø
 
 #ifdef DEV_MOTOR
     #define MOTOR_DEBUG(fmt, ...)    MAIN_D("[MOTOR_DEBUG] " fmt, ##__VA_ARGS__)
@@ -26,58 +26,55 @@
 #endif
 
 
-// ========== ç¡¬ä»¶æ¿æœ¬ï¼šç”µæœºæŽ§åˆ¶æ¨¡ï¿½? ==========
-// ï¿½? main.h ï¿½? BOARD_VERSION ç»Ÿä¸€ç®¡ç†
+// ========== Ó²¼þ°æ±¾£ºµç»ú¿ØÖÆÄ£Ê½ ==========
+// ÔÚ main.h ÖÐÍ¨¹ý BOARD_VERSION Í³Ò»¹ÜÀí
 #include "main.h"
 #if BOARD_VERSION == 0
-    // åŽŸHB_chuchaiæ¿ï¼šGPIO PB8/PB9 ç›´æŽ¥æŽ§åˆ¶æ­£åï¿½?/åœæ­¢
+    // Ô­HB_chuchai°å£ºGPIO PB8/PB9 Ö±½Ó¿ØÖÆÕý×ª/·´×ª/Í£Ö¹
     #define MOTOR_CONTROL_MODE  0
 #else
-    // æ•´åˆæ¿ï¼š4é€šé“ PWM å ç©ºæ¯”æŽ§åˆ¶ï¼Œç¼“å¯ï¿½?/ç¼“åœ
+    // ÕûºÏ°å£º4Í¨µÀ PWM Õ¼¿Õ±È¿ØÖÆ£¬»ºÆð/»ºÍ£
     #define MOTOR_CONTROL_MODE  1
 #endif
 
-// ========== ï¿½ï¿½ï¿½ï¿½è±¸ï¿½ï¿½ï¿½ï¿½ï¿½ë¶¨ï¿½ï¿½? ==========
-// ×¢ï¿½â£ºCMD_BASE_MOTOR ï¿½ï¿½ device_manager.h ï¿½ï¿½Ã»ï¿½ï¿½Ô¤ï¿½ï¿½ï¿½å£¬ï¿½ï¿½ï¿½ï¶¨ï¿½ï¿½
+// ========== µç»úÉè±¸ÃüÁî¶¨Òå ==========
+// ×¢Òâ£ºCMD_BASE_MOTOR ÔÚ device_manager.h ÖÐÃ»ÓÐÔ¤¶¨Òå£¬ÔÚ´Ë¶¨Òå
 #define CMD_BASE_MOTOR              0x9000
 #define CMD_MOTOR_STOP              (CMD_BASE_MOTOR + 0x01)
 #define CMD_MOTOR_RUN_FWD           (CMD_BASE_MOTOR + 0x02)
 #define CMD_MOTOR_RUN_REV           (CMD_BASE_MOTOR + 0x03)
 #define CMD_MOTOR_SET_SPEED         (CMD_BASE_MOTOR + 0x04)
 #define CMD_MOTOR_EMERGENCY_STOP    (CMD_BASE_MOTOR + 0x05)
-// ï¿½ï¿½ï¿½Óµï¿½ dev_motor.h ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë¶¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
-#define CMD_MOTOR_GET_DESIRED_DIR   (CMD_BASE_MOTOR + 0x06)   // ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+// Ìí¼Óµ½ dev_motor.h ÖÐµÄÃüÁî¶¨ÒåÀ©Õ¹
+#define CMD_MOTOR_GET_DESIRED_DIR   (CMD_BASE_MOTOR + 0x06)   // »ñÈ¡µ±Ç°ÆÚÍû·½Ïò£¨ÖÙ²Ã½á¹û£©
 
 
-// ========== ï¿½ï¿½ï¿½ï¿½è±¸ï¿½ï¿½ï¿½Ãºï¿½? ==========
-// Ä£Ê½ï¿½Ð»ï¿½ï¿½ê£º0=ï¿½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½ï¿½ï¿½ï¿½ï¿½Ô´È«ï¿½Å£ï¿½ï¿½ï¿½1=Ë«ï¿½ï¿½ï¿½Ô£ï¿½Ë«ï¿½ï¿½Ô´ï¿½ï¿½ï¿½Å£ï¿½
+// ========== µç»úÉè±¸ÅäÖÃºê ==========
+// Ä£Ê½ÇÐ»»ºê£º0=µ¥¼«ÐÔ£¨µ¥µçÔ´È«ÇÅ£©£¬1=Ë«¼«ÐÔ£¨Ë«µçÔ´È«ÇÅ£©
 #ifndef MOTOR_MODE_BIPOLAR
 #define MOTOR_MODE_BIPOLAR      0
 #endif
 
-// ï¿½ï¿½ï¿½È¼ï¿½Ä£Ê½ï¿½ï¿½ï¿½Ã£ï¿½1=IOï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½, 0=CANï¿½ï¿½ï¿½È¼ï¿½ï¿½ß£ï¿½
+// ÓÅÏÈ¼¶Ä£Ê½ÅäÖÃ£º1=IOÓÅÏÈ¼¶¸ß, 0=CANÓÅÏÈ¼¶¸ß
 #ifndef MOTOR_PRIORITY_IO_HIGH
 #define MOTOR_PRIORITY_IO_HIGH  1
 #endif
 
-// ï¿½è±¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½Î»ï¿½ï¿½Ï£ï¿½?
+// Éè±¸ÄÜÁ¦ÅäÖÃ£ºÎ»ÑÚÂë
 #ifndef MOTOR_MANUAL_CAPABILITY
-#define MOTOR_MANUAL_CAPABILITY  (CAP_ALLOW | CAP_BLOCK)  // IOï¿½è±¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ï¿½ï¿½Ö¹
+#define MOTOR_MANUAL_CAPABILITY  (CAP_ALLOW | CAP_BLOCK)  // IOÉè±¸¿ÉÒÔÇëÇóÔË¶¯Ò²¿ÉÒÔ½ûÖ¹ÔË¶¯
 #endif
 
 #ifndef MOTOR_CAN_CAPABILITY
-#define MOTOR_CAN_CAPABILITY     (CAP_ALLOW)  // CANï¿½è±¸ï¿½ï¿½ï¿½ï¿½
+#define MOTOR_CAN_CAPABILITY     (CAP_ALLOW)  // CANÉè±¸¿ÉÒÔÇëÇóÔË¶¯
 #endif
 
-// ï¿½è±¸ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½
+// Éè±¸ÄÜÁ¦Î»¶¨Òå
 #define CAP_BLOCK      (1 << 0)
 #define CAP_ALLOW      (1 << 1)
 
-// ========== ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¶ï¿½Ù¶ï¿½ï¿½ï¿½ ==========
-// ï¿½ï¿½ï¿½×´Ì¬ï¿½á¹¹ï¿½å£¨ï¿½ï¿½ï¿½ï¿½? Device_Read Ò»ï¿½ï¿½ï¿½Ô¶ï¿½È¡ï¿½ï¿½
-// ========== ï¿½ï¿½ï¿½×´Ì¬ï¿½á¹¹ï¿½å£¨ï¿½ï¿½ï¿½ï¿½? Device_Read Ò»ï¿½ï¿½ï¿½Ô¶ï¿½È¡ï¿½ï¿½ ==========
-
-
+// ========== ¹«¹²Ã¶¾Ù¶¨Òå ==========
+// µç»ú×´Ì¬½á¹¹Ìå£¨ÓÃÓÚ Device_Read Ò»´ÎÐÔ¶ÁÈ¡£©
 typedef enum {
     DIR_NONE = 0,
     DIR_FWD = 1,
@@ -110,7 +107,7 @@ typedef enum {
     CMD_TYPE_BLOCK_BOTH = 8,
 } CmdType_t;
 
-// ========== ï¿½è±¸IDÃ¶ï¿½ï¿½ ==========
+// ========== Éè±¸IDÃ¶¾Ù ==========
 typedef enum {
     DEV_ID_NONE             = 255,
     DEV_ID_POWER_POS        = 1,
@@ -118,21 +115,21 @@ typedef enum {
     DEV_ID_LIMIT_FWD        = 3,
     DEV_ID_LIMIT_REV        = 4,
     DEV_ID_CAN              = 5,
-    DEV_ID_IO_FWD           = 6,    // ï¿½ï¿½×ªIOï¿½è±¸
-    DEV_ID_IO_REV           = 7,    // ï¿½ï¿½×ªIOï¿½è±¸
+    DEV_ID_IO_FWD           = 6,    // Õý×ªIOÉè±¸
+    DEV_ID_IO_REV           = 7,    // ·´×ªIOÉè±¸
     DEV_ID_EMERGENCY        = 8,
-    DEV_ID_RTURN_FWD        = 9,    // Ô²ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Î»
-    DEV_ID_RTURN_REV        = 10,   // Ô²ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Î»
-    DEV_ID_OVERVOLTAGE_FWD  = 11,   // ï¿½ï¿½Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ª
-    DEV_ID_OVERVOLTAGE_REV  = 12,   // ï¿½ï¿½Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ª
-    DEV_ID_UNDERVOLTAGE_FWD = 13,   // Ç·Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ª
-    DEV_ID_UNDERVOLTAGE_REV = 14,   // Ç·Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ª
-    DEV_ID_OVERCUR_FWD      = 15,   // æ­£è½¬è¿‡æµ(å¼€çª—) - block_fwd
-    DEV_ID_OVERCUR_REV      = 16,   // åè½¬è¿‡æµ(å…³çª—) - block_rev
+    DEV_ID_RTURN_FWD        = 9,    // Ðý×ªÏÞÎ»-Õý×ªÏÞÎ»
+    DEV_ID_RTURN_REV        = 10,   // Ðý×ªÏÞÎ»-·´×ªÏÞÎ»
+    DEV_ID_OVERVOLTAGE_FWD  = 11,   // ¹ýÑ¹-×èÈûÕý×ª
+    DEV_ID_OVERVOLTAGE_REV  = 12,   // ¹ýÑ¹-×èÈû·´×ª
+    DEV_ID_UNDERVOLTAGE_FWD = 13,   // Ç·Ñ¹-×èÈûÕý×ª
+    DEV_ID_UNDERVOLTAGE_REV = 14,   // Ç·Ñ¹-×èÈû·´×ª
+    DEV_ID_OVERCUR_FWD      = 15,   // Õý×ª¹ýÁ÷(¿ª´°) - block_fwd
+    DEV_ID_OVERCUR_REV      = 16,   // ·´×ª¹ýÁ÷(¹Ø´°) - block_rev
     DEV_ID_MAX
 } MotorDeviceId_t;
 
-// ï¿½ï¿½ï¿½È¼ï¿½Ã¶ï¿½ï¿½
+// ÓÅÏÈ¼¶Ã¶¾Ù
 typedef enum {
     PRIO_NONE = 255,
     PRIO_EMERGENCY = 0,
@@ -142,7 +139,7 @@ typedef enum {
     PRIO_POWER = 5
 } MotorPriority_t;
 
-// ========== ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½? ==========
+// ========== ÃüÁî½á¹¹Ìå ==========
 typedef struct {
     MotorDeviceId_t device_id;
     MotorPriority_t priority;
@@ -152,11 +149,11 @@ typedef struct {
 } MotorControlCommand_t;
 
 typedef struct {
-    MotorDir_t desired_dir;     // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½?
-    MotorState_t state;         // ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½IDLE/RAMPING/RUNNINGï¿½ï¿½
-    MotorDir_t active_dir;      // ï¿½ï¿½Ç°ï¿½î¶¯ï¿½ï¿½ï¿½ï¿½
-    float current_duty;         // ï¿½ï¿½Ç°Õ¼ï¿½Õ±ï¿½
-    uint8_t enable;             // ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½×´ï¿½?
+    MotorDir_t desired_dir;     // µ±Ç°ÖÙ²ÃÆ÷µÃ³öµÄÆÚÍû·½Ïò
+    MotorState_t state;         // µç»ú×´Ì¬£ºIDLE/RAMPING/RUNNINGµÈ
+    MotorDir_t active_dir;      // µ±Ç°»î¶¯·½Ïò
+    float current_duty;         // µ±Ç°Õ¼¿Õ±È
+    uint8_t enable;             // µç»úÊ¹ÄÜ×´Ì¬
 } Motor_StateInfo_t;
 
 #define MAX_COMMANDS_PER_DIRECTION 20
@@ -166,7 +163,7 @@ typedef struct {
     uint8_t count;
 } MotorCommandList_t;
 
-// ========== ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½á¹¹ ==========
+// ========== µ÷ÊÔÐÅÏ¢½á¹¹Ìå ==========
 typedef struct {
     struct {
         MotorDeviceId_t device_ids[MAX_COMMANDS_PER_DIRECTION];
@@ -197,9 +194,9 @@ typedef struct {
     bool conflict_fault;
 } MotorDebugInfo_t;
 
-// ========== ï¿½ï¿½ï¿½ï¿½è±¸ï¿½á¹¹ï¿½ï¿½? ==========
+// ========== µç»úÉè±¸½á¹¹Ìå ==========
 typedef struct {
-    // ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    // ÖÙ²Ã¶ÓÁÐ
     MotorCommandList_t block_fwd;
     MotorCommandList_t block_rev;
     MotorCommandList_t allow_fwd;
@@ -209,19 +206,19 @@ typedef struct {
     MotorDeviceId_t active_device_id;
     float current_duty;
 
-    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
+    // µ÷ÊÔÐÅÏ¢
     MotorDebugInfo_t debug_info;
 
-    // ï¿½Ú²ï¿½×´Ì¬
+    // ÄÚ²¿×´Ì¬
     float last_sent_duty;
     uint32_t last_arbitration_time;
 
-    // ï¿½è±¸ï¿½ï¿½ï¿½ï¿½
-    uint8_t motor_id;           // ï¿½ï¿½ï¿½IDï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½?
-    uint8_t enable;             // ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½?
+    // Éè±¸ÊôÐÔ
+    uint8_t motor_id;           // µç»úID£¨ÓÃÓÚ¶àµç»ú³¡¾°£©
+    uint8_t enable;             // µç»úÊ¹ÄÜ
 } MotorDevice_t;
 
-// ========== ï¿½Â¼ï¿½ï¿½ï¿½ï¿½Ý½á¹¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½EventBusï¿½ï¿½ ==========
+// ========== ÊÂ¼þÊý¾Ý½á¹¹£¨ÓÃÓÚEventBus£© ==========
 typedef struct {
     MotorDir_t dir;
     bool is_active;
@@ -245,91 +242,91 @@ typedef struct {
 } MotorCANEvent_t;
 
 typedef struct {
-    uint8_t adc_id;             // ADCï¿½è±¸IDï¿½ï¿½ï¿½Ä¸ï¿½ADCï¿½ï¿½âµ½ï¿½Ä£ï¿½?
-    uint16_t current_ma;        // ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½(mA)
-    uint16_t threshold_ma;      // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ(mA)
-    uint32_t duration_ms;       // ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½(ms)
+    uint8_t adc_id;             // ADCÉè±¸ID£¨ÄÄ¸öADC¼ì²âµ½µÄ£©
+    uint16_t current_ma;        // µ±Ç°µçÁ÷(mA)
+    uint16_t threshold_ma;      // µçÁ÷ãÐÖµ(mA)
+    uint32_t duration_ms;       // ³ÖÐøÊ±¼ä(ms)
 } MotorOvercurrentEvent_t;
 
-// ========== ï¿½ï¿½ï¿½ï¿½Ù²Ã½ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½å£¬ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Ð´ï¿½ï¿½ ==========
+// ========== ÖÙ²Ã»Øµ÷º¯Êý£¨Èõ¶¨Òå£¬ÓÃ»§¿ÉÖØÐ´£© ==========
 /**
- * @brief ï¿½ï¿½ï¿½ï¿½Ù²Ã²ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½Í£Ö¹Ê±ï¿½ï¿½ï¿½ï¿½
- * @param motor ï¿½ï¿½ï¿½ï¿½è±¸Ö¸ï¿½ï¿½?
+ * @brief ÖÙ²Ã¾ö²ßÎªÍ£Ö¹Ê±µ÷ÓÃµÄ»Øµ÷
+ * @param motor µç»úÉè±¸Ö¸Õë
  */
 void Motor_OnArbitrationStop(MotorDevice_t* motor);
 
 /**
- * @brief ï¿½ï¿½ï¿½ï¿½Ù²Ã²ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªÊ±ï¿½ï¿½ï¿½ï¿½
- * @param motor ï¿½ï¿½ï¿½ï¿½è±¸Ö¸ï¿½ï¿½?
- * @param duty ï¿½ï¿½Ç°Õ¼ï¿½Õ±ï¿½
+ * @brief ÖÙ²Ã¾ö²ßÎªÕý×ªÊ±µ÷ÓÃµÄ»Øµ÷
+ * @param motor µç»úÉè±¸Ö¸Õë
+ * @param duty µ±Ç°Õ¼¿Õ±È
  */
 void Motor_OnArbitrationFwd(MotorDevice_t* motor, float duty);
 
 /**
- * @brief ï¿½ï¿½ï¿½ï¿½Ù²Ã²ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×ªÊ±ï¿½ï¿½ï¿½ï¿½
- * @param motor ï¿½ï¿½ï¿½ï¿½è±¸Ö¸ï¿½ï¿½?
- * @param duty ï¿½ï¿½Ç°Õ¼ï¿½Õ±ï¿½
+ * @brief ÖÙ²Ã¾ö²ßÎª·´×ªÊ±µ÷ÓÃµÄ»Øµ÷
+ * @param motor µç»úÉè±¸Ö¸Õë
+ * @param duty µ±Ç°Õ¼¿Õ±È
  */
 void Motor_OnArbitrationRev(MotorDevice_t* motor, float duty);
 
-// ========== ï¿½ï¿½ï¿½ï¿½è±¸ï¿½Ó¿Ú£ï¿½ï¿½ï¿½ï¿½ï¿½DeviceManagerï¿½æ·¶ï¿½ï¿½ ==========
-// ï¿½ï¿½×¼ï¿½è±¸ï¿½ï¿½ï¿½ï¿½
+// ========== µç»úÉè±¸½Ó¿Ú£¨·ûºÏDeviceManager¹æ·¶£© ==========
+// ±ê×¼Éè±¸²Ù×÷
 DeviceResult_t Motor_Init(void* handle);
 DeviceResult_t Motor_Deinit(void* handle);
 DeviceResult_t Motor_Read(void* handle, void* data, uint32_t size);
 DeviceResult_t Motor_Write(void* handle, const void* data, uint32_t size);
 DeviceResult_t Motor_Control(void* handle, DeviceCommandData_t* cmd);
-DeviceResult_t Motor_Update(void* handle);  // ï¿½ï¿½Ê±ï¿½ï¿½Ñ¯
+DeviceResult_t Motor_Update(void* handle);  // ¶¨Ê±ÂÖÑ¯
 
-// ï¿½ï¿½ï¿½ï¿½Ø¶ï¿½ï¿½Ó¿ï¿½?
+// ÌØ¶¨²Ù×÷½Ó¿Ú
 void Motor_SetSpeed(MotorDevice_t* motor, float duty);
 void Motor_Start(MotorDevice_t* motor, MotorDir_t dir);
 void Motor_Stop(MotorDevice_t* motor);
 void Motor_EmergencyStop(MotorDevice_t* motor);
 
-// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í£Ö¹ï¿½Ó¿Ú£ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½? allow Ö¸ï¿½î£¬ï¿½ï¿½ï¿½ï¿½ blockï¿½ï¿½
+// Çå¿ÕÔÊÐí¶ÓÁÐ½Ó¿Ú£¨°´·½ÏòÇå¿Õ allow Ö¸Áî£¬²»Ó°Ïì block£©
 void Motor_ClearAllowFwd(MotorDevice_t* motor);
 void Motor_ClearAllowRev(MotorDevice_t* motor);
 
-// ï¿½ï¿½ï¿½Ô½Ó¿ï¿½
+// µ÷ÊÔ½Ó¿Ú
 const MotorDebugInfo_t* Motor_GetDebugInfo(MotorDevice_t* motor);
 
-// ========== EventBusï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ==========
+// ========== EventBus»Øµ÷º¯ÊýÉùÃ÷ ==========
 void Motor_OnPowerEvent(void* payload);
 void Motor_OnHardLimit(void* payload);
 void Motor_OnManualIO(void* payload);
 void Motor_OnCANEvent(void* payload);
-void Motor_OnSpeedFeedback(void* payload);  // ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ù¶È·ï¿½ï¿½ï¿½?
+void Motor_OnSpeedFeedback(void* payload);  // ËÙ¶È·´À¡£¨Ô¤Áô£©
 void Motor_OnOvercurrent(void* payload);
 void Motor_OnVoltageAlarm(void* payload);
-void Motor_OnCurrentAlarm(void* payload);  // å·²ç¦ç”¨
-void Motor_OnOvercurrentFwd(void* payload);  // æ­£è½¬(å¼€çª—)è¿‡æµ â†’ block_fwd
-void Motor_OnOvercurrentRev(void* payload);  // åè½¬(å…³çª—)è¿‡æµ â†’ block_rev
-void Motor_OnRTurnLimit(void* payload);  // æ—‹è½¬é™ä½
-// ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ÐµÄ·ï¿½ï¿½ï¿½?
+void Motor_OnCurrentAlarm(void* payload);  // ÒÑ½ûÓÃ
+void Motor_OnOvercurrentFwd(void* payload);  // Õý×ª(¿ª´°)¹ýÁ÷ ¡ú block_fwd
+void Motor_OnOvercurrentRev(void* payload);  // ·´×ª(¹Ø´°)¹ýÁ÷ ¡ú block_rev
+void Motor_OnRTurnLimit(void* payload);  // Ðý×ªÏÞÎ»
+// »ñÈ¡µ±Ç°ÖÙ²ÃÆ÷ÆÚÍû·½Ïò£¨¼´µ±Ç°ÕýÔÚÖ´ÐÐµÄ·½Ïò£©
 MotorDir_t Motor_GetDesiredDirection(MotorDevice_t* motor);
 
-// ========== ï¿½ï¿½Ñ¹ï¿½æ¾¯ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½? ==========
+// ========== µçÑ¹±¨¾¯ÊÖ¶¯Çå³ý½Ó¿Ú ==========
 /**
- * @brief ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¹ï¿½æ¾¯ï¿½Úµï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½ block Ö¸ï¿½ï¿½
- * @param motor ï¿½ï¿½ï¿½ï¿½è±¸Ö¸ï¿½ï¿½?
- * @param u8AlarmType ï¿½æ¾¯ï¿½ï¿½ï¿½Í£ï¿½VOLTAGE_ALARM_OVERVOLTAGE ï¿½ï¿½ VOLTAGE_ALARM_UNDERVOLTAGE
- * @note ï¿½ï¿½ï¿½ï¿½ VOLTAGE_CLEAR_MODE == VOLTAGE_CLEAR_MANUAL Ê±Ê¹ï¿½ï¿½
- *       ï¿½ï¿½ App_FaultHandler ï¿½ï¿½ï¿½Õµï¿½ TOPIC_FAULT_CLEAR ï¿½Â¼ï¿½Ê±ï¿½ï¿½ï¿½ï¿½
+ * @brief Çå³ýµçÑ¹±¨¾¯ÔÚÖÙ²ÃÆ÷ÖÐÉèÖÃµÄ block Ö¸Áî
+ * @param motor µç»úÉè±¸Ö¸Õë
+ * @param u8AlarmType ±¨¾¯ÀàÐÍ£ºVOLTAGE_ALARM_OVERVOLTAGE »ò VOLTAGE_ALARM_UNDERVOLTAGE
+ * @note ½öÔÚ VOLTAGE_CLEAR_MODE == VOLTAGE_CLEAR_MANUAL Ê±Ê¹ÓÃ
+ *       ÔÚ App_FaultHandler ÊÕµ½ TOPIC_FAULT_CLEAR ÊÂ¼þÊ±µ÷ÓÃ
  */
 void Motor_ClearVoltageBlock(MotorDevice_t* motor, uint8_t u8AlarmType);
 
-// ========== ï¿½ï¿½ï¿½ï¿½ï¿½æ¾¯ï¿½Ö¶ï¿½ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½? ==========
+// ========== µçÁ÷±¨¾¯ÊÖ¶¯Çå³ý½Ó¿Ú ==========
 /**
- * @brief ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ¾¯ï¿½Úµï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½ block Ö¸ï¿½ï¿½
- * @param motor ï¿½ï¿½ï¿½ï¿½è±¸Ö¸ï¿½ï¿½?
- * @note ï¿½ï¿½ App_FaultHandler ï¿½ï¿½ï¿½Õµï¿½ TOPIC_FAULT_CLEAR ï¿½Â¼ï¿½Ê±ï¿½ï¿½ï¿½ï¿½
- *       ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½?
+ * @brief Çå³ýµçÁ÷±¨¾¯ÔÚÖÙ²ÃÆ÷ÖÐÉèÖÃµÄ block Ö¸Áî
+ * @param motor µç»úÉè±¸Ö¸Õë
+ * @note ÔÚ App_FaultHandler ÊÕµ½ TOPIC_FAULT_CLEAR ÊÂ¼þÊ±µ÷ÓÃ
+ *       Çå³ý¹ýÁ÷¹ÊÕÏºó£¬ÐèÒª½â³ýÖÙ²ÃÆ÷ÖÐµÄË«Ïò×èÈû
  */
 void Motor_ClearOvercurrentBlock(MotorDevice_t* motor);
 
-// ========== Keil Watch ï¿½ï¿½ï¿½ï¿½È«ï¿½Ö±ï¿½ï¿½ï¿½ ==========
-// ï¿½ï¿½ Watch ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ g_pMotorDevWatch ï¿½ï¿½ï¿½É²é¿´ï¿½ï¿½ï¿½ï¿½Ù²ï¿½ï¿½ï¿½ï¿½Ú²ï¿½×´ï¿½?
+// ========== Keil Watch µ÷ÊÔÈ«¾Ö±äÁ¿ ==========
+// ÔÚ Watch ´°¿ÚÖÐ²é¿´ g_pMotorDevWatch ¿É¹Û²ìÖÙ²ÃÆ÷ÄÚ²¿×´Ì¬
 extern MotorDevice_t* volatile g_pMotorDevWatch;
 
 #endif /* DEV_MOTOR_H_ */

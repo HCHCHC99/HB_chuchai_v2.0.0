@@ -15,7 +15,7 @@ typedef struct {
     uint16_t hall_a_pin;        /* GPIO_PIN_xx */
     uint8_t hall_b_port;
     uint16_t hall_b_pin;
-    
+
     /* �ж����� */
     uint32_t eirq_ch_a;         /* EXTINT_CHxx */
     uint32_t eirq_ch_b;
@@ -24,14 +24,13 @@ typedef struct {
     uint32_t irq_src_a;         /* INT_PORT_EIRQx */
     uint32_t irq_src_b;
     uint8_t irq_priority;
-    
+
     /* ���������ת��ת����أ� */
     uint8_t pole_pairs;
     uint8_t hall_count;
     uint16_t custom_pulses_per_rev;
-    
-} motor_hall_config_t;
 
+} motor_hall_config_t;
 
 /* ========== Ĭ������ʾ����ԭ�������? - PA9, PA10�� ========== */
 #define DEFAULT_HALL_A_PORT      GPIO_PORT_A
@@ -49,8 +48,8 @@ typedef struct {
 #define DEFAULT_HALL_IRQ_PRIORITY DDL_IRQ_PRIORITY_02
 
 /* Ĭ�ϵ������? */
-#define DEFAULT_POLE_PAIRS       (3)     
-#define DEFAULT_HALL_COUNT       (2)     
+#define DEFAULT_POLE_PAIRS       (3)
+#define DEFAULT_HALL_COUNT       (2)
 
 /* �Զ�����ÿת�������������� �� ������ �� 2��˫���أ� */
 #define CALC_PULSES_PER_REV(pole_pairs, hall_count) ((pole_pairs) * (hall_count) * 2)

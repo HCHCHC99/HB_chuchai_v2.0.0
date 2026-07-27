@@ -5,35 +5,35 @@ static DeviceNode_t s_device_registry[MAX_DEVICES];
 static DeviceManagerConfig_t s_config;
 static uint8_t s_initialized = 0;
 
-// ÄÚ²¿¸¨Öúº¯Êı
+// å†…éƒ¨è¾…åŠ©å‡½æ•°
 static uint8_t DeviceManager_GetCurrentTaskId(void);
 static bool DeviceManager_IsTimeout(uint64_t start_time, uint32_t timeout_ms);
 static bool DeviceManager_ShouldUpdate(DeviceNode_t* node);
 
-// »ñÈ¡µ±Ç°ÈÎÎñID
+// è·å–å½“å‰ä»»åŠ¡ID
 static uint8_t DeviceManager_GetCurrentTaskId(void) {
-    // ¼òµ¥ÊµÏÖ£º¿É¸ù¾İÊµ¼ÊÇé¿öÀ©Õ¹
-    return 1;  // Ö÷Ñ­»·ÉÏÏÂÎÄ
+    // ç®€å•å®ç°ï¼šå¯æ ¹æ®å®é™…æƒ…å†µæ‰©å±•
+    return 1;  // ä¸»å¾ªç¯ä¸Šä¸‹æ–‡
 }
 
-// ¼ì²éÊÇ·ñ³¬Ê±
+// æ£€æŸ¥æ˜¯å¦è¶…æ—¶
 static bool DeviceManager_IsTimeout(uint64_t start_time, uint32_t timeout_ms) {
     if (timeout_ms == 0) return false;
     uint64_t elapsed = tickTimer_GetCount() - start_time;
     return (elapsed >= timeout_ms);
 }
 
-// ÅĞ¶ÏÉè±¸ÊÇ·ñÓ¦¸Ã±»¸üĞÂ
+// åˆ¤æ–­è®¾å¤‡æ˜¯å¦åº”è¯¥è¢«æ›´æ–°
 static bool DeviceManager_ShouldUpdate(DeviceNode_t* node) {
     if (node == NULL) return false;
-    
-    // 1. ¼ì²éÉè±¸×´Ì¬£ºÖ»ÓĞ¾ÍĞ÷×´Ì¬µÄÉè±¸²ÅÄÜ¸üĞÂ
+
+    // 1. æ£€æŸ¥è®¾å¤‡çŠ¶æ€ï¼šåªæœ‰å°±ç»ªçŠ¶æ€çš„è®¾å¤‡æ‰èƒ½æ›´æ–°
     if (node->state != DEVICE_STATE_READY) return false;
-    
-    // 2. ¼ì²éÊÇ·ñÔÊĞí¸üĞÂ
+
+    // 2. æ£€æŸ¥æ˜¯å¦å…è®¸æ›´æ–°
     if (node->update_allow == 0) return false;
-    
-    // 3. ¼ì²é¸üĞÂ¼ä¸ô£¨Ê±¼äÆ¬£©
+
+    // 3. æ£€æŸ¥æ›´æ–°é—´éš”ï¼ˆæ—¶é—´ç‰‡ï¼‰
     if (node->update_interval == 0) {
         return true;
     } else {
@@ -43,14 +43,14 @@ static bool DeviceManager_ShouldUpdate(DeviceNode_t* node) {
             return true;
         }
     }
-    
+
     return false;
 }
 
-// ³õÊ¼»¯¹ÜÀíÆ÷
+// åˆå§‹åŒ–ç®¡ç†å™¨
 void DeviceManager_Init(const DeviceManagerConfig_t* config) {
     memset(s_device_registry, 0, sizeof(s_device_registry));
-    
+
     if (config != NULL) {
         s_config = *config;
     } else {
@@ -58,22 +58,22 @@ void DeviceManager_Init(const DeviceManagerConfig_t* config) {
         s_config.enable_mutex = 1;
         s_config.auto_subscribe = 1;
     }
-    
+
     s_initialized = 1;
 }
 
-// ×¢²áÉè±¸
+// æ³¨å†Œè®¾å¤‡
 DeviceResult_t DeviceManager_Register(uint8_t id, const char* name, DeviceType_t type, void* priv, DeviceOps_t ops) {
     if (!s_initialized) return RESULT_ERROR;
     if (id >= MAX_DEVICES) return RESULT_PARAM_ERR;
-    
-    __disable_irq();
-    
+
+    // __disable_irq();
+
     if (s_device_registry[id].used) {
-        __enable_irq();
+        // __enable_irq();
         return RESULT_PARAM_ERR;
     }
-    
+
     s_device_registry[id].id = id;
     s_device_registry[id].type = type;
     s_device_registry[id].private_data = priv;
@@ -83,53 +83,53 @@ DeviceResult_t DeviceManager_Register(uint8_t id, const char* name, DeviceType_t
     s_device_registry[id].used = 1;
     s_device_registry[id].mutex_owner = 0;
     s_device_registry[id].mutex_lock_time = 0;
-    
-    // ³õÊ¼»¯µ÷¶ÈÏà¹Ø×Ö¶Î
+
+    // åˆå§‹åŒ–è°ƒåº¦ç›¸å…³å­—æ®µ
     s_device_registry[id].update_interval = 0;
     s_device_registry[id].update_allow = 1;
     s_device_registry[id].last_update_time = tickTimer_GetCount();
-    
-    // ³õÊ¼»¯EventBus¶©ÔÄ¼ÇÂ¼
+
+    // åˆå§‹åŒ–EventBusè®¢é˜…è®°å½•
     memset(s_device_registry[id].subscribed_topics, 0, sizeof(s_device_registry[id].subscribed_topics));
-    
-    __enable_irq();
-    
+
+    // __enable_irq();
+
     return RESULT_OK;
 }
 
-// È¥×¢²áÉè±¸
+// å»æ³¨å†Œè®¾å¤‡
 DeviceResult_t DeviceManager_Unregister(uint8_t id) {
     if (!s_initialized) return RESULT_ERROR;
     if (id >= MAX_DEVICES) return RESULT_PARAM_ERR;
-    
-    __disable_irq();
-    
+
+    // __disable_irq();
+
     if (!s_device_registry[id].used) {
-        __enable_irq();
+        // __enable_irq();
         return RESULT_NOT_FOUND;
     }
-    
+
     DeviceNode_t* node = &s_device_registry[id];
-    
-    // È¡ÏûËùÓĞ¶©ÔÄ
+
+    // å–æ¶ˆæ‰€æœ‰è®¢é˜…
     for (int i = 0; i < TOPIC_MAX; i++) {
         if (node->subscribed_topics[i]) {
-            // ×¢Òâ£ºEventBusµ±Ç°°æ±¾²»Ö§³ÖÈ¡Ïû¶©ÔÄ£¬ÕâÀïÖ»ÊÇÇå¿Õ¼ÇÂ¼
-            // ÈçĞèÍêÕû¹¦ÄÜ£¬ĞèÒªÔÚEventBusÖĞÌí¼ÓÈ¡Ïû¶©ÔÄ½Ó¿Ú
+            // æ³¨æ„ï¼šEventBuså½“å‰ç‰ˆæœ¬ä¸æ”¯æŒå–æ¶ˆè®¢é˜…ï¼Œè¿™é‡Œåªæ˜¯æ¸…ç©ºè®°å½•
+            // å¦‚éœ€å®Œæ•´åŠŸèƒ½ï¼Œéœ€è¦åœ¨EventBusä¸­æ·»åŠ å–æ¶ˆè®¢é˜…æ¥å£
             node->subscribed_topics[i] = 0;
         }
     }
-    
+
     if (node->state != DEVICE_STATE_UNINIT && node->ops.deinit != NULL) {
-        __enable_irq();
+        // __enable_irq();
         node->ops.deinit(node->private_data);
-        __disable_irq();
+        // __disable_irq();
     }
-    
+
     memset(node, 0, sizeof(DeviceNode_t));
-    
-    __enable_irq();
-    
+
+    // __enable_irq();
+
     return RESULT_OK;
 }
 
@@ -137,44 +137,44 @@ DeviceNode_t* DeviceManager_Get(uint8_t id) {
     if (!s_initialized) return NULL;
     if (id >= MAX_DEVICES) return NULL;
     if (!s_device_registry[id].used) return NULL;
-    
-    // MAIN_D("DeviceManager_Get: id=%d, private_data=0x%p\r\n", 
+
+    // MAIN_D("DeviceManager_Get: id=%d, private_data=0x%p\r\n",
     //        id, s_device_registry[id].private_data);
-    
+
     return &s_device_registry[id];
 }
 
-// Ëø¶¨Éè±¸
+// é”å®šè®¾å¤‡
 static DeviceResult_t DeviceManager_Lock(uint8_t id, uint32_t timeout_ms) {
     if (!s_initialized) return RESULT_ERROR;
     if (!s_config.enable_mutex) return RESULT_OK;
-    
+
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return RESULT_NOT_FOUND;
-    
+
     uint8_t current_task = DeviceManager_GetCurrentTaskId();
     uint64_t start_time = tickTimer_GetCount();
-    
+
     while (1) {
-        __disable_irq();
-        
+        // __disable_irq();
+
         if (node->mutex_owner == 0) {
             node->mutex_owner = current_task;
             node->mutex_lock_time = tickTimer_GetCount();
-            __enable_irq();
+            // __enable_irq();
             return RESULT_OK;
         } else if (node->mutex_owner == current_task) {
-            __enable_irq();
+            // __enable_irq();
             return RESULT_OK;
         }
-        
-        __enable_irq();
-        
+
+        // __enable_irq();
+
         if (timeout_ms != 0 && DeviceManager_IsTimeout(start_time, timeout_ms)) {
             return RESULT_TIMEOUT;
         }
-        
-        // ¶ÌÔİÑÓÊ±
+
+        // çŸ­æš‚å»¶æ—¶
         volatile uint32_t delay_cnt = 0;
         for (uint32_t i = 0; i < 100; i++) {
             delay_cnt++;
@@ -182,170 +182,170 @@ static DeviceResult_t DeviceManager_Lock(uint8_t id, uint32_t timeout_ms) {
     }
 }
 
-// ½âËøÉè±¸
+// è§£é”è®¾å¤‡
 static void DeviceManager_Unlock(uint8_t id) {
     if (!s_initialized) return;
     if (!s_config.enable_mutex) return;
-    
+
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return;
-    
+
     uint8_t current_task = DeviceManager_GetCurrentTaskId();
-    
-    __disable_irq();
-    
+
+    // __disable_irq();
+
     if (node->mutex_owner == current_task) {
         node->mutex_owner = 0;
         node->mutex_lock_time = 0;
     }
-    
-    __enable_irq();
+
+    // __enable_irq();
 }
 
-// ========== Éè±¸¸üĞÂµ÷¶È½Ó¿ÚÊµÏÖ ==========
+// ========== è®¾å¤‡æ›´æ–°è°ƒåº¦æ¥å£å®ç° ==========
 
-// ¸üĞÂµ¥¸öÉè±¸
+// æ›´æ–°å•ä¸ªè®¾å¤‡
 DeviceResult_t DeviceManager_Update(uint8_t id) {
     if (!s_initialized) return RESULT_ERROR;
-    
+
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return RESULT_NOT_FOUND;
     if (!node->ops.update) return RESULT_PARAM_ERR;
-    
+
     if (!DeviceManager_ShouldUpdate(node)) {
         return RESULT_OK;
     }
-    
+
     if (DeviceManager_Lock(id, 0) != RESULT_OK) {
         return RESULT_BUSY;
     }
-    
+
     DeviceResult_t res = node->ops.update(node->private_data);
     node->last_update_time = tickTimer_GetCount();
-    
+
     DeviceManager_Unlock(id);
-    
+
     return res;
 }
 
-// ¸üĞÂËùÓĞÉè±¸
+// æ›´æ–°æ‰€æœ‰è®¾å¤‡
 void DeviceManager_UpdateAll(void) {
     if (!s_initialized) return;
-    
+
     for (uint8_t i = 0; i < MAX_DEVICES; i++) {
         if (!s_device_registry[i].used) continue;
         if (!s_device_registry[i].ops.update) continue;
-        
+
         DeviceManager_Update(i);
     }
 }
 
-// ¿ªÆôÉè±¸µÄupdate_allow
+// å¼€å¯è®¾å¤‡çš„update_allow
 void DeviceManager_EnableUpdate(uint8_t id) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return;
-    
-    __disable_irq();
+
+    // __disable_irq();
     node->update_allow = 1;
-    __enable_irq();
+    // __enable_irq();
 }
 
-// ¹Ø±ÕÉè±¸µÄupdate_allow
+// å…³é—­è®¾å¤‡çš„update_allow
 void DeviceManager_DisableUpdate(uint8_t id) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return;
-    
-    __disable_irq();
+
+    // __disable_irq();
     node->update_allow = 0;
-    __enable_irq();
+    // __enable_irq();
 }
 
-// »ñÈ¡Éè±¸µÄupdate_allow×´Ì¬
+// è·å–è®¾å¤‡çš„update_allowçŠ¶æ€
 uint8_t DeviceManager_IsUpdateEnabled(uint8_t id) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return 0;
-    
+
     return node->update_allow;
 }
 
-// ÉèÖÃÉè±¸¸üĞÂ¼ä¸ô
+// è®¾ç½®è®¾å¤‡æ›´æ–°é—´éš”
 void DeviceManager_SetUpdateInterval(uint8_t id, uint16_t interval_ms) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return;
-    
-    __disable_irq();
+
+    // __disable_irq();
     node->update_interval = interval_ms;
     node->last_update_time = tickTimer_GetCount();
-    __enable_irq();
+    // __enable_irq();
 }
 
-// »ñÈ¡Éè±¸¸üĞÂ¼ä¸ô
+// è·å–è®¾å¤‡æ›´æ–°é—´éš”
 uint16_t DeviceManager_GetUpdateInterval(uint8_t id) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return 0;
-    
+
     return node->update_interval;
 }
 
-// ========== EventBus¼¯³É½Ó¿ÚÊµÏÖ ==========
+// ========== EventBusé›†æˆæ¥å£å®ç° ==========
 
-// Éè±¸¶©ÔÄÖ÷Ìâ
+// è®¾å¤‡è®¢é˜…ä¸»é¢˜
 bool DeviceManager_Subscribe(uint8_t id, Topic_t topic, EventCallback callback) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return false;
     if (topic >= TOPIC_MAX || callback == NULL) return false;
-    
-    // ¼ì²éÊÇ·ñÒÑ¾­¶©ÔÄ
+
+    // æ£€æŸ¥æ˜¯å¦å·²ç»è®¢é˜…
     if (node->subscribed_topics[topic]) {
-        return true;  // ÒÑ¾­¶©ÔÄ¹ı
+        return true;  // å·²ç»è®¢é˜…è¿‡
     }
-    
-    // µ÷ÓÃEventBus¶©ÔÄ£¨Ê¹ÓÃÓÅÏÈ¼¶0£©
+
+    // è°ƒç”¨EventBusè®¢é˜…ï¼ˆä½¿ç”¨ä¼˜å…ˆçº§0ï¼‰
     if (EventBus_Subscribe(topic, callback, 0)) {
         node->subscribed_topics[topic] = 1;
         return true;
     }
-    
+
     return false;
 }
 
-// Éè±¸È¡Ïû¶©ÔÄÖ÷Ìâ
+// è®¾å¤‡å–æ¶ˆè®¢é˜…ä¸»é¢˜
 bool DeviceManager_Unsubscribe(uint8_t id, Topic_t topic) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return false;
     if (topic >= TOPIC_MAX) return false;
-    
+
     if (node->subscribed_topics[topic]) {
-        // ×¢Òâ£ºµ±Ç°EventBusÊµÏÖ²»Ö§³ÖÈ¡Ïû¶©ÔÄ
-        // ÕâÀïÖ»Çå¿Õ¼ÇÂ¼£¬Êµ¼ÊEventBusĞèÒªÀ©Õ¹´Ë¹¦ÄÜ
+        // æ³¨æ„ï¼šå½“å‰EventBuså®ç°ä¸æ”¯æŒå–æ¶ˆè®¢é˜…
+        // è¿™é‡Œåªæ¸…ç©ºè®°å½•ï¼Œå®é™…EventBuséœ€è¦æ‰©å±•æ­¤åŠŸèƒ½
         node->subscribed_topics[topic] = 0;
         return true;
     }
-    
+
     return false;
 }
 
-// Éè±¸·¢²¼ÊÂ¼ş£¨Ö÷¶¯Éè±¸Ê¹ÓÃ£©
+// è®¾å¤‡å‘å¸ƒäº‹ä»¶ï¼ˆä¸»åŠ¨è®¾å¤‡ä½¿ç”¨ï¼‰
 void DeviceManager_Publish(uint8_t id, Topic_t topic, void* payload) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return;
     if (topic >= TOPIC_MAX) return;
-    
-    // ·¢²¼µ½EventBus
+
+    // å‘å¸ƒåˆ°EventBus
     EventBus_Publish(topic, payload);
 }
 
-// ÎªÉè±¸ÉèÖÃÄ¬ÈÏµÄÊÂ¼ş»Øµ÷
+// ä¸ºè®¾å¤‡è®¾ç½®é»˜è®¤çš„äº‹ä»¶å›è°ƒ
 void DeviceManager_SetEventCallback(uint8_t id, EventCallback callback) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node) return;
-    
-    // ¿ÉÒÔÎªÌØ¶¨Éè±¸ÀàĞÍ×Ô¶¯¶©ÔÄÏà¹ØÖ÷Ìâ
-    // ÀıÈç£ºµç»úÉè±¸¶©ÔÄËÙ¶È·´À¡Ö÷Ìâ
-    // ÕâÀïÖ»ÊÇÊ¾Àı£¬¾ßÌå¶©ÔÄÓÉÓÃ»§¾ö¶¨
+
+    // å¯ä»¥ä¸ºç‰¹å®šè®¾å¤‡ç±»å‹è‡ªåŠ¨è®¢é˜…ç›¸å…³ä¸»é¢˜
+    // ä¾‹å¦‚ï¼šç”µæœºè®¾å¤‡è®¢é˜…é€Ÿåº¦åé¦ˆä¸»é¢˜
+    // è¿™é‡Œåªæ˜¯ç¤ºä¾‹ï¼Œå…·ä½“è®¢é˜…ç”±ç”¨æˆ·å†³å®š
 }
 
-// ÆôÓÃËùÓĞÉè±¸µÄ¸üĞÂ
+// å¯ç”¨æ‰€æœ‰è®¾å¤‡çš„æ›´æ–°
 void DeviceManager_EnableAllUpdate(void) {
     for (uint8_t i = 0; i < MAX_DEVICES; i++) {
         if (s_device_registry[i].used) {
@@ -354,7 +354,7 @@ void DeviceManager_EnableAllUpdate(void) {
     }
 }
 
-// ½ûÓÃËùÓĞÉè±¸µÄ¸üĞÂ
+// ç¦ç”¨æ‰€æœ‰è®¾å¤‡çš„æ›´æ–°
 void DeviceManager_DisableAllUpdate(void) {
     for (uint8_t i = 0; i < MAX_DEVICES; i++) {
         if (s_device_registry[i].used) {
@@ -363,10 +363,10 @@ void DeviceManager_DisableAllUpdate(void) {
     }
 }
 
-// ÖØÖÃËùÓĞÉè±¸µÄ¸üĞÂ¼ÆÊ±Æ÷
+// é‡ç½®æ‰€æœ‰è®¾å¤‡çš„æ›´æ–°è®¡æ—¶å™¨
 void DeviceManager_ResetAllUpdateTimers(void) {
     uint64_t current_time = tickTimer_GetCount();
-    
+
     for (uint8_t i = 0; i < MAX_DEVICES; i++) {
         if (s_device_registry[i].used) {
             s_device_registry[i].last_update_time = current_time;
@@ -374,10 +374,10 @@ void DeviceManager_ResetAllUpdateTimers(void) {
     }
 }
 
-// °´ÀàĞÍ²éÕÒÉè±¸
+// æŒ‰ç±»å‹æŸ¥æ‰¾è®¾å¤‡
 DeviceNode_t* DeviceManager_FindByType(DeviceType_t type) {
     if (!s_initialized) return NULL;
-    
+
     for (uint8_t i = 0; i < MAX_DEVICES; i++) {
         if (s_device_registry[i].used && s_device_registry[i].type == type) {
             return &s_device_registry[i];
@@ -386,12 +386,12 @@ DeviceNode_t* DeviceManager_FindByType(DeviceType_t type) {
     return NULL;
 }
 
-// °´Ãû³Æ²éÕÒÉè±¸
+// æŒ‰åç§°æŸ¥æ‰¾è®¾å¤‡
 DeviceNode_t* DeviceManager_FindByName(const char* name) {
     if (!s_initialized || name == NULL) return NULL;
-    
+
     for (uint8_t i = 0; i < MAX_DEVICES; i++) {
-        if (s_device_registry[i].used && 
+        if (s_device_registry[i].used &&
             strcmp(s_device_registry[i].name, name) == 0) {
             return &s_device_registry[i];
         }
@@ -399,91 +399,91 @@ DeviceNode_t* DeviceManager_FindByName(const char* name) {
     return NULL;
 }
 
-// ========== Ó¦ÓÃ²ãÍ³Ò»½Ó¿Ú ==========
+// ========== åº”ç”¨å±‚ç»Ÿä¸€æ¥å£ ==========
 
 DeviceResult_t Device_Init(uint8_t id) {
     DeviceResult_t res;
-    
+
     if (DeviceManager_Lock(id, s_config.operation_timeout_ms) != RESULT_OK) {
         return RESULT_BUSY;
     }
-    
+
     res = Device_Init_NoLock(id);
-    
+
     DeviceManager_Unlock(id);
     return res;
 }
 
 DeviceResult_t Device_Deinit(uint8_t id) {
     DeviceResult_t res;
-    
+
     if (DeviceManager_Lock(id, s_config.operation_timeout_ms) != RESULT_OK) {
         return RESULT_BUSY;
     }
-    
+
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node || !node->ops.deinit) {
         DeviceManager_Unlock(id);
         return RESULT_PARAM_ERR;
     }
-    
+
     res = node->ops.deinit(node->private_data);
     if (res == RESULT_OK) {
         node->state = DEVICE_STATE_DEINIT;
     }
-    
+
     DeviceManager_Unlock(id);
     return res;
 }
 
 DeviceResult_t Device_Read(uint8_t id, void* data, uint32_t size) {
     DeviceResult_t res;
-    
+
     if (data == NULL && size > 0) return RESULT_PARAM_ERR;
     if (DeviceManager_Lock(id, s_config.operation_timeout_ms) != RESULT_OK) {
         return RESULT_BUSY;
     }
-    
+
     res = Device_Read_NoLock(id, data, size);
-    
+
     DeviceManager_Unlock(id);
     return res;
 }
 
 DeviceResult_t Device_Write(uint8_t id, const void* data, uint32_t size) {
     DeviceResult_t res;
-    
+
     if (data == NULL && size > 0) return RESULT_PARAM_ERR;
     if (DeviceManager_Lock(id, s_config.operation_timeout_ms) != RESULT_OK) {
         return RESULT_BUSY;
     }
-    
+
     res = Device_Write_NoLock(id, data, size);
-    
+
     DeviceManager_Unlock(id);
     return res;
 }
 
 DeviceResult_t Device_Control(uint8_t id, DeviceCommandData_t* cmd) {
     DeviceResult_t res;
-    
+
     if (cmd == NULL) return RESULT_PARAM_ERR;
     if (DeviceManager_Lock(id, s_config.operation_timeout_ms) != RESULT_OK) {
         return RESULT_BUSY;
     }
-    
+
     res = Device_Control_NoLock(id, cmd);
-    
+
     DeviceManager_Unlock(id);
     return res;
 }
 
-// ========== Ó¦ÓÃ²ãÍ³Ò»½Ó¿Ú£¨ÎŞËø°æ±¾£© ==========
+// ========== åº”ç”¨å±‚ç»Ÿä¸€æ¥å£ï¼ˆæ— é”ç‰ˆæœ¬ï¼‰ ==========
 
 DeviceResult_t Device_Init_NoLock(uint8_t id) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node || !node->ops.init) return RESULT_PARAM_ERR;
-    
+
     DeviceResult_t res = node->ops.init(node->private_data);
     node->state = (res == RESULT_OK) ? DEVICE_STATE_READY : DEVICE_STATE_ERROR;
     return res;
@@ -492,29 +492,29 @@ DeviceResult_t Device_Init_NoLock(uint8_t id) {
 DeviceResult_t Device_Read_NoLock(uint8_t id, void* data, uint32_t size) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node || !node->ops.read) return RESULT_PARAM_ERR;
-    
+
     if (node->state == DEVICE_STATE_UNINIT) return RESULT_ERROR;
     if (node->state == DEVICE_STATE_ERROR) return RESULT_ERROR;
-    
+
     return node->ops.read(node->private_data, data, size);
 }
 
 DeviceResult_t Device_Write_NoLock(uint8_t id, const void* data, uint32_t size) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node || !node->ops.write) return RESULT_PARAM_ERR;
-    
+
     if (node->state == DEVICE_STATE_UNINIT) return RESULT_ERROR;
     if (node->state == DEVICE_STATE_ERROR) return RESULT_ERROR;
-    
+
     return node->ops.write(node->private_data, data, size);
 }
 
 DeviceResult_t Device_Control_NoLock(uint8_t id, DeviceCommandData_t* cmd) {
     DeviceNode_t* node = DeviceManager_Get(id);
     if (!node || !node->ops.control) return RESULT_PARAM_ERR;
-    
+
     if (node->state == DEVICE_STATE_UNINIT) return RESULT_ERROR;
     if (node->state == DEVICE_STATE_ERROR) return RESULT_ERROR;
-    
+
     return node->ops.control(node->private_data, cmd);
 }

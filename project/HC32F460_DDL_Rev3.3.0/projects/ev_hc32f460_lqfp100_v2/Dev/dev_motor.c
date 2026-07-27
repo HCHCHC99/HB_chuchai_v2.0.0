@@ -1,47 +1,47 @@
 #include "dev_motor.h"
 #include "App_Params.h"
-#include "dev_pwm.h"          // PWM�豸��
-#include "dev_voltage.h"      // ��ѹ�澯�¼�����
-#include "dev_sensor.h"       // �����澯�¼�����
+#include "dev_pwm.h"          // PWM设备头文�?
+#include "dev_voltage.h"      // 电压报警事件头文�?
+#include "dev_sensor.h"       // 电流报警事件头文�?
 #include "device_manager.h"
 #include "TickTimer.h"
 #include <string.h>
 #include "rtt_log.h"
-#include "dev_rturn.h"          // �������У����� RTurn_LimitEvent_t
-#include "Template_Pwm.h"       // PWM���ã�TMRA_4, PB6/PB7��
-#include "hc32_ll_tmra.h"      // TMRA�Ĵ�������
+#include "dev_rturn.h"          // 旋转限位，包�? RTurn_LimitEvent_t
+#include "Template_Pwm.h"       // PWM配置：TMRA_4, PB6/PB7�?
+#include "hc32_ll_tmra.h"      // TMRA寄存器操作头文件
 
 #if MOTOR_CONTROL_MODE == 1
-#include "Pwm.h"                // PWM ��������
+#include "Pwm.h"                // PWM 斜坡控制头文�?
 
-/* PWM ȫ��ʵ������ main.c �ж��壩*/
+/* PWM 全局实例（在 main.c 中定义）*/
 extern pwm_t g_motor_pwm_ch1;   // PB6
 extern pwm_t g_motor_pwm_ch2;   // PB7
 extern pwm_t g_motor_pwm_ch3;   // PB8
 extern pwm_t g_motor_pwm_ch4;   // PB9
 
-/* PWM ģʽ��̬״̬���� */
+/* PWM 模式静态状态变�? */
 static MotorDir_t s_eLastArbitrationDir = DIR_NONE;
 static uint16_t s_u16LastTargetDuty = 0;
-static bool s_bPolaritySwitchPending = false;   /* ������0�����м��� */
-static uint16_t s_u16PendingTargetDuty = 0;      /* ��������Ŀ��ռ�ձ� */
-static uint8_t s_u8PendingDirection = 0;          /* �������ķ���: 1=FWD 2=REV */
+static bool s_bPolaritySwitchPending = false;   /* 极性切换等待中标志 */
+static uint16_t s_u16PendingTargetDuty = 0;      /* 等待切换的最终目标占空比 */
+static uint8_t s_u8PendingDirection = 0;          /* 等待切换的方�?: 1=FWD 2=REV */
 
-/* ������/��ͣʱ�䣨���룩*/
+/* 缓起/缓停时间（毫秒）*/
 #define MOTOR_RAMP_TIME_MS      800
 
-/* ռ�ձ����ƣ�2%-98%��*/
+/* 占空比限制：2%-98% */
 #define MOTOR_DUTY_MIN          2
 #define MOTOR_DUTY_MAX          98
 
-/* ռ�ձ��޷� */
+/* 占空比限幅函�? */
 static uint16_t Motor_LimitDuty(uint16_t duty) {
     if (duty < MOTOR_DUTY_MIN) return MOTOR_DUTY_MIN;
     if (duty > MOTOR_DUTY_MAX) return MOTOR_DUTY_MAX;
     return duty;
 }
 
-/* ֹͣ��PB6~PB9 ȫ 98% ����Ч */
+/* 停止：PB6~PB9 �? 98% 低有�? */
 static void Motor_SetStopDuty(void) {
     stc_tmra_pwm_init_t stcPwmInit;
     (void)TMRA_PWM_StructInit(&stcPwmInit);
@@ -64,7 +64,7 @@ static void Motor_SetStopDuty(void) {
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH4, ENABLE);
 }
 
-/* ���м��ԣ�ȫ����Ϊ����Ч */
+/* 运行极性：全部改为低有�? */
 static void Motor_SetRunPolarity(void) {
     stc_tmra_pwm_init_t stcPwmInit;
     (void)TMRA_PWM_StructInit(&stcPwmInit);
@@ -84,7 +84,7 @@ static void Motor_SetRunPolarity(void) {
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH4, ENABLE);
 }
 
-/* ֱ������4ͨ��ռ�ձȣ�����̬��ȫ����Ч��*/
+/* 直接设置4通道占空比，运行态全部低有效 */
 static void Motor_SetRunDutyDirect(uint16_t ch1, uint16_t ch2, uint16_t ch3, uint16_t ch4) {
     uint32_t u32Period = TMRA_GetPeriodValue(CM_TMRA_4);
     TMRA_SetCompareValue(CM_TMRA_4, TMRA_CH1, (u32Period * ch1) / 100U);
@@ -93,7 +93,7 @@ static void Motor_SetRunDutyDirect(uint16_t ch1, uint16_t ch2, uint16_t ch3, uin
     TMRA_SetCompareValue(CM_TMRA_4, TMRA_CH4, (u32Period * ch4) / 100U);
 }
 
-/* ������-��ת��CH1/2 ��ռ�ձȣ�CH3/4 ��ռ�ձ� */
+/* 斜坡-正转：CH1/2 低占空比，CH3/4 高占空比 */
 static void Motor_RampForward(uint16_t target_duty) {
     uint16_t limited_duty = Motor_LimitDuty(target_duty);
     uint16_t duty_low = limited_duty;
@@ -101,7 +101,7 @@ static void Motor_RampForward(uint16_t target_duty) {
     uint16_t current_duty_ch1 = PWM_GetDuty(&g_motor_pwm_ch1);
 
     if (current_duty_ch1 != 0) {
-        /* �Ȼ�����0��������������ɺ���?? Motor_Update �м����ٻ��� */
+        /* 先归零，在等待完成后�? Motor_Update 中继续斜�? */
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch1, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch2, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch3, 100 - current_duty_ch1, 0, 50);
@@ -112,7 +112,7 @@ static void Motor_RampForward(uint16_t target_duty) {
         return;
     }
 
-    /* ��ǰ��Ϊ0%��ֱ���м��Ի��� */
+    /* 当前�?0%，直接进行极性切�? */
     Motor_SetRunPolarity();
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch1, 0, duty_low, MOTOR_RAMP_TIME_MS);
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch2, 0, duty_low, MOTOR_RAMP_TIME_MS);
@@ -120,7 +120,7 @@ static void Motor_RampForward(uint16_t target_duty) {
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch4, 0, duty_high, MOTOR_RAMP_TIME_MS);
 }
 
-/* ������-��ת��CH1/2 ��ռ�ձȣ�CH3/4 ��ռ�ձ� */
+/* 斜坡-反转：CH1/2 高占空比，CH3/4 低占空比 */
 static void Motor_RampReverse(uint16_t target_duty) {
     uint16_t limited_duty = Motor_LimitDuty(target_duty);
     uint16_t duty_low = 100 - limited_duty;
@@ -128,7 +128,7 @@ static void Motor_RampReverse(uint16_t target_duty) {
     uint16_t current_duty_ch1 = PWM_GetDuty(&g_motor_pwm_ch1);
 
     if (current_duty_ch1 != 0) {
-        /* �Ȼ�����0��������������ɺ���?? Motor_Update �м����ٻ��� */
+        /* 先归零，在等待完成后�? Motor_Update 中继续斜�? */
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch1, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch2, current_duty_ch1, 0, 50);
         PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch3, 100 - current_duty_ch1, 0, 50);
@@ -139,7 +139,7 @@ static void Motor_RampReverse(uint16_t target_duty) {
         return;
     }
 
-    /* ��ǰ��Ϊ0%��ֱ���м��Ի��� */
+    /* 当前�?0%，直接进行极性切�? */
     Motor_SetRunPolarity();
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch1, 0, duty_low, MOTOR_RAMP_TIME_MS);
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch2, 0, duty_low, MOTOR_RAMP_TIME_MS);
@@ -147,7 +147,7 @@ static void Motor_RampReverse(uint16_t target_duty) {
     PWM_StartRamp_TargetFromStart(&g_motor_pwm_ch4, 0, duty_high, MOTOR_RAMP_TIME_MS);
 }
 
-/* ������ת���޻�������*/
+/* 立即正转（无斜坡�?*/
 static void Motor_RunForwardImmediate(uint16_t duty) {
     uint16_t limited_duty = Motor_LimitDuty(duty);
     uint16_t duty_low = limited_duty;
@@ -160,7 +160,7 @@ static void Motor_RunForwardImmediate(uint16_t duty) {
     PWM_SetDuty(&g_motor_pwm_ch4, duty_high);
 }
 
-/* ������ת���޻�������*/
+/* 立即反转（无斜坡�?*/
 static void Motor_RunReverseImmediate(uint16_t duty) {
     uint16_t limited_duty = Motor_LimitDuty(duty);
     uint16_t duty_low = 100 - limited_duty;
@@ -174,40 +174,39 @@ static void Motor_RunReverseImmediate(uint16_t duty) {
 }
 #endif /* MOTOR_CONTROL_MODE == 1 */
 
-
-// ���ļ���ͷ������ include ֮������
-// ��ӡ�������??
+// 本文件头文件 include 之后的内�?
+// 打印相关变量
 volatile int motor_state = 0;
 static uint32_t s_u32LastMotorPrintTime = 0;
 #define MOTOR_PRINT_INTERVAL_MS   500
 
-// ========== Keil Watch ����ȫ�ֱ��� ==========
-// ����ٲò���Ա��� - �� Watch ����������Щ��������ʵʱ�鿴����ٲ�״�?
-MotorDevice_t* volatile g_pMotor_Dev_Watch = NULL;      // ����豸ָ�루��չ���鿴���г�Ա��??
-MotorDebugInfo_t volatile g_stcMotorDebug = {0};     // ������Ϣ�������ṹ����ʽ��
-// Ϊ�˷���鿴���ٵ���һЩ�����ı���??
-volatile uint8_t  g_u8MotorDebug_BlockFwdCount = 0;   // ��ת������������
-volatile uint8_t  g_u8MotorDebug_BlockRevCount = 0;   // ��ת������������
-volatile uint8_t  g_u8MotorDebug_AllowFwdCount = 0;   // ��ת������������
-volatile uint8_t  g_u8MotorDebug_AllowRevCount = 0;   // ��ת������������
-volatile uint8_t  g_u8MotorDebug_ActiveDeviceId = 0;  // ��ǰ��豸ID
-volatile uint8_t  g_u8MotorDebug_ActiveDir = 0;       // ��ǰ�����(0=ֹͣ,1=��ת,2=��ת)
-volatile uint8_t  g_u8MotorDebug_State = 0;           // ���״�?(0=IDLE,1=RAMPING,2=RUNNING)
-volatile float    g_fMotorDebug_CurrentDuty = 0.0f;   // ��ǰռ�ձ�
-volatile uint8_t  g_u8MotorDebug_ConflictFault = 0;   // ��ͻ���ϱ�־
+// ========== Keil Watch 调试全局变量 ==========
+// 仲裁器内部变�? - �? Watch 窗口中可查看这些变量实时观察仲裁状�?
+MotorDevice_t* volatile g_pMotor_Dev_Watch = NULL;      // 电机设备指针（展开可查看所有成员）
+MotorDebugInfo_t volatile g_stcMotorDebug = {0};     // 调试信息（完整结构体形式�?
+// 为了方便查看，再添加一些单独的变量
+volatile uint8_t  g_u8MotorDebug_BlockFwdCount = 0;   // 正转阻塞队列数量
+volatile uint8_t  g_u8MotorDebug_BlockRevCount = 0;   // 反转阻塞队列数量
+volatile uint8_t  g_u8MotorDebug_AllowFwdCount = 0;   // 正转允许队列数量
+volatile uint8_t  g_u8MotorDebug_AllowRevCount = 0;   // 反转允许队列数量
+volatile uint8_t  g_u8MotorDebug_ActiveDeviceId = 0;  // 当前活动设备ID
+volatile uint8_t  g_u8MotorDebug_ActiveDir = 0;       // 当前活动方向(0=停止,1=正转,2=反转)
+volatile uint8_t  g_u8MotorDebug_State = 0;           // 电机状�?(0=IDLE,1=RAMPING,2=RUNNING)
+volatile float    g_fMotorDebug_CurrentDuty = 0.0f;   // 当前占空�?
+volatile uint8_t  g_u8MotorDebug_ConflictFault = 0;   // 冲突故障标志
 
-// ========== �豸ID���� ==========
-#define DEV_PWM_MOTOR_ID    1   // ���PWM�豸ID
-#define DEV_MOTOR_ID        0   // ����豸ID���� App_Motor_Project.h �е� ID_MOTOR ����һ�£�
+// ========== 设备ID定义 ==========
+#define DEV_PWM_MOTOR_ID    1   // 电机PWM设备ID
+#define DEV_MOTOR_ID        0   // 电机设备ID，与 App_Motor_Project.h 中的 ID_MOTOR 保持一�?
 
-// ========== �豸������ ==========
+// ========== 设备基因�? ==========
 typedef struct {
     MotorDeviceId_t id;
     MotorPriority_t priority;
     uint32_t capability;
 } MotorDeviceGene_t;
 
-// �������ȼ�ģʽ��̬�������ȼ�ֵ
+// 根据优先级模式动态设置优先级�?
 #if MOTOR_PRIORITY_IO_HIGH
     #define MANUAL_PRIORITY  3
     #define CAN_PRIORITY     4
@@ -216,7 +215,7 @@ typedef struct {
     #define CAN_PRIORITY     3
 #endif
 
-// �豸�����??
+// 设备基因�?
 static const MotorDeviceGene_t c_device_genes[] = {
 #if MOTOR_MODE_BIPOLAR
     { DEV_ID_POWER_POS,  PRIO_POWER,     CAP_ALLOW },
@@ -230,23 +229,23 @@ static const MotorDeviceGene_t c_device_genes[] = {
     { DEV_ID_OVERVOLTAGE_REV,   PRIO_LIMIT,     CAP_BLOCK },
     { DEV_ID_UNDERVOLTAGE_FWD,  PRIO_LIMIT,     CAP_BLOCK },
     { DEV_ID_UNDERVOLTAGE_REV,  PRIO_LIMIT,     CAP_BLOCK },
-	{ DEV_ID_OVERCUR_FWD,       PRIO_LIMIT,     CAP_BLOCK },
-	{ DEV_ID_OVERCUR_REV,       PRIO_LIMIT,     CAP_BLOCK },
+    { DEV_ID_OVERCUR_FWD,       PRIO_LIMIT,     CAP_BLOCK },
+    { DEV_ID_OVERCUR_REV,       PRIO_LIMIT,     CAP_BLOCK },
     // { DEV_ID_CAN,        (MotorPriority_t)CAN_PRIORITY,   MOTOR_CAN_CAPABILITY },
     { DEV_ID_IO_FWD,     (MotorPriority_t)MANUAL_PRIORITY, MOTOR_MANUAL_CAPABILITY },
     { DEV_ID_IO_REV,     (MotorPriority_t)MANUAL_PRIORITY, MOTOR_MANUAL_CAPABILITY },
     // { DEV_ID_EMERGENCY,  PRIO_EMERGENCY, CAP_BLOCK }
 };
 
-// ========== ����ٲý���ص������������壬�û�����д�� ==========
-// ʹ�� Template_Pwm.h �� APP_FUNC_FOUR_CH_LOW_PWM ģʽ�����ã�
+// ========== 仲裁回调函数（弱定义，用户可重写�?==========
+// 使用 Template_Pwm.h �? APP_FUNC_FOUR_CH_LOW_PWM 模式配置�?
 //   TMRA_UNIT = CM_TMRA_4, CH1=PB6, CH2=PB7, CH3=PB8, CH4=PB9
-// ��ת��PB6=20%, PB7=20%, PB8=80%, PB9=80%��ȫ������Ч��
-// ��ת��PB6=80%, PB7=80%, PB8=20%, PB9=20%��ȫ������Ч��
-// ֹͣ��PB6=50%(����Ч), PB7=50%(����Ч), PB8=50%(����Ч), PB9=50%(����Ч)
+// 正转：PB6=20%, PB7=20%, PB8=80%, PB9=80%（全部低有效�?
+// 反转：PB6=80%, PB7=80%, PB8=20%, PB9=20%（全部低有效�?
+// 停止：PB6=50%(低有�?), PB7=50%(低有�?), PB8=50%(低有�?), PB9=50%(低有�?)
 
-#if 0  // Disabled: superseded by Motor_SetRunDutyDirect/Motor_SetStopDuty/Motor_SetRunPolarity in PWM block above
-// �ڲ����������� TMRA_4 ��ͨ��ռ�ձȣ�ȫ������Ч��
+#if 0  // 已禁用：被上面PWM模块中的 Motor_SetRunDutyDirect/Motor_SetStopDuty/Motor_SetRunPolarity 替代
+// 内部函数：设�? TMRA_4 四通道占空比，全部低有�?
 static void Motor_SetPwmDuty(uint32_t u32Ch1Pct, uint32_t u32Ch2Pct, uint32_t u32Ch3Pct, uint32_t u32Ch4Pct) {
     uint32_t u32Period = TMRA_GetPeriodValue(CM_TMRA_4);
     TMRA_SetCompareValue(CM_TMRA_4, TMRA_CH1, (u32Period * u32Ch1Pct) / 100U);  // PB6
@@ -256,15 +255,15 @@ static void Motor_SetPwmDuty(uint32_t u32Ch1Pct, uint32_t u32Ch2Pct, uint32_t u3
 }
 #endif
 
-#if 0  // Disabled: superseded by Motor_SetRunDutyDirect/Motor_SetStopDuty/Motor_SetRunPolarity in PWM block above
-// �ڲ�������ֹͣʱ�������⼫�ԣ�PB6/PB8����Ч��PB7/PB9����Ч��
+#if 0  // 已禁用：被上面PWM模块中的 Motor_SetRunDutyDirect/Motor_SetStopDuty/Motor_SetRunPolarity 替代
+// 内部函数：停止时的互补极性，PB6/PB8低有效，PB7/PB9高有�?
 static void Motor_SetStopPolarity(void) {
     stc_tmra_pwm_init_t stcPwmInit;
     (void)TMRA_PWM_StructInit(&stcPwmInit);
     uint32_t u32Period = TMRA_GetPeriodValue(CM_TMRA_4);
     uint32_t u32Compare = (u32Period * 50U) / 100U;
 
-    /* CH1(PB6) - ����Ч��50% */
+    /* CH1(PB6) - 低有效，50% */
     stcPwmInit.u32CompareValue        = u32Compare;
     stcPwmInit.u16StartPolarity       = TMRA_PWM_LOW;
     stcPwmInit.u16StopPolarity        = TMRA_PWM_LOW;
@@ -273,7 +272,7 @@ static void Motor_SetStopPolarity(void) {
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH1, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH1, ENABLE);
 
-    /* CH2(PB7) - ����Ч��50% */
+    /* CH2(PB7) - 高有效，50% */
     stcPwmInit.u32CompareValue        = u32Compare;
     stcPwmInit.u16StartPolarity       = TMRA_PWM_HIGH;
     stcPwmInit.u16StopPolarity        = TMRA_PWM_HIGH;
@@ -282,7 +281,7 @@ static void Motor_SetStopPolarity(void) {
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH2, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH2, ENABLE);
 
-    /* CH3(PB8) - ����Ч��50% */
+    /* CH3(PB8) - 低有效，50% */
     stcPwmInit.u32CompareValue        = u32Compare;
     stcPwmInit.u16StartPolarity       = TMRA_PWM_LOW;
     stcPwmInit.u16StopPolarity        = TMRA_PWM_LOW;
@@ -291,7 +290,7 @@ static void Motor_SetStopPolarity(void) {
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH3, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH3, ENABLE);
 
-    /* CH4(PB9) - ����Ч��50% */
+    /* CH4(PB9) - 高有效，50% */
     stcPwmInit.u32CompareValue        = u32Compare;
     stcPwmInit.u16StartPolarity       = TMRA_PWM_HIGH;
     stcPwmInit.u16StopPolarity        = TMRA_PWM_HIGH;
@@ -302,13 +301,13 @@ static void Motor_SetStopPolarity(void) {
 }
 #endif
 
-#if 0  // Disabled: superseded by Motor_SetRunDutyDirect/Motor_SetStopDuty/Motor_SetRunPolarity in PWM block above
-// �ڲ���������������ʱ�ĵ���Ч���ԣ�ȫ������Ч��
+#if 0  // 已禁用：被上面PWM模块中的 Motor_SetRunDutyDirect/Motor_SetStopDuty/Motor_SetRunPolarity 替代
+// 内部函数：运行时的低有效极性，全部低有�?
 static void Motor_SetRunPolarity(void) {
     stc_tmra_pwm_init_t stcPwmInit;
     (void)TMRA_PWM_StructInit(&stcPwmInit);
 
-    /* CH1(PB6) - ����Ч */
+    /* CH1(PB6) - 低有�? */
     stcPwmInit.u16StartPolarity       = TMRA_PWM_HIGH;
     stcPwmInit.u16StopPolarity        = TMRA_PWM_HIGH;
     stcPwmInit.u16CompareMatchPolarity = TMRA_PWM_LOW;
@@ -316,15 +315,15 @@ static void Motor_SetRunPolarity(void) {
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH1, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH1, ENABLE);
 
-    /* CH2(PB7) - ����Ч */
+    /* CH2(PB7) - 低有�? */
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH2, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH2, ENABLE);
 
-    /* CH3(PB8) - ����Ч */
+    /* CH3(PB8) - 低有�? */
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH3, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH3, ENABLE);
 
-    /* CH4(PB9) - ����Ч */
+    /* CH4(PB9) - 低有�? */
     (void)TMRA_PWM_Init(CM_TMRA_4, TMRA_CH4, &stcPwmInit);
     TMRA_PWM_OutputCmd(CM_TMRA_4, TMRA_CH4, ENABLE);
 }
@@ -333,14 +332,14 @@ static void Motor_SetRunPolarity(void) {
 __weak void Motor_OnArbitrationStop(MotorDevice_t* motor) {
     (void)motor;
 #if MOTOR_CONTROL_MODE == 0
-    // === GPIO ģʽ ===
+    // === GPIO 模式 ===
     GPIO_SET(PHU_PORT, PHU_PIN);
     GPIO_SET(PHV_PORT, PHV_PIN);
 
     motor_state = 0;
 
 #elif MOTOR_CONTROL_MODE == 1
-    // === PWM ģʽ����ͣ����������ֹͣ���� ===
+    // === PWM 模式：停止时切换到停止极�? ===
     Motor_SetStopDuty();
 
     s_bPolaritySwitchPending = false;
@@ -351,33 +350,32 @@ __weak void Motor_OnArbitrationStop(MotorDevice_t* motor) {
 #endif
 }
 
-
 __weak void Motor_OnArbitrationFwd(MotorDevice_t* motor, float duty) {
     (void)motor;
 #if MOTOR_CONTROL_MODE == 0
-    // === GPIO ģʽ ===
+    // === GPIO 模式 ===
     (void)duty;
-
-if (g_AppParam.motor_dir != 0) {
+    // tickTimer_DelayMs(100);
+    if (g_AppParam.motor_dir != 0) {
         GPIO_SET(PHV_PORT, PHV_PIN);
         GPIO_RESET(PHU_PORT, PHU_PIN);
-} else {
+    } else {
         GPIO_SET(PHU_PORT, PHU_PIN);
         GPIO_RESET(PHV_PORT, PHV_PIN);
-}
+    }
 
     motor_state = 1;
 
 #elif MOTOR_CONTROL_MODE == 1
-    // === PWM ģʽ ===
+    // === PWM 模式 ===
     uint16_t duty_percent = (uint16_t)(duty);
 
     if (s_eLastArbitrationDir != DIR_FWD || s_u16LastTargetDuty != duty_percent) {
-if (g_AppParam.motor_dir != 0) {
-        Motor_RampReverse(duty_percent);
-} else {
-        Motor_RampForward(duty_percent);
-}
+        if (g_AppParam.motor_dir != 0) {
+            Motor_RampReverse(duty_percent);
+        } else {
+            Motor_RampForward(duty_percent);
+        }
         s_eLastArbitrationDir = DIR_FWD;
         s_u16LastTargetDuty = duty_percent;
     }
@@ -385,33 +383,32 @@ if (g_AppParam.motor_dir != 0) {
 #endif
 }
 
-
 __weak void Motor_OnArbitrationRev(MotorDevice_t* motor, float duty) {
     (void)motor;
 #if MOTOR_CONTROL_MODE == 0
-    // === GPIO ģʽ ===
+    // === GPIO 模式 ===
     (void)duty;
-
-if (g_AppParam.motor_dir != 0) {
+    // tickTimer_DelayMs(100);
+    if (g_AppParam.motor_dir != 0) {
         GPIO_SET(PHU_PORT, PHU_PIN);
         GPIO_RESET(PHV_PORT, PHV_PIN);
-} else {
+    } else {
         GPIO_SET(PHV_PORT, PHV_PIN);
         GPIO_RESET(PHU_PORT, PHU_PIN);
-}
+    }
 
     motor_state = 2;
 
 #elif MOTOR_CONTROL_MODE == 1
-    // === PWM ģʽ ===
+    // === PWM 模式 ===
     uint16_t duty_percent = (uint16_t)(duty);
 
     if (s_eLastArbitrationDir != DIR_REV || s_u16LastTargetDuty != duty_percent) {
-if (g_AppParam.motor_dir != 0) {
-        Motor_RampForward(duty_percent);
-} else {
-        Motor_RampReverse(duty_percent);
-}
+        if (g_AppParam.motor_dir != 0) {
+            Motor_RampForward(duty_percent);
+        } else {
+            Motor_RampReverse(duty_percent);
+        }
         s_eLastArbitrationDir = DIR_REV;
         s_u16LastTargetDuty = duty_percent;
     }
@@ -419,8 +416,7 @@ if (g_AppParam.motor_dir != 0) {
 #endif
 }
 
-
-// ========== �ڲ��������� ==========
+// ========== 内部函数声明 ==========
 static const MotorDeviceGene_t* Motor_GetGene(MotorDeviceId_t id);
 static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id);
 static void Motor_CmdList_SetAllow(MotorCommandList_t* q, MotorCommandList_t* block_q, MotorControlCommand_t cmd);
@@ -428,7 +424,7 @@ static void Motor_CmdList_SetBlock(MotorCommandList_t* q, MotorControlCommand_t 
 static void Motor_ArbitrationDecision(MotorDevice_t* motor);
 static void Motor_UpdateDebugInfo(MotorDevice_t* motor);
 
-// ========== �ڲ�����ʵ�� ==========
+// ========== 内部函数实现 ==========
 
 static const MotorDeviceGene_t* Motor_GetGene(MotorDeviceId_t id) {
     for(int i = 0; i < sizeof(c_device_genes)/sizeof(MotorDeviceGene_t); i++) {
@@ -439,18 +435,18 @@ static const MotorDeviceGene_t* Motor_GetGene(MotorDeviceId_t id) {
 
 static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id) {
     if (id == DEV_ID_RTURN_FWD || id == DEV_ID_RTURN_REV) {
-        MAIN_D("[REMOVE_DEBUG] Trying to remove id=%d from queue at 0x%p, current count=%d\r\n", 
+        MAIN_D("[REMOVE_DEBUG] Trying to remove id=%d from queue at 0x%p, current count=%d\r\n",
                id, q, q->count);
-        // ��ӡ����ջ��ǰλ��
-    }    
+        // 打印当前队列位置
+    }
     for (int i = 0; i < q->count; i++) {
         if (q->commands[i].device_id == id) {
-            MAIN_D("[REMOVE_DEBUG] FOUND and REMOVED id=%d from queue at 0x%p\r\n", id, q);            
+            MAIN_D("[REMOVE_DEBUG] FOUND and REMOVED id=%d from queue at 0x%p\r\n", id, q);
             for (int j = i; j < q->count - 1; j++) {
                 q->commands[j] = q->commands[j + 1];
             }
             q->count--;
-            // ��ձ��Ƴ���λ��??
+            // 清空被移除的位置
             if (q->count < MAX_COMMANDS_PER_DIRECTION) {
                 q->commands[q->count].device_id = DEV_ID_NONE;
                 q->commands[q->count].priority = PRIO_NONE;
@@ -458,7 +454,7 @@ static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id) {
                 q->commands[q->count].param = 0.0f;
                 q->commands[q->count].timestamp = 0;
             }
-            // ʵʱ���� Keil Watch ��������
+            // 实时更新 Keil Watch 调试变量
             if (q == &g_pMotor_Dev_Watch->block_fwd) {
                 g_u8MotorDebug_BlockFwdCount = q->count;
             } else if (q == &g_pMotor_Dev_Watch->block_rev) {
@@ -493,8 +489,8 @@ static void Motor_CmdList_SetAllow(MotorCommandList_t* q, MotorCommandList_t* bl
 
     q->commands[idx] = cmd;
     q->count++;
-    
-    // ʵʱ���� Keil Watch ��������
+
+    // 实时更新 Keil Watch 调试变量
     if (g_pMotor_Dev_Watch != NULL) {
         if (q == &g_pMotor_Dev_Watch->allow_fwd) {
             g_u8MotorDebug_AllowFwdCount = q->count;
@@ -510,8 +506,8 @@ static void Motor_CmdList_SetBlock(MotorCommandList_t* q, MotorControlCommand_t 
     }
     if (q->count >= MAX_COMMANDS_PER_DIRECTION) return;
     q->commands[q->count++] = cmd;
-    
-    // ʵʱ���� Keil Watch ��������
+
+    // 实时更新 Keil Watch 调试变量
     if (g_pMotor_Dev_Watch != NULL) {
         if (q == &g_pMotor_Dev_Watch->block_fwd) {
             g_u8MotorDebug_BlockFwdCount = q->count;
@@ -524,7 +520,7 @@ static void Motor_CmdList_SetBlock(MotorCommandList_t* q, MotorControlCommand_t 
 static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
     MotorDebugInfo_t* d = &motor->debug_info;
 
-    // ͬ��block_fwd����
+    // 同步block_fwd队列
     d->block_fwd.count = motor->block_fwd.count;
     for(int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         if (i < d->block_fwd.count) {
@@ -534,7 +530,7 @@ static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
         }
     }
 
-    // ͬ��block_rev����
+    // 同步block_rev队列
     d->block_rev.count = motor->block_rev.count;
     for(int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         if (i < d->block_rev.count) {
@@ -544,7 +540,7 @@ static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
         }
     }
 
-    // ͬ��allow_fwd����
+    // 同步allow_fwd队列
     d->allow_fwd.count = motor->allow_fwd.count;
     for(int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         if (i < d->allow_fwd.count) {
@@ -556,7 +552,7 @@ static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
         }
     }
 
-    // ͬ��allow_rev����
+    // 同步allow_rev队列
     d->allow_rev.count = motor->allow_rev.count;
     for(int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         if (i < d->allow_rev.count) {
@@ -573,11 +569,11 @@ static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
     d->active_device_id = motor->active_device_id;
     d->current_duty = motor->last_sent_duty;
     d->conflict_fault = motor->debug_info.conflict_fault;
-    
-    // ========== ͬ����ȫ�ֵ��Ա������� Keil Watch �鿴�� ==========
+
+    // ========== 同步到全局变量以便 Keil Watch 查看 ==========
     memcpy((void*)&g_stcMotorDebug, &motor->debug_info, sizeof(MotorDebugInfo_t));
-    
-    // ͬ������������
+
+    // 同步各个单独变量
     g_u8MotorDebug_BlockFwdCount = motor->block_fwd.count;
     g_u8MotorDebug_BlockRevCount = motor->block_rev.count;
     g_u8MotorDebug_AllowFwdCount = motor->allow_fwd.count;
@@ -592,7 +588,7 @@ static void Motor_UpdateDebugInfo(MotorDevice_t* motor) {
 static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
     if (!motor->enable) return;
 
-    // 1. ָ���ѡѡ��??
+    // 1. 选出候选命�?
     MotorControlCommand_t* fwd_cmd = NULL;
     MotorControlCommand_t* rev_cmd = NULL;
 
@@ -604,7 +600,7 @@ static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
         rev_cmd = &motor->allow_rev.commands[0];
     }
 
-    // 2. ��ͻ�ж�
+    // 2. 冲突判断
     MotorControlCommand_t* final = NULL;
     motor->debug_info.conflict_fault = false;
 
@@ -623,41 +619,41 @@ static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
         final = fwd_cmd ? fwd_cmd : rev_cmd;
     }
 
-    // 3. ִ�о��� - ���Դ�ӡ
+    // 3. 执行决策 - 带调试打�?
     if (final) {
         MOTOR_DEBUG("Arbitration: Selected %s (prio=%d), dir=%s, duty=%.1f%%\r\n",
                     (final->device_id == DEV_ID_IO_FWD) ? "IO_FWD" :
                     (final->device_id == DEV_ID_IO_REV) ? "IO_REV" :
                     (final->device_id == DEV_ID_RTURN_FWD) ? "RTURN_FWD" :
                     (final->device_id == DEV_ID_RTURN_REV) ? "RTURN_REV" :
-					(final->device_id == DEV_ID_OVERCUR_FWD) ? "OVERCUR_FWD" :
+                    (final->device_id == DEV_ID_OVERCUR_FWD) ? "OVERCUR_FWD" :
                     (final->device_id == DEV_ID_CAN) ? "CAN" :
                     (final->device_id == DEV_ID_POWER_POS) ? "POWER_POS" :
                     (final->device_id == DEV_ID_POWER_NEG) ? "POWER_NEG" : "UNKNOWN",
                     final->priority,
                     (final->type == CMD_TYPE_RUN_FWD || final->type == CMD_TYPE_RAMP_FWD) ? "FWD" : "REV",
                     final->param);
-        
+
         motor->active_device_id = final->device_id;
         motor->active_dir = (final->type == CMD_TYPE_RUN_FWD || final->type == CMD_TYPE_RAMP_FWD) ? DIR_FWD : DIR_REV;
         motor->last_sent_duty = final->param;
         motor->state = (final->type == CMD_TYPE_RAMP_FWD || final->type == CMD_TYPE_RAMP_REV) ? MS_RAMPING : MS_RUNNING;
 
-        // �����ٲý���ص�??
+        // 调用仲裁回调
         if (motor->active_dir == DIR_FWD) {
             Motor_OnArbitrationFwd(motor, motor->last_sent_duty);
         } else {
             Motor_OnArbitrationRev(motor, motor->last_sent_duty);
         }
 
-        // ����PWM�豸����
+        // 更新PWM设备
         DeviceCommandData_t cmd_data;
         PWM_RampCmd_t ramp_cmd;
 
         if (final->type == CMD_TYPE_RAMP_FWD || final->type == CMD_TYPE_RAMP_REV) {
             cmd_data.cmd = CMD_PWM_SET_DUTY_SLOW;
             ramp_cmd.targetDuty = (uint16_t)(final->param);
-            ramp_cmd.rampTimeMs = 2000;  // 2�뻺����
+            ramp_cmd.rampTimeMs = 2000;  // 2秒缓�?
             cmd_data.params = &ramp_cmd;
             cmd_data.param_size = sizeof(PWM_RampCmd_t);
         } else {
@@ -668,16 +664,16 @@ static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
         Device_Control(DEV_PWM_MOTOR_ID, &cmd_data);
     } else {
         MOTOR_DEBUG("Arbitration: No command selected - STOP\r\n");
-        
+
         motor->last_sent_duty = 0.0f;
         motor->state = MS_IDLE;
         motor->active_dir = DIR_NONE;
         motor->active_device_id = DEV_ID_NONE;
 
-        // �����ٲ�ֹͣ�ص�
+        // 调用仲裁停止回调
         Motor_OnArbitrationStop(motor);
 
-        // ֹͣPWM
+        // 停止PWM
         DeviceCommandData_t cmd_data;
         cmd_data.cmd = CMD_PWM_STOP;
         cmd_data.params = NULL;
@@ -687,14 +683,14 @@ static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
     Motor_UpdateDebugInfo(motor);
 }
 
-// ========== EventBus�ص����� ==========
+// ========== EventBus回调函数 ==========
 
 void Motor_OnOvercurrent(void* payload) {
     MotorOvercurrentEvent_t* ev = (MotorOvercurrentEvent_t*)payload;
     MAIN_D("Motor: Overcurrent event! ADC=%d, Current=%d mA, Threshold=%d mA, Duration=%lu ms\r\n",
            ev->adc_id, ev->current_ma, ev->threshold_ma, ev->duration_ms);
 
-    // ִ�н���ֹͣ
+    // 执行紧急停�?
     DeviceNode_t* node = DeviceManager_Get(DEV_MOTOR_ID);
     if (node && node->private_data) {
         MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
@@ -703,7 +699,7 @@ void Motor_OnOvercurrent(void* payload) {
     }
 }
 
-// ========== ��ѹ�澯�ص� ==========
+// ========== 电压报警回调 ==========
 void Motor_OnVoltageAlarm(void* payload) {
     Voltage_AlarmEvent_t* ev = (Voltage_AlarmEvent_t*)payload;
 
@@ -713,8 +709,8 @@ void Motor_OnVoltageAlarm(void* payload) {
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
     if (ev->u8IsActive) {
-        // �澯���� - ���ݸ澯����ʹ�ö�Ӧ���豸ID�� block_fwd/block_rev ��������ָ��
-        // ʹ�� PRIO_LIMIT ���ȼ�������λ����ͬ����ȷ�������豸�޷�����
+        // 报警触发 - 根据报警类型使用对应的设备ID�? block_fwd/block_rev 插入阻塞指令
+        // 使用 PRIO_LIMIT 优先级，与限位相同，确保其他设备无法绕过
         MotorDeviceId_t dev_id_fwd, dev_id_rev;
         const char* alarm_name;
 
@@ -747,7 +743,7 @@ void Motor_OnVoltageAlarm(void* payload) {
         MAIN_D("Motor: %s alarm! Bus=%lu mV, Threshold=%lu mV - Block both directions!\r\n",
                alarm_name, ev->u32BusVoltageMv, ev->u32ThresholdMv);
     } else {
-        // �澯���?? - ���ݸ澯����ʹ�ö�Ӧ���豸ID�� block_fwd/block_rev �Ƴ�����ָ��
+        // 报警解除 - 根据报警类型使用对应的设备ID�? block_fwd/block_rev 移除阻塞指令
         MotorDeviceId_t dev_id_fwd, dev_id_rev;
         const char* alarm_name;
 
@@ -780,7 +776,7 @@ void Motor_OnRTurnLimit(void* payload) {
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
     if (ev->u8IsActive) {
-        // ��λ���������� BLOCK ָ�ʹ�� RTurn ר���豸ID��
+        // 限位触发：插�? BLOCK 指令（使�? RTurn 专用设备ID�?
         MotorControlCommand_t cmd = {
             .device_id = (ev->u8Direction == RTURN_LIMIT_FORWARD) ? DEV_ID_RTURN_FWD : DEV_ID_RTURN_REV,
             .priority = PRIO_LIMIT,
@@ -790,18 +786,18 @@ void Motor_OnRTurnLimit(void* payload) {
         if (ev->u8Direction == RTURN_LIMIT_FORWARD) {
             cmd.type = CMD_TYPE_BLOCK_FWD;
             Motor_CmdList_SetBlock(&motor->block_fwd, cmd);
-            // ͬʱ���?? allow_fwd��ȷ����ʹ block ���Ƴ������Ҳ���������ת
+            // 同时清空 allow_fwd，确保即�? block 被移除也不会立即恢复正转
             Motor_ClearAllowFwd(motor);
             MAIN_D("Motor: RTurn forward limit triggered, block forward + clear allow_fwd\r\n");
         } else {
             cmd.type = CMD_TYPE_BLOCK_REV;
             Motor_CmdList_SetBlock(&motor->block_rev, cmd);
-            // ͬʱ���?? allow_rev��ȷ����ʹ block ���Ƴ������Ҳ���������ת
+            // 同时清空 allow_rev，确保即�? block 被移除也不会立即恢复反转
             Motor_ClearAllowRev(motor);
             MAIN_D("Motor: RTurn reverse limit triggered, block reverse + clear allow_rev\r\n");
         }
     } else {
-        // ��λ������Ƴ�?? BLOCK ָ�ʹ�� RTurn ר���豸ID��
+        // 限位解除：移�? BLOCK 指令（使�? RTurn 专用设备ID�?
         MotorDeviceId_t id = (ev->u8Direction == RTURN_LIMIT_FORWARD) ? DEV_ID_RTURN_FWD : DEV_ID_RTURN_REV;
         if (ev->u8Direction == RTURN_LIMIT_FORWARD) {
             Motor_CmdList_Remove(&motor->block_fwd, id);
@@ -810,7 +806,7 @@ void Motor_OnRTurnLimit(void* payload) {
             Motor_CmdList_Remove(&motor->block_rev, id);
             MAIN_D("Motor: RTurn reverse limit released\r\n");
         } else {
-            // ����Ϊ0ʱ������������?
+            // 方向�?0时，移除两个方向
             Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_RTURN_FWD);
             Motor_CmdList_Remove(&motor->block_rev, DEV_ID_RTURN_REV);
         }
@@ -819,7 +815,7 @@ void Motor_OnRTurnLimit(void* payload) {
     Motor_ArbitrationDecision(motor);
 }
 
-// ========== �����澯�ص� ==========
+// ========== 电流报警回调 ==========
 void Motor_OnCurrentAlarm(void* payload) {
     Current_AlarmEvent_t* ev = (Current_AlarmEvent_t*)payload;
 
@@ -829,13 +825,13 @@ void Motor_OnCurrentAlarm(void* payload) {
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
     if (ev->u8IsActive) {
-        /* �жϵ�ǰ������򣺽���תʱ�������������?
-         * ��ת��ת����Ԥ�ڹ������緧�Źرյ�λ������������ת */
+        /* 判断当前期望方向：正转时过流可能异常，反转时过流可能是到位堵�? */
+        /* 正转/反转都有预期工况，如阀门关闭到位时反转堵转 */
         MotorDir_t eDesiredDir = Motor_GetDesiredDirection(motor);
-        
+
         if (eDesiredDir == DIR_FWD)
         {
-            // ��תʱ���� �� �� block_fwd ���� DEV_ID_OVERCUR_FWD ����ָ��
+            // 正转时过�? -> �? block_fwd 插入 DEV_ID_OVERCUR_FWD 阻塞指令
             MotorControlCommand_t block_fwd_cmd = {
                 .device_id = DEV_ID_OVERCUR_FWD,
                 .priority = PRIO_LIMIT,
@@ -849,12 +845,12 @@ void Motor_OnCurrentAlarm(void* payload) {
         }
         else
         {
-            // ��ת��ֹͣʱ���� �� ��������ת����ת��ת����Ԥ�ڹ�����
+            // 反转或停止时过流 -> 不阻塞，这是预期的到位堵�?
             MAIN_D("Motor: OVERCURRENT alarm (dir=%d, REV/STOP is normal stall)! Current=%ld mA, Threshold=%ld mA - Skip block forward\r\n",
                    (int)eDesiredDir, (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
         }
     } else {
-        // �����澯���?? - �� block_fwd �Ƴ� DEV_ID_OVERCUR_FWD
+        // 电流报警解除 - �? block_fwd 移除 DEV_ID_OVERCUR_FWD
         Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_OVERCUR_FWD);
 
         MAIN_D("Motor: OVERCURRENT released! Current=%ld mA - Unblock forward\r\n",
@@ -864,8 +860,7 @@ void Motor_OnCurrentAlarm(void* payload) {
     Motor_ArbitrationDecision(motor);
 }
 
-
-// ========== 正转(开�??)过流回调 ==========
+// ========== 正转(开�?)过流回调 ==========
 void Motor_OnOvercurrentFwd(void* payload) {
     Current_AlarmEvent_t* ev = (Current_AlarmEvent_t*)payload;
     if (!ev) return;
@@ -892,7 +887,6 @@ void Motor_OnOvercurrentFwd(void* payload) {
 
     Motor_ArbitrationDecision(motor);
 }
-
 
 // ========== 反转(关窗)过流回调 ==========
 void Motor_OnOvercurrentRev(void* payload) {
@@ -921,7 +915,6 @@ void Motor_OnOvercurrentRev(void* payload) {
 
     Motor_ArbitrationDecision(motor);
 }
-
 
 void Motor_OnHardLimit(void* payload) {
     MotorLimitEvent_t* ev = (MotorLimitEvent_t*)payload;
@@ -966,8 +959,8 @@ void Motor_OnPowerEvent(void* payload) {
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
 #if MOTOR_MODE_BIPOLAR
-    // ========== ˫����ģʽ ==========
-    // ��Դ�豸�ṩ ALLOW ���Ƶ��ת�򣬲�����?? BLOCK
+    // ========== 双极性模�? ==========
+    // 电源设备提供 ALLOW 控制电机转向，不涉及 BLOCK
     MotorDeviceId_t id = (ev->power_id == 0) ? DEV_ID_POWER_POS : DEV_ID_POWER_NEG;
     const MotorDeviceGene_t* gene = Motor_GetGene(id);
     if (!gene) return;
@@ -999,9 +992,9 @@ void Motor_OnPowerEvent(void* payload) {
         }
     }
 #else
-    // ========== ������ģʽ ==========
-    // ������ģʽ�µ�Դ�豸�������ٲã������κβ���
-    // �����豸�����ֶ�IO���ṩĳת���ALLOW����ת
+    // ========== 单极性模�? ==========
+    // 单极性模式下电源设备不参与仲裁，不产生任何操�?
+    // 由其他设备（如手动IO）提供某方向的ALLOW正转
     MAIN_D("[MOTOR] Unipolar mode: power_id=%d, is_on=%d - power device not involved in arbitration\r\n",
            ev->power_id, ev->is_on);
 #endif
@@ -1011,18 +1004,18 @@ void Motor_OnPowerEvent(void* payload) {
 
 void Motor_OnManualIO(void* payload) {
     MotorManualIOEvent_t* ev = (MotorManualIOEvent_t*)payload;
-    
-    // �ȼ���¼����ݵ���Ч��??
+
+    // 先检查接收数据是否有�?
     if (ev == NULL) {
         MAIN_D("[MOTOR] OnManualIO: NULL payload!\r\n");
         return;
     }
-    
-    // ��ӡԭʼ�¼����ݣ�ʹ��ʮ�����ƴ�ӡ��������
+
+    // 打印原始事件数据，使用十六进制打印便于分�?
     uint32_t speed_raw = *(uint32_t*)&ev->speed;
-    MAIN_D("[MOTOR] OnManualIO RAW: dir=%d, type=%d, speed_raw=0x%08X\r\n", 
+    MAIN_D("[MOTOR] OnManualIO RAW: dir=%d, type=%d, speed_raw=0x%08X\r\n",
            ev->dir, ev->type, speed_raw);
-    
+
     DeviceNode_t* node = DeviceManager_Get(DEV_MOTOR_ID);
     if (!node || !node->private_data) {
         MAIN_D("[MOTOR] OnManualIO: Device not found!\r\n");
@@ -1031,9 +1024,9 @@ void Motor_OnManualIO(void* payload) {
 
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
-    // ���ݷ���ȷ�����ĸ�IO�豸 - �����ʼ��Ĭ��ֵ��??
-    MotorDeviceId_t io_dev_id = DEV_ID_NONE;  // ��ʼ��Ϊ NONE
-    
+    // 根据方向确定是哪个IO设备 - 避免使用默认�?
+    MotorDeviceId_t io_dev_id = DEV_ID_NONE;  // 初始化为 NONE
+
     if (ev->dir == DIR_FWD) {
         io_dev_id = DEV_ID_IO_FWD;
     } else if (ev->dir == DIR_REV) {
@@ -1041,7 +1034,7 @@ void Motor_OnManualIO(void* payload) {
     } else if (ev->dir == DIR_NONE) {
         io_dev_id = DEV_ID_NONE;
     } else {
-        // ��Ч�� dir ֵ
+        // 无效�? dir �?
         MAIN_D("[MOTOR] OnManualIO: Invalid dir=%d, expected 0,1,2\r\n", ev->dir);
         return;
     }
@@ -1054,23 +1047,23 @@ void Motor_OnManualIO(void* payload) {
             return;
         }
     }
-    
-    // ��ӡ������Ϣ - ������ת��Ϊ����
+
+    // 打印关键信息 - 将浮点数转换为整数打�?
     int32_t speed_int = (int32_t)(ev->speed * 10);
     MAIN_D("[MOTOR] OnManualIO: dir=%d, type=%d, speed=%ld.%ld%%, io_dev_id=%d\r\n",
            ev->dir, ev->type, (long)(speed_int / 10), (long)(speed_int % 10), io_dev_id);
     MAIN_D("[MOTOR] OnManualIO: Before - allow_fwd.count=%d, allow_rev.count=%d, block_fwd.count=%d, block_rev.count=%d\r\n",
            motor->allow_fwd.count, motor->allow_rev.count, motor->block_fwd.count, motor->block_rev.count);
 
-    // ��������ָ��
+    // 处理具体指令
     if (ev->type == CMD_TYPE_RUN_FWD || ev->type == CMD_TYPE_RAMP_FWD) {
-        // ���?? io_dev_id �Ƿ���ȷ
+        // 检�? io_dev_id 是否正确
         if (io_dev_id != DEV_ID_IO_FWD) {
             MAIN_D("[MOTOR] ERROR: RUN_FWD but io_dev_id=%d (expected %d)\r\n", io_dev_id, DEV_ID_IO_FWD);
             return;
         }
-        
-        // IO_FWD���£��Ƴ��Լ���BLOCK�������Լ���ALLOW
+
+        // IO_FWD运行：移除自己的BLOCK，添加自己的ALLOW
         MotorControlCommand_t cmd = {
             .device_id = io_dev_id,
             .priority = gene->priority,
@@ -1081,17 +1074,17 @@ void Motor_OnManualIO(void* payload) {
 
         Motor_CmdList_Remove(&motor->block_fwd, io_dev_id);
         Motor_CmdList_SetAllow(&motor->allow_fwd, &motor->block_fwd, cmd);
-        
+
         MAIN_D("[MOTOR] IO_FWD: RUN, removed block_fwd, added allow_fwd\r\n");
     }
     else if (ev->type == CMD_TYPE_RUN_REV || ev->type == CMD_TYPE_RAMP_REV) {
-        // ���?? io_dev_id �Ƿ���ȷ
+        // 检�? io_dev_id 是否正确
         if (io_dev_id != DEV_ID_IO_REV) {
             MAIN_D("[MOTOR] ERROR: RUN_REV but io_dev_id=%d (expected %d)\r\n", io_dev_id, DEV_ID_IO_REV);
             return;
         }
-        
-        // IO_REV���£��Ƴ��Լ���BLOCK�������Լ���ALLOW
+
+        // IO_REV运行：移除自己的BLOCK，添加自己的ALLOW
         MotorControlCommand_t cmd = {
             .device_id = io_dev_id,
             .priority = gene->priority,
@@ -1102,12 +1095,12 @@ void Motor_OnManualIO(void* payload) {
 
         Motor_CmdList_Remove(&motor->block_rev, io_dev_id);
         Motor_CmdList_SetAllow(&motor->allow_rev, &motor->block_rev, cmd);
-        
+
         MAIN_D("[MOTOR] IO_REV: RUN, removed block_rev, added allow_rev\r\n");
     }
     else if (ev->type == CMD_TYPE_STOP) {
         if (ev->dir == DIR_FWD) {
-            // IO_FWDֹͣ���Ƴ��Լ���ALLOW�������Լ���BLOCK
+            // IO_FWD停止：移除自己的ALLOW，添加自己的BLOCK
             if (gene == NULL) {
                 gene = Motor_GetGene(DEV_ID_IO_FWD);
                 if (!gene) {
@@ -1115,9 +1108,9 @@ void Motor_OnManualIO(void* payload) {
                     return;
                 }
             }
-            
+
             Motor_CmdList_Remove(&motor->allow_fwd, DEV_ID_IO_FWD);
-            
+
             MotorControlCommand_t block_cmd = {
                 .device_id = DEV_ID_IO_FWD,
                 .priority = gene->priority,
@@ -1125,11 +1118,11 @@ void Motor_OnManualIO(void* payload) {
                 .timestamp = tickTimer_GetCount()
             };
             // Motor_CmdList_SetBlock(&motor->block_fwd, block_cmd);
-            
+
             MAIN_D("[MOTOR] IO_FWD: STOP, removed allow_fwd, added block_fwd\r\n");
         }
         else if (ev->dir == DIR_REV) {
-            // IO_REVֹͣ���Ƴ��Լ���ALLOW�������Լ���BLOCK
+            // IO_REV停止：移除自己的ALLOW，添加自己的BLOCK
             if (gene == NULL) {
                 gene = Motor_GetGene(DEV_ID_IO_REV);
                 if (!gene) {
@@ -1137,9 +1130,9 @@ void Motor_OnManualIO(void* payload) {
                     return;
                 }
             }
-            
+
             Motor_CmdList_Remove(&motor->allow_rev, DEV_ID_IO_REV);
-            
+
             MotorControlCommand_t block_cmd = {
                 .device_id = DEV_ID_IO_REV,
                 .priority = gene->priority,
@@ -1147,17 +1140,17 @@ void Motor_OnManualIO(void* payload) {
                 .timestamp = tickTimer_GetCount()
             };
             // Motor_CmdList_SetBlock(&motor->block_rev, block_cmd);
-            
+
             MAIN_D("[MOTOR] IO_REV: STOP, removed allow_rev, added block_rev\r\n");
         }
         else {
-            // ֹͣ����IO�豸���Ƴ����Ե�ALLOW�����Ӹ��Ե�BLOCK
+            // 停止所有IO设备：移除各自的ALLOW，添加各自的BLOCK
             const MotorDeviceGene_t* gene_fwd = Motor_GetGene(DEV_ID_IO_FWD);
             const MotorDeviceGene_t* gene_rev = Motor_GetGene(DEV_ID_IO_REV);
-            
+
             Motor_CmdList_Remove(&motor->allow_fwd, DEV_ID_IO_FWD);
             Motor_CmdList_Remove(&motor->allow_rev, DEV_ID_IO_REV);
-            
+
             if (gene_fwd) {
                 MotorControlCommand_t block_fwd_cmd = {
                     .device_id = DEV_ID_IO_FWD,
@@ -1167,7 +1160,7 @@ void Motor_OnManualIO(void* payload) {
                 };
                 // Motor_CmdList_SetBlock(&motor->block_fwd, block_fwd_cmd);
             }
-            
+
             if (gene_rev) {
                 MotorControlCommand_t block_rev_cmd = {
                     .device_id = DEV_ID_IO_REV,
@@ -1177,7 +1170,7 @@ void Motor_OnManualIO(void* payload) {
                 };
                 // Motor_CmdList_SetBlock(&motor->block_rev, block_rev_cmd);
             }
-            
+
             MAIN_D("[MOTOR] All IO: STOP, removed all allow, added all block\r\n");
         }
     }
@@ -1190,12 +1183,12 @@ void Motor_OnManualIO(void* payload) {
 }
 
 void Motor_OnCANEvent(void* payload) {
-    // CAN�¼���������ʱ�����ӿڣ�δʵ�֣�
+    // CAN事件处理预留接口（未实现�?
     // MotorCANEvent_t* ev = (MotorCANEvent_t*)payload;
-    (void)payload;  // ����δʹ�þ���
+    (void)payload;  // 避免未使用警�?
 }
 
-// ========== �������������ת�ٷ����ص�?? ==========
+// ========== 速度反馈回调（预留） ==========
 void Motor_OnSpeedFeedback(void* payload) {
     int32_t* speed_rpm = (int32_t*)payload;
 
@@ -1204,17 +1197,17 @@ void Motor_OnSpeedFeedback(void* payload) {
 
     MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
 
-    // ��ѡ������ת�ٽ��бջ�����
-    // ���磺����Ŀ��ת�ٵ���ռ�ձ�
+    // 可选择使用当前转速进行闭环控�?
+    // 例如：根据目标转速调整占空比
     if (motor->state == MS_RUNNING || motor->state == MS_RAMPING) {
-        // ����������ʵ�� PID ����
-        // Ŀǰֻ�ǽ���ת�����ݣ������Ի������չʹ��??
-        (void)motor;      // ����δʹ�þ���
-        (void)speed_rpm;  // ����δʹ�þ���
+        // 这里可以添加 PID 控制逻辑
+        // 目前只是接收转速数据，留作后续扩展使用
+        (void)motor;      // 避免未使用警�?
+        (void)speed_rpm;  // 避免未使用警�?
     }
 }
 
-// ========== ��׼�豸�����ӿ�ʵ�� ==========
+// ========== 标准设备驱动接口实现 ==========
 
 DeviceResult_t Motor_Init(void* handle) {
     MotorDevice_t* motor = (MotorDevice_t*)handle;
@@ -1222,7 +1215,7 @@ DeviceResult_t Motor_Init(void* handle) {
 
     memset(motor, 0, sizeof(MotorDevice_t));
 
-    // ��ʼ�������б�
+    // 初始化所有队�?
     for(int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_fwd.commands[i].device_id = DEV_ID_NONE;
         motor->allow_fwd.commands[i].priority = PRIO_NONE;
@@ -1232,8 +1225,8 @@ DeviceResult_t Motor_Init(void* handle) {
         motor->block_rev.commands[i].device_id = DEV_ID_NONE;
     }
 
-    // ��ʼ��IO�豸Ĭ��״̬��ÿ��IO�豸Ĭ��BLOCK�Լ��ķ���
-    // IO_FWDĬ��BLOCK��ת��IO_REVĬ��BLOCK��ת
+    // 初始化IO设备默认状态：每个IO设备默认BLOCK自己的方�?
+    // IO_FWD默认BLOCK正转，IO_REV默认BLOCK反转
     MotorControlCommand_t io_fwd_block = {
         .device_id = DEV_ID_IO_FWD,
         .priority = MANUAL_PRIORITY,
@@ -1241,7 +1234,7 @@ DeviceResult_t Motor_Init(void* handle) {
         .timestamp = tickTimer_GetCount()
     };
     // Motor_CmdList_SetBlock(&motor->block_fwd, io_fwd_block);
-    
+
     MotorControlCommand_t io_rev_block = {
         .device_id = DEV_ID_IO_REV,
         .priority = MANUAL_PRIORITY,
@@ -1253,22 +1246,21 @@ DeviceResult_t Motor_Init(void* handle) {
     motor->enable = 1;
     motor->last_arbitration_time = tickTimer_GetCount();
 
-    // ���õ���ȫ��ָ��
+    // 设置调试全局指针
     g_pMotor_Dev_Watch = motor;
-    
-    // ��ʼ�����Ա���
+
+    // 初始化调试变�?
     Motor_UpdateDebugInfo(motor);
 
-    // ����EventBus�¼�
-    // ע�⣺����ͳһ�� App_Motor_Project.c �� SetupEventBusSubscriptions() �й���
-    // ���ﲻ���ظ����ģ�����ص������ע��
-    
+    // 注册EventBus事件
+    // 注意：所有订阅统一�? App_Motor_Project.c �? SetupEventBusSubscriptions() 中管�?
+    // 此处不再重复订阅，避免回调被重复注册
 
 #if MOTOR_CONTROL_MODE == 1
     s_eLastArbitrationDir = DIR_NONE;
     s_u16LastTargetDuty = 0;
 
-    // ͬ������PWM״̬��Ӳ���Ĵ���
+    // 同步初始化PWM状态到硬件寄存�?
     uint32_t period = TMRA_GetPeriodValue(CM_TMRA_4);
     if (period > 0) {
         uint32_t cmp1 = TMRA_GetCompareValue(CM_TMRA_4, TMRA_CH1);
@@ -1292,7 +1284,7 @@ DeviceResult_t Motor_Deinit(void* handle) {
 
     motor->enable = 0;
     Motor_EmergencyStop(motor);
-    
+
     g_pMotor_Dev_Watch = NULL;
     memset((void*)&g_stcMotorDebug, 0, sizeof(MotorDebugInfo_t));
 
@@ -1308,7 +1300,7 @@ DeviceResult_t Motor_Read(void* handle, void* data, uint32_t size) {
         memcpy(data, &motor->debug_info, sizeof(MotorDebugInfo_t));
         return RESULT_OK;
     }
-    // ������֧�ֶ�ȡ״̬�ṹ��
+    // 额外支持读取状态结构体
     else if (size == sizeof(Motor_StateInfo_t)) {
         Motor_StateInfo_t* pstcState = (Motor_StateInfo_t*)data;
         pstcState->desired_dir = DIR_NONE;
@@ -1326,7 +1318,7 @@ DeviceResult_t Motor_Read(void* handle, void* data, uint32_t size) {
 }
 
 DeviceResult_t Motor_Write(void* handle, const void* data, uint32_t size) {
-    // ����豸ͨ������Ҫֱ��д����??
+    // 电机设备通常不需要直接写�?
     (void)handle;
     (void)data;
     (void)size;
@@ -1377,22 +1369,22 @@ DeviceResult_t Motor_Update(void* handle) {
     if (!motor || !motor->enable) return RESULT_ERROR;
 
 #if MOTOR_CONTROL_MODE == 1
-    // ����4ͨ��PWM������״̬��
+    // 更新4通道PWM软件状�?
     PWM_Update(&g_motor_pwm_ch1);
     PWM_Update(&g_motor_pwm_ch2);
     PWM_Update(&g_motor_pwm_ch3);
     PWM_Update(&g_motor_pwm_ch4);
 
-    // ��黺���Ƿ���ɣ���Ҫ�л����м����ٻ���
+    // 检查缓冲是否完成，需要切换极性或继续斜坡
     if (s_bPolaritySwitchPending) {
         if (PWM_GetState(&g_motor_pwm_ch1) == PWM_STATE_IDLE &&
             PWM_GetState(&g_motor_pwm_ch2) == PWM_STATE_IDLE &&
             PWM_GetState(&g_motor_pwm_ch3) == PWM_STATE_IDLE &&
             PWM_GetState(&g_motor_pwm_ch4) == PWM_STATE_IDLE) {
-            /* ������ɣ��м���?? */
+            /* 归零完成，切换极�? */
             Motor_SetRunPolarity();
             s_bPolaritySwitchPending = false;
-            /* ��ʼ������Ŀ�� */
+            /* 开始最终的斜坡目标 */
             uint16_t duty = s_u16PendingTargetDuty;
             if (s_u8PendingDirection == 1) {
                 uint16_t dl = Motor_LimitDuty(duty);
@@ -1412,25 +1404,23 @@ DeviceResult_t Motor_Update(void* handle) {
         }
     }
 
-
 #endif
-
 
     uint32_t now = tickTimer_GetCount();
 
-    // ÿ50ms�ٲ�һ��
+    // �?50ms仲裁一�?
     if (now - motor->last_arbitration_time >= 50) {
         Motor_ArbitrationDecision(motor);
         motor->last_arbitration_time = now;
     }
 
-    // ========== ÿ2000ms��ӡһ�ε���ٲ�״�? ==========
+    // ========== �?2000ms打印一次当前仲裁状�? ==========
     if (now - s_u32LastMotorPrintTime >= MOTOR_PRINT_INTERVAL_MS) {
         s_u32LastMotorPrintTime = now;
 
         MOTOR_OUT("=== Motor Arbitration State ===\r\n");
 
-        // ��ӡ��ǰ״̬
+        // 打印当前状�?
         const char* state_str = (motor->state == MS_IDLE) ? "IDLE" :
                                 (motor->state == MS_RAMPING) ? "RAMPING" :
                                 (motor->state == MS_RUNNING) ? "RUNNING" : "LOCKED";
@@ -1439,7 +1429,7 @@ DeviceResult_t Motor_Update(void* handle) {
         MOTOR_OUT("  State=%s, ActiveDir=%s, Duty=%.1f%%\r\n",
                   state_str, dir_str, motor->current_duty);
 
-        // ��ӡ�������õ�����ָ��
+        // 打印当前有效的允许指�?
         MOTOR_OUT("  Active Allow FWD: ");
         if (motor->allow_fwd.count > 0) {
             for (int i = 0; i < motor->allow_fwd.count; i++) {
@@ -1478,7 +1468,7 @@ DeviceResult_t Motor_Update(void* handle) {
         }
         MOTOR_OUT("\r\n");
 
-        // ��ӡ�������õ�����ָ��
+        // 打印当前有效的阻塞指�?
         MOTOR_OUT("  Active Block FWD: ");
         if (motor->block_fwd.count > 0) {
             for (int i = 0; i < motor->block_fwd.count; i++) {
@@ -1535,14 +1525,14 @@ DeviceResult_t Motor_Update(void* handle) {
         }
         MOTOR_OUT("\r\n");
 
-        // ========== ��ӡ��ע�ᵫδ���õ��豸 ==========
-        // �����豸������������Щ�豸û���� allow �� block �б���
-        
-        // �ռ������õ��豸ID
+        // ========== 打印已注册但未使用的设备 ==========
+        // 检查哪些设备没有出现在 allow �? block 列表�?
+
+        // 收集已在使用的设备ID
         uint8_t active_devices[16] = {0};
         uint8_t active_count = 0;
-        
-        // ���� allow_fwd �е��豸
+
+        // 遍历 allow_fwd 中的设备
         for (int i = 0; i < motor->allow_fwd.count; i++) {
             uint8_t dev_id = motor->allow_fwd.commands[i].device_id;
             bool found = false;
@@ -1551,8 +1541,8 @@ DeviceResult_t Motor_Update(void* handle) {
             }
             if (!found) active_devices[active_count++] = dev_id;
         }
-        
-        // ���� allow_rev �е��豸
+
+        // 遍历 allow_rev 中的设备
         for (int i = 0; i < motor->allow_rev.count; i++) {
             uint8_t dev_id = motor->allow_rev.commands[i].device_id;
             bool found = false;
@@ -1561,8 +1551,8 @@ DeviceResult_t Motor_Update(void* handle) {
             }
             if (!found) active_devices[active_count++] = dev_id;
         }
-        
-        // ���� block_fwd �е��豸
+
+        // 遍历 block_fwd 中的设备
         for (int i = 0; i < motor->block_fwd.count; i++) {
             uint8_t dev_id = motor->block_fwd.commands[i].device_id;
             bool found = false;
@@ -1571,8 +1561,8 @@ DeviceResult_t Motor_Update(void* handle) {
             }
             if (!found) active_devices[active_count++] = dev_id;
         }
-        
-        // ���� block_rev �е��豸
+
+        // 遍历 block_rev 中的设备
         for (int i = 0; i < motor->block_rev.count; i++) {
             uint8_t dev_id = motor->block_rev.commands[i].device_id;
             bool found = false;
@@ -1581,12 +1571,12 @@ DeviceResult_t Motor_Update(void* handle) {
             }
             if (!found) active_devices[active_count++] = dev_id;
         }
-        
-        // ��������е�������??
+
+        // 检查所有可能的设备
         MOTOR_OUT("  Registered but Inactive Devices:\r\n");
         bool has_inactive = false;
-        
-        // �������п��ܵ��豸��������
+
+        // 列出所有可能的设备
         struct { uint8_t id; const char* name; } all_devices[] = {
             {DEV_ID_POWER_POS, "POWER_POS"},
             {DEV_ID_POWER_NEG, "POWER_NEG"},
@@ -1599,7 +1589,7 @@ DeviceResult_t Motor_Update(void* handle) {
             {DEV_ID_IO_REV, "IO_REV"},
             {DEV_ID_EMERGENCY, "EMERGENCY"}
         };
-        
+
         for (int i = 0; i < sizeof(all_devices)/sizeof(all_devices[0]); i++) {
             bool is_active = false;
             for (int j = 0; j < active_count; j++) {
@@ -1609,21 +1599,21 @@ DeviceResult_t Motor_Update(void* handle) {
                 }
             }
             if (!is_active) {
-                MOTOR_OUT("    %s (ID=%d) - No command\r\n", 
+                MOTOR_OUT("    %s (ID=%d) - No command\r\n",
                           all_devices[i].name, all_devices[i].id);
                 has_inactive = true;
             }
         }
-        
+
         if (!has_inactive) {
             MOTOR_OUT("    (All registered devices are active)\r\n");
         }
-        
-        // ��ӡ��ͻ״̬
+
+        // 打印冲突状�?
         MOTOR_OUT("  Conflict=%d\r\n",
                   motor->debug_info.conflict_fault);
-        
-        // ��ӡ��ǰ��豸
+
+        // 打印当前活动设备
         const char* active_dev_name = "NONE";
         switch(motor->active_device_id) {
             case DEV_ID_IO_FWD: active_dev_name = "IO_FWD"; break;
@@ -1638,15 +1628,15 @@ DeviceResult_t Motor_Update(void* handle) {
         }
         MOTOR_OUT("  Active Device: %s (ID=%d)\r\n", active_dev_name, motor->active_device_id);
     }
-    
+
     return RESULT_OK;
 }
 
-// ========== ����ض��ӿ�ʵ��?? ==========
+// ========== 特定接口实现 ==========
 
 void Motor_SetSpeed(MotorDevice_t* motor, float duty) {
     if (!motor || !motor->enable) return;
-    
+
     DeviceCommandData_t cmd;
     uint16_t duty_percent = (uint16_t)(duty * 100.0f);
     cmd.cmd = CMD_PWM_SET_DUTY;
@@ -1657,41 +1647,41 @@ void Motor_SetSpeed(MotorDevice_t* motor, float duty) {
 
 void Motor_Start(MotorDevice_t* motor, MotorDir_t dir) {
     if (!motor || !motor->enable) return;
-    
-    // ͨ��EventBus���������¼������ٲò㴦��
+
+    // 通过EventBus发送事件，由仲裁层处理
     MotorManualIOEvent_t ev = {
         .dir = dir,
         .type = CMD_TYPE_RUN_FWD,
         .speed = 50.0f
     };
-    
+
     if (dir == DIR_FWD) {
         ev.type = CMD_TYPE_RUN_FWD;
     } else if (dir == DIR_REV) {
         ev.type = CMD_TYPE_RUN_REV;
     }
-    
+
     EventBus_Publish(TOPIC_MANUAL_IO, &ev);
 }
 
 void Motor_Stop(MotorDevice_t* motor) {
     if (!motor) return;
-    
+
     MotorManualIOEvent_t ev = {
         .dir = DIR_NONE,
         .type = CMD_TYPE_STOP,
         .speed = 0
     };
-    
+
     EventBus_Publish(TOPIC_MANUAL_IO, &ev);
 }
 
 void Motor_EmergencyStop(MotorDevice_t* motor) {
     if (!motor) return;
-    
+
     MOTOR_DEBUG("EmergencyStop: clearing all allow commands\r\n");
-    
-    // ����ֹͣ���������?? allow_fwd �� commands[] ����
+
+    // 紧急停止：清空 allow_fwd 中所有命�?
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_fwd.commands[i].device_id = DEV_ID_NONE;
         motor->allow_fwd.commands[i].priority = PRIO_NONE;
@@ -1700,8 +1690,8 @@ void Motor_EmergencyStop(MotorDevice_t* motor) {
         motor->allow_fwd.commands[i].timestamp = 0;
     }
     motor->allow_fwd.count = 0;
-    
-    // ����ֹͣ���������?? allow_rev �� commands[] ����
+
+    // 紧急停止：清空 allow_rev 中所有命�?
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_rev.commands[i].device_id = DEV_ID_NONE;
         motor->allow_rev.commands[i].priority = PRIO_NONE;
@@ -1710,22 +1700,22 @@ void Motor_EmergencyStop(MotorDevice_t* motor) {
         motor->allow_rev.commands[i].timestamp = 0;
     }
     motor->allow_rev.count = 0;
-    
-    // ע�⣺������ block_fwd / block_rev��
-    
-    // ���µ��Ա���
+
+    // 注意：不修改 block_fwd / block_rev
+
+    // 更新调试变量
     g_u8MotorDebug_AllowFwdCount = 0;
     g_u8MotorDebug_AllowRevCount = 0;
-    
+
     Motor_ArbitrationDecision(motor);
 }
 
 void Motor_ClearAllowFwd(MotorDevice_t* motor) {
     if (!motor) return;
-    
+
     MOTOR_DEBUG("ClearAllowFwd: clearing all allow_fwd commands\r\n");
-    
-    // �������?? commands[] ����
+
+    // 清空 allow_fwd 中所有命�?
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_fwd.commands[i].device_id = DEV_ID_NONE;
         motor->allow_fwd.commands[i].priority = PRIO_NONE;
@@ -1734,20 +1724,20 @@ void Motor_ClearAllowFwd(MotorDevice_t* motor) {
         motor->allow_fwd.commands[i].timestamp = 0;
     }
     motor->allow_fwd.count = 0;
-    
-    // ���µ��Ա���
+
+    // 更新调试变量
     g_u8MotorDebug_AllowFwdCount = 0;
-    
-    // �����ٲ�
+
+    // 重新仲裁
     Motor_ArbitrationDecision(motor);
 }
 
 void Motor_ClearAllowRev(MotorDevice_t* motor) {
     if (!motor) return;
-    
+
     MOTOR_DEBUG("ClearAllowRev: clearing all allow_rev commands\r\n");
-    
-    // �������?? commands[] ����
+
+    // 清空 allow_rev 中所有命�?
     for (int i = 0; i < MAX_COMMANDS_PER_DIRECTION; i++) {
         motor->allow_rev.commands[i].device_id = DEV_ID_NONE;
         motor->allow_rev.commands[i].priority = PRIO_NONE;
@@ -1756,11 +1746,11 @@ void Motor_ClearAllowRev(MotorDevice_t* motor) {
         motor->allow_rev.commands[i].timestamp = 0;
     }
     motor->allow_rev.count = 0;
-    
-    // ���µ��Ա���
+
+    // 更新调试变量
     g_u8MotorDebug_AllowRevCount = 0;
-    
-    // �����ٲ�
+
+    // 重新仲裁
     Motor_ArbitrationDecision(motor);
 }
 
@@ -1771,32 +1761,32 @@ const MotorDebugInfo_t* Motor_GetDebugInfo(MotorDevice_t* motor) {
 
 MotorDir_t Motor_GetDesiredDirection(MotorDevice_t* motor) {
     if (!motor) return DIR_NONE;
-    // �����ǰ������ִ�е���������䷽��??
+    // 如果当前正在运行或缓起，返回当前活动方向
     if (motor->state == MS_RUNNING || motor->state == MS_RAMPING) {
         return motor->active_dir;
     }
     return DIR_NONE;
 }
 
-// ========== �����澯�ֶ�����ӿ�?? ==========
+// ========== 过流故障手动清除接口 ==========
 void Motor_ClearOvercurrentBlock(MotorDevice_t* motor) {
     if (!motor) return;
-    
+
     MOTOR_DEBUG("ClearOvercurrentBlock: removing block_fwd for DEV_ID_OVERCUR_FWD\r\n");
-    
+
     Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_OVERCUR_FWD);
-    
-    // �����ٲ�
+
+    // 重新仲裁
     Motor_ArbitrationDecision(motor);
 }
 
-// ========== ��ѹ�澯�ֶ�����ӿ�?? ==========
+// ========== 电压故障手动清除接口 ==========
 void Motor_ClearVoltageBlock(MotorDevice_t* motor, uint8_t u8AlarmType) {
     if (!motor) return;
-    
+
     MotorDeviceId_t dev_id_fwd, dev_id_rev;
     const char* alarm_name;
-    
+
     if (u8AlarmType == VOLTAGE_ALARM_OVERVOLTAGE) {
         dev_id_fwd = DEV_ID_OVERVOLTAGE_FWD;
         dev_id_rev = DEV_ID_OVERVOLTAGE_REV;
@@ -1808,12 +1798,12 @@ void Motor_ClearVoltageBlock(MotorDevice_t* motor, uint8_t u8AlarmType) {
     } else {
         return;
     }
-    
+
     MOTOR_DEBUG("ClearVoltageBlock: %s - removing block_fwd/rev\r\n", alarm_name);
-    
+
     Motor_CmdList_Remove(&motor->block_fwd, dev_id_fwd);
     Motor_CmdList_Remove(&motor->block_rev, dev_id_rev);
-    
-    // �����ٲ�
+
+    // 重新仲裁
     Motor_ArbitrationDecision(motor);
 }
