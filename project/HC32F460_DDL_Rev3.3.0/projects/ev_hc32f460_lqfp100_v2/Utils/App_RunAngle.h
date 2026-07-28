@@ -78,6 +78,14 @@ void RunAngle_OnCalibration(void);
  *  If out of range, returns false (caller should set FAULT_BIT_OVERCURRENT_FWD). */
 bool RunAngle_TryCalibrate(void);
 
+/** @brief Jog offset in window-open direction (FWD).
+ *  target = current + offset_x10, then calls RunAngle_GotoTarget(). */
+void RunAngle_JogFwd(uint16_t offset_x10);
+
+/** @brief Jog offset in window-close direction (REV).
+ *  target = current - offset_x10, then calls RunAngle_GotoTarget(). */
+void RunAngle_JogRev(uint16_t offset_x10);
+
 extern AbsAngleRecord_t g_AbsAngle;
 
 #endif /* __APP_RUNANGLE_H__ */

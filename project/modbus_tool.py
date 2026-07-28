@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Modbus RTU 指令生成器 v4.4 (故障位拆分: 开窗过流/关窗过流) """
+""" Modbus RTU 指令生成器 v4.5 (点动偏移: 0x272B开窗/0x272C关窗) """
 
 def modbus_crc16(data):
     crc = 0xFFFF
@@ -362,6 +362,8 @@ def menu_window_zero():
         print("  3. 转动到目标角度")
         print("  4. 读绝对角度(RAM)")
         print("  5. 解读绝对角度RAM")
+        print("  6. 开窗方向点动")
+        print("  7. 关窗方向点动")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0':
@@ -410,55 +412,87 @@ def menu_window_zero():
             input("\n按 Enter 返回...")
         elif c == '5':
             menu_parse_abs_angle()
+        elif c == '6':
+            print("\n====== 开窗方向点动 =====")
+            print("  电机从当前位置往开窗方向(正转)移动指定偏移量")
+            print("  单位 0.1°（如 10 = 1.0°, 50 = 5.0°, 300 = 30.0°）")
+            print("  uint16 范围: 0~65535 (最大 6553.5°)")
+            print("  ⚠ 需先在[控制]中'控制开启'解锁，且电机停转")
+            val = ask_value("偏移量 (0.1°)")
+            if val is None or val < 0:
+                print("无效"); input("\n按 Enter 返回..."); continue
+            if val > 65535: val = 65535
+            node = ask_node()
+            print(f"\n  ▎开窗点动: {val} (0.1°) = {val*0.1:.1f}°")
+            req_data = [node, 0x06, 0x27, 0x2B, (val>>8)&0xFF, val&0xFF]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '7':
+            print("\n====== 关窗方向点动 =====")
+            print("  电机从当前位置往关窗方向(反转)移动指定偏移量")
+            print("  单位 0.1°（如 10 = 1.0°, 50 = 5.0°, 300 = 30.0°）")
+            print("  uint16 范围: 0~65535 (最大 6553.5°)")
+            print("  ⚠ 需先在[控制]中'控制开启'解锁，且电机停转")
+            val = ask_value("偏移量 (0.1°)")
+            if val is None or val < 0:
+                print("无效"); input("\n按 Enter 返回..."); continue
+            if val > 65535: val = 65535
+            node = ask_node()
+            print(f"\n  ▎关窗点动: {val} (0.1°) = {val*0.1:.1f}°")
+            req_data = [node, 0x06, 0x27, 0x2C, (val>>8)&0xFF, val&0xFF]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
         else:
             print("无效")
 
 def menu_parse_abs_angle():
-    """解读绝对角度RAM - 解析从机返回的4字节数据"""
+    """解读绝对角度RAM - 解析从机返回的4字节数据，循环直到用户选择退出"""
     print("\n====== 解读绝对角度RAM =====")
-    print("  请粘贴从机返回的 Modbus 回令帧")
+    print("  请粘贴从机返回的 Modbus 回令帧 (0x03 读 0x2721+0x2722)")
     print("  示例: 01 03 04 FF F8 FF FF 4A 66")
-    s = input("\n请输入: ").strip()
-    
-    if not s:
-        print("\n  未输入数据")
-        input("\n按 Enter 返回...")
-        return
-    
-    try:
-        parts = s.split()
-        if len(parts) < 7:
-            print(f"\n  格式错误: 需要至少7字节，当前 {len(parts)} 字节")
-            input("\n按 Enter 返回...")
+    print("  直接按 Enter = 返回上级菜单")
+
+    while True:
+        s = input("\n请输入: ").strip()
+
+        if not s:
+            print("  已返回")
             return
-        
-        raw = [int(x, 16) for x in parts]
-        
-        # 提取4字节数据 (int32, 小端序)
-        data_bytes = raw[3:7]
-        
-        if len(data_bytes) < 4:
-            print(f"\n  数据长度不足: 需要4字节，当前 {len(data_bytes)} 字节")
-            input("\n按 Enter 返回...")
-            return
-        
-        # 小端序解析: [低字节, 次低字节, 次高字节, 高字节]
-        val = (data_bytes[3] << 24) | (data_bytes[2] << 16) | (data_bytes[1] << 8) | data_bytes[0]
-        
-        # 处理负数 (int32)
-        if val > 0x7FFFFFFF:
-            val = val - 0x100000000
-        
-        angle = val * 0.1
-        
-        print(f"\n  实际角度: {angle:.1f}°")
-        
-    except ValueError:
-        print("\n  解析失败: 包含非法十六进制字符")
-    except Exception as e:
-        print(f"\n  解析失败: {e}")
-    
-    input("\n按 Enter 返回...")
+
+        try:
+            parts = s.split()
+            if len(parts) < 7:
+                print(f"  格式错误: 需要至少7字节，当前 {len(parts)} 字节")
+                continue
+
+            raw = [int(x, 16) for x in parts]
+
+            # 提取4字节数据 (int32, Modbus双寄存器格式)
+            data_bytes = raw[3:7]
+
+            if len(data_bytes) < 4:
+                print(f"  数据长度不足: 需要4字节，当前 {len(data_bytes)} 字节")
+                continue
+
+            # Modbus int32: 两个16位寄存器(每寄存器大端), 低寄存器(0x2721)在前
+            # 字节顺序: [reg0_H, reg0_L, reg1_H, reg1_L]
+            low16  = (data_bytes[0] << 8) | data_bytes[1]
+            high16 = (data_bytes[2] << 8) | data_bytes[3]
+            val = (high16 << 16) | low16
+
+            # 处理负数 (int32)
+            if val > 0x7FFFFFFF:
+                val = val - 0x100000000
+
+            angle = val * 0.1
+
+            print(f"  → 原始值: {val} (0.1°)")
+            print(f"  → 实际角度: {angle:.1f}°")
+
+        except ValueError:
+            print("  解析失败: 包含非法十六进制字符")
+        except Exception as e:
+            print(f"  解析失败: {e}")
 
 # ===== 9. 开发者选项 (需密码) =====
 def menu_dev_options():
@@ -824,7 +858,7 @@ MENU = [
 def main():
     while True:
         print("\n" + "=" * 42)
-        print("  Modbus RTU 指令生成器 v4.4")
+        print("  Modbus RTU 指令生成器 v4.5")
         print("=" * 42)
         for i, (name, _) in enumerate(MENU):
             print(f"  {i+1}. {name}")

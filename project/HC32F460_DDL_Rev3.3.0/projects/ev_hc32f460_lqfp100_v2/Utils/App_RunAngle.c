@@ -357,6 +357,22 @@ bool RunAngle_TryCalibrate(void)
     return false;
 }
 
+void RunAngle_JogFwd(uint16_t offset_x10)
+{
+    s_target_x10 = s_abs_offset_x10 + (int32_t)offset_x10;
+    MAIN_D("[ABSA] JogFwd: offset=%u, target=%ld (0.1 deg)\r\n",
+           (unsigned int)offset_x10, (long)s_target_x10);
+    RunAngle_GotoTarget();
+}
+
+void RunAngle_JogRev(uint16_t offset_x10)
+{
+    s_target_x10 = s_abs_offset_x10 - (int32_t)offset_x10;
+    MAIN_D("[ABSA] JogRev: offset=%u, target=%ld (0.1 deg)\r\n",
+           (unsigned int)offset_x10, (long)s_target_x10);
+    RunAngle_GotoTarget();
+}
+
 /*******************************************************************************
  * EOF
  ******************************************************************************/

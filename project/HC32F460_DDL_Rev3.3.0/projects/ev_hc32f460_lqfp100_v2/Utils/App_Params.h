@@ -56,6 +56,8 @@
 #define REG_ABS_TARGET_HI           (0x2728U)   /* R/W: 目标角度 int32高16位 (0.1度) */
 #define REG_CALIB_UPPER_X10         (0x2729U)   /* R/W: 关窗过流校准有效角度上限 0.1度 (默认200=20.0度) */
 #define REG_CALIB_LOWER_X10         (0x272AU)   /* R/W: 关窗过流校准有效角度下限 0.1度 (默认-20=-2.0度) */
+#define REG_JOG_FWD_X10             (0x272BU)   /* W: 开窗方向点动偏移 0.1度 (uint16) */
+#define REG_JOG_REV_X10             (0x272CU)   /* W: 关窗方向点动偏移 0.1度 (uint16) */
 
 /* --- 心跳包 (只读，不存Flash) --- */
 #define REG_HEARTBEAT               (0x271FU)   /* 心跳包: 读回值 = 设备地址 (0x2710) */
