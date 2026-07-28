@@ -120,7 +120,7 @@
 #define PARAM_DEFAULT_VOLTAGE_LOWER_LIMIT       (210U)      /* 欠压阈值 0.1V (21.0V) */
 #define PARAM_DEFAULT_CURRENT_UPPER_LIMIT       (1800)      /* 过流阈值 1mA (5A) */
 #define PARAM_DEFAULT_CURRENT_DETECT_MS         (30)        /* 过流判定时间 1ms */
-#define PARAM_DEFAULT_MOTOR_HALL_DIR            (1)         /* 霍尔方向 0=正常, 1=反转 */
+#define PARAM_DEFAULT_MOTOR_HALL_DIR            (0)         /* 霍尔方向 0=正常, 1=反转 */
 #define PARAM_DEFAULT_MOTOR_DIR                 (1)         /* 电机方向 0=正常, 1=反转 */
 #define PARAM_DEFAULT_RTURN_REDUCTION_RATIO     (11830)     /* 减速比 x0.1 */
 #define PARAM_DEFAULT_MOTOR_HALL_POLE_PAIRS     (3)         /* 电机极对数 */
@@ -137,7 +137,7 @@
 #define PARAM_DEFAULT_CURRENT_RELEASE_MS        (200U)      /* 过流释放时间窗口 1ms (0.2s) */
 #define PARAM_DEFAULT_OVERCURRENT_TRIGGER_CNT   (1U)        /* 过流触发计数 (时间窗口模式可选择使用) */
 #define PARAM_DEFAULT_CALIB_UPPER_X10           (10)       /* 关窗过流校准有效角度上限 (0.1度) */
-#define PARAM_DEFAULT_CALIB_LOWER_X10           (-30)       /* 关窗过流校准有效角度下限 (0.1度) */
+#define PARAM_DEFAULT_CALIB_LOWER_X10           (-50)       /* 关窗过流校准有效角度下限 (0.1度) */
 
 /*=============================================================================
  * 调试开关宏定义 (不存 Flash，通过宏定义开关)

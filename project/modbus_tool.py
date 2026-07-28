@@ -361,6 +361,7 @@ def menu_window_zero():
         print("  2. 回到关窗基准点")
         print("  3. 转动到目标角度")
         print("  4. 读绝对角度(RAM)")
+        print("  5. 解读绝对角度RAM")
         print("  0. 返回")
         c = input("选择: ").strip()
         if c == '0':
@@ -407,64 +408,57 @@ def menu_window_zero():
             print("\n  读绝对角度(RAM) (int32, 0.1°)")
             print_cmd(req_data, node)
             input("\n按 Enter 返回...")
+        elif c == '5':
+            menu_parse_abs_angle()
         else:
             print("无效")
 
-# ===== 关窗基准点高级 (开发者选项内) =====
-def menu_window_zero_advanced():
-    """关窗基准点高级 - 放在开发者选项内"""
-    while True:
-        print("\n====== 关窗基准点（高级）======")
-        print("  1. 读关窗基准点(Flash)")
-        print("  2. 保存基准点到Flash")
-        print("  3. 读停止阈值")
-        print("  4. 设置停止阈值")
-        print("  0. 返回")
-        c = input("选择: ").strip()
-        if c == '0':
+def menu_parse_abs_angle():
+    """解读绝对角度RAM - 解析从机返回的4字节数据"""
+    print("\n====== 解读绝对角度RAM =====")
+    print("  请粘贴从机返回的 Modbus 回令帧")
+    print("  示例: 01 03 04 FF F8 FF FF 4A 66")
+    s = input("\n请输入: ").strip()
+    
+    if not s:
+        print("\n  未输入数据")
+        input("\n按 Enter 返回...")
+        return
+    
+    try:
+        parts = s.split()
+        if len(parts) < 7:
+            print(f"\n  格式错误: 需要至少7字节，当前 {len(parts)} 字节")
+            input("\n按 Enter 返回...")
             return
-        elif c == '1':
-            node = ask_node()
-            req_data = [node, 0x03, 0x27, 0x23, 0x00, 0x02]
-            print("\n  读关窗基准点(Flash) (int32, 0.1°)")
-            print_cmd(req_data, node)
+        
+        raw = [int(x, 16) for x in parts]
+        
+        # 提取4字节数据 (int32, 小端序)
+        data_bytes = raw[3:7]
+        
+        if len(data_bytes) < 4:
+            print(f"\n  数据长度不足: 需要4字节，当前 {len(data_bytes)} 字节")
             input("\n按 Enter 返回...")
-        elif c == '2':
-            print("\n====== 保存基准点到Flash =====")
-            print("  将当前RAM偏移值固化到Flash，掉电后自动恢复")
-            node = ask_node()
-            req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x02]
-            print_cmd(req_data, node)
-            input("\n按 Enter 返回...")
-        elif c == '3':
-            node = ask_node()
-            print("\n  停止阈值 (0x2726, 0.1°)")
-            req_data = [node, 0x03, 0x27, 0x26, 0x00, 0x01]
-            print_cmd(req_data, node)
-            input("\n按 Enter 返回...")
-        elif c == '4':
-            print("\n====== 设置停止阈值 =====")
-            print("  回基准点/回目标的停止判定阈值")
-            print("  范围: 0.0°~20.0° (值 0~200, 单位 0.1°)")
-            print("  默认: 0.1° (值=1)")
-            val = ask_value("阈值 (0.1°)")
-            if val is None:
-                print("无效"); input("\n按 Enter 返回..."); continue
-            node = ask_node()
-            req_data = [node, 0x06, 0x27, 0x26, (val>>8)&0xFF, val&0xFF]
-            result, modified = apply_validation(0x2726, val)
-            if modified:
-                note = f"MCU校验后: {val*0.1:.1f}° → {result*0.1:.1f}°"
-            else:
-                note = ""
-            print_cmd(req_data, node, note, skip_echo=True)
-            echo_data = [node, 0x06, 0x27, 0x26, (result>>8)&0xFF, result&0xFF]
-            crc = modbus_crc16(echo_data)
-            echo = ' '.join(f'{b:02X}' for b in echo_data)
-            print(f"  回令: {echo} {crc&0xFF:02X} {crc>>8&0xFF:02X}")
-            input("\n按 Enter 返回...")
-        else:
-            print("无效"); input("\n按 Enter 返回...")
+            return
+        
+        # 小端序解析: [低字节, 次低字节, 次高字节, 高字节]
+        val = (data_bytes[3] << 24) | (data_bytes[2] << 16) | (data_bytes[1] << 8) | data_bytes[0]
+        
+        # 处理负数 (int32)
+        if val > 0x7FFFFFFF:
+            val = val - 0x100000000
+        
+        angle = val * 0.1
+        
+        print(f"\n  实际角度: {angle:.1f}°")
+        
+    except ValueError:
+        print("\n  解析失败: 包含非法十六进制字符")
+    except Exception as e:
+        print(f"\n  解析失败: {e}")
+    
+    input("\n按 Enter 返回...")
 
 # ===== 9. 开发者选项 (需密码) =====
 def menu_dev_options():
@@ -758,6 +752,62 @@ def menu_calc_hall_pulse():
     print(f"  一圈脉冲: {pulses_per_rev}")
     print(f"  转动角度: {angle:.2f}°")
     print(f"  {'='*42}")
+
+# ===== 关窗基准点高级 (开发者选项内) =====
+def menu_window_zero_advanced():
+    """关窗基准点高级 - 放在开发者选项内"""
+    while True:
+        print("\n====== 关窗基准点（高级）======")
+        print("  1. 读关窗基准点(Flash)")
+        print("  2. 保存基准点到Flash")
+        print("  3. 读停止阈值")
+        print("  4. 设置停止阈值")
+        print("  0. 返回")
+        c = input("选择: ").strip()
+        if c == '0':
+            return
+        elif c == '1':
+            node = ask_node()
+            req_data = [node, 0x03, 0x27, 0x23, 0x00, 0x02]
+            print("\n  读关窗基准点(Flash) (int32, 0.1°)")
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '2':
+            print("\n====== 保存基准点到Flash =====")
+            print("  将当前RAM偏移值固化到Flash，掉电后自动恢复")
+            node = ask_node()
+            req_data = [node, 0x06, 0x27, 0x25, 0x00, 0x02]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '3':
+            node = ask_node()
+            print("\n  停止阈值 (0x2726, 0.1°)")
+            req_data = [node, 0x03, 0x27, 0x26, 0x00, 0x01]
+            print_cmd(req_data, node)
+            input("\n按 Enter 返回...")
+        elif c == '4':
+            print("\n====== 设置停止阈值 =====")
+            print("  回基准点/回目标的停止判定阈值")
+            print("  范围: 0.0°~20.0° (值 0~200, 单位 0.1°)")
+            print("  默认: 0.1° (值=1)")
+            val = ask_value("阈值 (0.1°)")
+            if val is None:
+                print("无效"); input("\n按 Enter 返回..."); continue
+            node = ask_node()
+            req_data = [node, 0x06, 0x27, 0x26, (val>>8)&0xFF, val&0xFF]
+            result, modified = apply_validation(0x2726, val)
+            if modified:
+                note = f"MCU校验后: {val*0.1:.1f}° → {result*0.1:.1f}°"
+            else:
+                note = ""
+            print_cmd(req_data, node, note, skip_echo=True)
+            echo_data = [node, 0x06, 0x27, 0x26, (result>>8)&0xFF, result&0xFF]
+            crc = modbus_crc16(echo_data)
+            echo = ' '.join(f'{b:02X}' for b in echo_data)
+            print(f"  回令: {echo} {crc&0xFF:02X} {crc>>8&0xFF:02X}")
+            input("\n按 Enter 返回...")
+        else:
+            print("无效"); input("\n按 Enter 返回...")
 
 # ===== 主菜单 =====
 MENU = [
