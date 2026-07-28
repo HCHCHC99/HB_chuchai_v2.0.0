@@ -177,12 +177,7 @@ static void Motor_RunReverseImmediate(uint16_t duty) {
 // ========== 反转消隐变量 ==========
 static uint8_t s_u8LastArbWasRev = 0;
 static NonBlockingDelay_t s_stcReverseBlankTimer;
-volatile uint8_t g_u8MotorReverseBlankActive = 0;
-
-// ========== 正转消隐变量 ==========
-static uint8_t s_u8LastArbWasFwd = 0;
-static NonBlockingDelay_t s_stcForwardBlankTimer;
-volatile uint8_t g_u8MotorForwardBlankActive = 0;
+volatile uint8_t g_u8MotorReverseBlankActive = 0;// ========== 正转消隐变量 ==========static uint8_t s_u8LastArbWasFwd = 0;static NonBlockingDelay_t s_stcForwardBlankTimer;volatile uint8_t g_u8MotorForwardBlankActive = 0;
 
 // 本文件头文件 include 之后的内�?
 // 打印相关变量
@@ -341,8 +336,6 @@ static void Motor_SetRunPolarity(void) {
 
 __weak void Motor_OnArbitrationStop(MotorDevice_t* motor) {
     (void)motor;
-    s_u8LastArbWasFwd = 0;
-    g_u8MotorForwardBlankActive = 0;
     s_u8LastArbWasRev = 0;
     g_u8MotorReverseBlankActive = 0;
 #if MOTOR_CONTROL_MODE == 0
@@ -366,12 +359,6 @@ __weak void Motor_OnArbitrationStop(MotorDevice_t* motor) {
 
 __weak void Motor_OnArbitrationFwd(MotorDevice_t* motor, float duty) {
     (void)motor;
-    if (!s_u8LastArbWasFwd) {
-        nbDelay_Init(&s_stcForwardBlankTimer, MOTOR_FORWARD_BLANK_MS);
-        nbDelay_Start(&s_stcForwardBlankTimer);
-        g_u8MotorForwardBlankActive = 1;
-    }
-    s_u8LastArbWasFwd = 1;
     s_u8LastArbWasRev = 0;
     g_u8MotorReverseBlankActive = 0;
 #if MOTOR_CONTROL_MODE == 0
@@ -407,8 +394,6 @@ __weak void Motor_OnArbitrationFwd(MotorDevice_t* motor, float duty) {
 
 __weak void Motor_OnArbitrationRev(MotorDevice_t* motor, float duty) {
     (void)motor;
-    s_u8LastArbWasFwd = 0;
-    g_u8MotorForwardBlankActive = 0;
     if (!s_u8LastArbWasRev) {
         nbDelay_Init(&s_stcReverseBlankTimer, MOTOR_REVERSE_BLANK_MS);
         nbDelay_Start(&s_stcReverseBlankTimer);
@@ -1438,11 +1423,7 @@ DeviceResult_t Motor_Update(void* handle) {
 
     uint32_t now = tickTimer_GetCount();
 
-    if (g_u8MotorForwardBlankActive && nbDelay_IsComplete(&s_stcForwardBlankTimer)) {
-        g_u8MotorForwardBlankActive = 0;
-    }
-
-    // reverse blank timer check
+    // 反转消隐定时器到期检查
     if (g_u8MotorReverseBlankActive && nbDelay_IsComplete(&s_stcReverseBlankTimer)) {
         g_u8MotorReverseBlankActive = 0;
     }

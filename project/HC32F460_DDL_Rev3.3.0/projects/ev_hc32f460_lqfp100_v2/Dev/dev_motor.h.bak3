@@ -326,13 +326,11 @@ void Motor_ClearVoltageBlock(MotorDevice_t* motor, uint8_t u8AlarmType);
 void Motor_ClearOvercurrentBlock(MotorDevice_t* motor);
 
 // ========== ��ת�������� ==========
-#define MOTOR_FORWARD_BLANK_MS     (40U)     // 正转消隐时长（ms�?
-#define MOTOR_REVERSE_BLANK_MS     (0U)   // ��ת����ʱ�䣨ms��
+#define MOTOR_REVERSE_BLANK_MS     (10000)   // ��ת����ʱ�䣨ms��
 
 // ========== ��ת���������ⲿ���� ==========
 // dev_sensor ʹ�ô˱�־�������ڹ�������
-extern volatile uint8_t g_u8MotorForwardBlankActive;
-extern volatile uint8_t g_u8MotorReverseBlankActive;
+extern volatile uint8_t g_u8MotorForwardBlankActive;extern volatile uint8_t g_u8MotorReverseBlankActive;
 
 // ========== Keil Watch ����ȫ�ֱ��� ==========
 // �� Watch �����в鿴 g_pMotorDevWatch �ɹ۲��ٲ����ڲ�״̬
