@@ -14,8 +14,8 @@
 #include <stdbool.h>
 #include "rtt_manager.h"
 
-// ========== 调试宏定义 ==========
-// 所有调试输出统一使用 rtt_manager.h 中的宏，通过 DEV_MOTOR 控制开关
+// ========== 锟斤拷锟皆宏定锟斤拷 ==========
+// 锟斤拷锟叫碉拷锟斤拷锟斤拷锟酵骋皇癸拷锟? rtt_manager.h 锟叫的宏，通锟斤拷 DEV_MOTOR 锟斤拷锟狡匡拷锟斤拷
 
 #ifdef DEV_MOTOR
     #define MOTOR_DEBUG(fmt, ...)    MAIN_D("[MOTOR_DEBUG] " fmt, ##__VA_ARGS__)
@@ -26,55 +26,55 @@
 #endif
 
 
-// ========== 硬件版本：电机控制模式 ==========
-// 在 main.h 中通过 BOARD_VERSION 统一管理
+// ========== 硬锟斤拷锟芥本锟斤拷锟斤拷锟斤拷锟斤拷锟侥Ｊ? ==========
+// 锟斤拷 main.h 锟斤拷通锟斤拷 BOARD_VERSION 统一锟斤拷锟斤拷
 #include "main.h"
 #if BOARD_VERSION == 0
-    // 原HB_chuchai板：GPIO PB8/PB9 直接控制正转/反转/停止
+    // 原HB_chuchai锟藉：GPIO PB8/PB9 直锟接匡拷锟斤拷锟斤拷转/锟斤拷转/停止
     #define MOTOR_CONTROL_MODE  0
 #else
-    // 整合板：4通道 PWM 占空比控制，缓起/缓停
+    // 锟斤拷锟较板：4通锟斤拷 PWM 占锟秸比匡拷锟狡ｏ拷锟斤拷锟斤拷/锟斤拷停
     #define MOTOR_CONTROL_MODE  1
 #endif
 
-// ========== 电机设备命令定义 ==========
-// 注意：CMD_BASE_MOTOR 在 device_manager.h 中没有预定义，在此定义
+// ========== 锟斤拷锟斤拷璞革拷锟斤拷疃拷锟? ==========
+// 注锟解：CMD_BASE_MOTOR 锟斤拷 device_manager.h 锟斤拷没锟斤拷预锟斤拷锟藉，锟节此讹拷锟斤拷
 #define CMD_BASE_MOTOR              0x9000
 #define CMD_MOTOR_STOP              (CMD_BASE_MOTOR + 0x01)
 #define CMD_MOTOR_RUN_FWD           (CMD_BASE_MOTOR + 0x02)
 #define CMD_MOTOR_RUN_REV           (CMD_BASE_MOTOR + 0x03)
 #define CMD_MOTOR_SET_SPEED         (CMD_BASE_MOTOR + 0x04)
 #define CMD_MOTOR_EMERGENCY_STOP    (CMD_BASE_MOTOR + 0x05)
-// 添加到 dev_motor.h 中的命令定义扩展
-#define CMD_MOTOR_GET_DESIRED_DIR   (CMD_BASE_MOTOR + 0x06)   // 获取当前期望方向（仲裁结果）
+// 锟斤拷锟接碉拷 dev_motor.h 锟叫碉拷锟斤拷锟筋定锟斤拷锟斤拷展
+#define CMD_MOTOR_GET_DESIRED_DIR   (CMD_BASE_MOTOR + 0x06)   // 锟斤拷取锟斤拷前锟斤拷锟斤拷锟斤拷锟斤拷锟劫裁斤拷锟斤拷锟?
 
 
-// ========== 电机设备配置宏 ==========
-// 模式切换宏：0=单极性（单电源全桥），1=双极性（双电源全桥）
+// ========== 锟斤拷锟斤拷璞革拷锟斤拷煤锟? ==========
+// 模式锟叫伙拷锟疥：0=锟斤拷锟斤拷锟皆ｏ拷锟斤拷锟斤拷源全锟脚ｏ拷锟斤拷1=双锟斤拷锟皆ｏ拷双锟斤拷源全锟脚ｏ拷
 #ifndef MOTOR_MODE_BIPOLAR
 #define MOTOR_MODE_BIPOLAR      0
 #endif
 
-// 优先级模式配置：1=IO优先级高, 0=CAN优先级高
+// 锟斤拷锟饺硷拷模式锟斤拷锟矫ｏ拷1=IO锟斤拷锟饺硷拷锟斤拷, 0=CAN锟斤拷锟饺硷拷锟斤拷
 #ifndef MOTOR_PRIORITY_IO_HIGH
 #define MOTOR_PRIORITY_IO_HIGH  1
 #endif
 
-// 设备能力配置：位掩码
+// 锟借备锟斤拷锟斤拷锟斤拷锟矫ｏ拷位锟斤拷锟斤拷
 #ifndef MOTOR_MANUAL_CAPABILITY
-#define MOTOR_MANUAL_CAPABILITY  (CAP_ALLOW | CAP_BLOCK)  // IO设备可以请求运动也可以禁止运动
+#define MOTOR_MANUAL_CAPABILITY  (CAP_ALLOW | CAP_BLOCK)  // IO锟借备锟斤拷锟斤拷锟斤拷锟斤拷锟剿讹拷也锟斤拷锟皆斤拷止锟剿讹拷
 #endif
 
 #ifndef MOTOR_CAN_CAPABILITY
-#define MOTOR_CAN_CAPABILITY     (CAP_ALLOW)  // CAN设备可以请求运动
+#define MOTOR_CAN_CAPABILITY     (CAP_ALLOW)  // CAN锟借备锟斤拷锟斤拷锟斤拷锟斤拷锟剿讹拷
 #endif
 
-// 设备能力位定义
+// 锟借备锟斤拷锟斤拷位锟斤拷锟斤拷
 #define CAP_BLOCK      (1 << 0)
 #define CAP_ALLOW      (1 << 1)
 
-// ========== 公共枚举定义 ==========
-// 电机状态结构体（用于 Device_Read 一次性读取）
+// ========== 锟斤拷锟斤拷枚锟劫讹拷锟斤拷 ==========
+// 锟斤拷锟阶刺拷峁癸拷澹拷锟斤拷锟? Device_Read 一锟斤拷锟皆讹拷取锟斤拷
 typedef enum {
     DIR_NONE = 0,
     DIR_FWD = 1,
@@ -107,7 +107,7 @@ typedef enum {
     CMD_TYPE_BLOCK_BOTH = 8,
 } CmdType_t;
 
-// ========== 设备ID枚举 ==========
+// ========== 锟借备ID枚锟斤拷 ==========
 typedef enum {
     DEV_ID_NONE             = 255,
     DEV_ID_POWER_POS        = 1,
@@ -115,21 +115,21 @@ typedef enum {
     DEV_ID_LIMIT_FWD        = 3,
     DEV_ID_LIMIT_REV        = 4,
     DEV_ID_CAN              = 5,
-    DEV_ID_IO_FWD           = 6,    // 正转IO设备
-    DEV_ID_IO_REV           = 7,    // 反转IO设备
+    DEV_ID_IO_FWD           = 6,    // 锟斤拷转IO锟借备
+    DEV_ID_IO_REV           = 7,    // 锟斤拷转IO锟借备
     DEV_ID_EMERGENCY        = 8,
-    DEV_ID_RTURN_FWD        = 9,    // 旋转限位-正转限位
-    DEV_ID_RTURN_REV        = 10,   // 旋转限位-反转限位
-    DEV_ID_OVERVOLTAGE_FWD  = 11,   // 过压-阻塞正转
-    DEV_ID_OVERVOLTAGE_REV  = 12,   // 过压-阻塞反转
-    DEV_ID_UNDERVOLTAGE_FWD = 13,   // 欠压-阻塞正转
-    DEV_ID_UNDERVOLTAGE_REV = 14,   // 欠压-阻塞反转
-    DEV_ID_OVERCUR_FWD      = 15,   // 正转过流(开窗) - block_fwd
-    DEV_ID_OVERCUR_REV      = 16,   // 反转过流(关窗) - block_rev
+    DEV_ID_RTURN_FWD        = 9,    // 锟斤拷转锟斤拷位-锟斤拷转锟斤拷位
+    DEV_ID_RTURN_REV        = 10,   // 锟斤拷转锟斤拷位-锟斤拷转锟斤拷位
+    DEV_ID_OVERVOLTAGE_FWD  = 11,   // 锟斤拷压-锟斤拷锟斤拷锟斤拷转
+    DEV_ID_OVERVOLTAGE_REV  = 12,   // 锟斤拷压-锟斤拷锟斤拷锟斤拷转
+    DEV_ID_UNDERVOLTAGE_FWD = 13,   // 欠压-锟斤拷锟斤拷锟斤拷转
+    DEV_ID_UNDERVOLTAGE_REV = 14,   // 欠压-锟斤拷锟斤拷锟斤拷转
+    DEV_ID_OVERCUR_FWD      = 15,   // 锟斤拷转锟斤拷锟斤拷(锟斤拷锟斤拷) - block_fwd
+    DEV_ID_OVERCUR_REV      = 16,   // 锟斤拷转锟斤拷锟斤拷(锟截达拷) - block_rev
     DEV_ID_MAX
 } MotorDeviceId_t;
 
-// 优先级枚举
+// 锟斤拷锟饺硷拷枚锟斤拷
 typedef enum {
     PRIO_NONE = 255,
     PRIO_EMERGENCY = 0,
@@ -139,7 +139,7 @@ typedef enum {
     PRIO_POWER = 5
 } MotorPriority_t;
 
-// ========== 命令结构体 ==========
+// ========== 锟斤拷锟斤拷峁癸拷锟? ==========
 typedef struct {
     MotorDeviceId_t device_id;
     MotorPriority_t priority;
@@ -149,11 +149,11 @@ typedef struct {
 } MotorControlCommand_t;
 
 typedef struct {
-    MotorDir_t desired_dir;     // 当前仲裁器得出的期望方向
-    MotorState_t state;         // 电机状态：IDLE/RAMPING/RUNNING等
-    MotorDir_t active_dir;      // 当前活动方向
-    float current_duty;         // 当前占空比
-    uint8_t enable;             // 电机使能状态
+    MotorDir_t desired_dir;     // 锟斤拷前锟劫诧拷锟斤拷锟矫筹拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+    MotorState_t state;         // 锟斤拷锟阶刺拷锟絀DLE/RAMPING/RUNNING锟斤拷
+    MotorDir_t active_dir;      // 锟斤拷前锟筋动锟斤拷锟斤拷
+    float current_duty;         // 锟斤拷前占锟秸憋拷
+    uint8_t enable;             // 锟斤拷锟绞癸拷锟阶刺?
 } Motor_StateInfo_t;
 
 #define MAX_COMMANDS_PER_DIRECTION 20
@@ -163,7 +163,7 @@ typedef struct {
     uint8_t count;
 } MotorCommandList_t;
 
-// ========== 调试信息结构体 ==========
+// ========== 锟斤拷锟斤拷锟斤拷息锟结构锟斤拷 ==========
 typedef struct {
     struct {
         MotorDeviceId_t device_ids[MAX_COMMANDS_PER_DIRECTION];
@@ -194,9 +194,9 @@ typedef struct {
     bool conflict_fault;
 } MotorDebugInfo_t;
 
-// ========== 电机设备结构体 ==========
+// ========== 锟斤拷锟斤拷璞革拷峁癸拷锟? ==========
 typedef struct {
-    // 仲裁队列
+    // 锟劫裁讹拷锟斤拷
     MotorCommandList_t block_fwd;
     MotorCommandList_t block_rev;
     MotorCommandList_t allow_fwd;
@@ -206,19 +206,19 @@ typedef struct {
     MotorDeviceId_t active_device_id;
     float current_duty;
 
-    // 调试信息
+    // 锟斤拷锟斤拷锟斤拷息
     MotorDebugInfo_t debug_info;
 
-    // 内部状态
+    // 锟节诧拷状态
     float last_sent_duty;
     uint32_t last_arbitration_time;
 
-    // 设备属性
-    uint8_t motor_id;           // 电机ID（用于多电机场景）
-    uint8_t enable;             // 电机使能
+    // 锟借备锟斤拷锟斤拷
+    uint8_t motor_id;           // 锟斤拷锟絀D锟斤拷锟斤拷锟节讹拷锟斤拷锟斤拷锟斤拷锟斤拷
+    uint8_t enable;             // 锟斤拷锟绞癸拷锟?
 } MotorDevice_t;
 
-// ========== 事件数据结构（用于EventBus） ==========
+// ========== 锟铰硷拷锟斤拷锟捷结构锟斤拷锟斤拷锟斤拷EventBus锟斤拷 ==========
 typedef struct {
     MotorDir_t dir;
     bool is_active;
@@ -242,91 +242,98 @@ typedef struct {
 } MotorCANEvent_t;
 
 typedef struct {
-    uint8_t adc_id;             // ADC设备ID（哪个ADC检测到的）
-    uint16_t current_ma;        // 当前电流(mA)
-    uint16_t threshold_ma;      // 电流阈值(mA)
-    uint32_t duration_ms;       // 持续时间(ms)
+    uint8_t adc_id;             // ADC锟借备ID锟斤拷锟侥革拷ADC锟斤拷獾斤拷模锟?
+    uint16_t current_ma;        // 锟斤拷前锟斤拷锟斤拷(mA)
+    uint16_t threshold_ma;      // 锟斤拷锟斤拷锟斤拷值(mA)
+    uint32_t duration_ms;       // 锟斤拷锟斤拷时锟斤拷(ms)
 } MotorOvercurrentEvent_t;
 
-// ========== 仲裁回调函数（弱定义，用户可重写） ==========
+// ========== 锟劫裁回碉拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟藉，锟矫伙拷锟斤拷锟斤拷写锟斤拷 ==========
 /**
- * @brief 仲裁决策为停止时调用的回调
- * @param motor 电机设备指针
+ * @brief 锟劫裁撅拷锟斤拷为停止时锟斤拷锟矫的回碉拷
+ * @param motor 锟斤拷锟斤拷璞钢革拷锟?
  */
 void Motor_OnArbitrationStop(MotorDevice_t* motor);
 
 /**
- * @brief 仲裁决策为正转时调用的回调
- * @param motor 电机设备指针
- * @param duty 当前占空比
+ * @brief 锟劫裁撅拷锟斤拷为锟斤拷转时锟斤拷锟矫的回碉拷
+ * @param motor 锟斤拷锟斤拷璞钢革拷锟?
+ * @param duty 锟斤拷前占锟秸憋拷
  */
 void Motor_OnArbitrationFwd(MotorDevice_t* motor, float duty);
 
 /**
- * @brief 仲裁决策为反转时调用的回调
- * @param motor 电机设备指针
- * @param duty 当前占空比
+ * @brief 锟劫裁撅拷锟斤拷为锟斤拷转时锟斤拷锟矫的回碉拷
+ * @param motor 锟斤拷锟斤拷璞钢革拷锟?
+ * @param duty 锟斤拷前占锟秸憋拷
  */
 void Motor_OnArbitrationRev(MotorDevice_t* motor, float duty);
 
-// ========== 电机设备接口（符合DeviceManager规范） ==========
-// 标准设备操作
+// ========== 锟斤拷锟斤拷璞革拷涌冢锟斤拷锟斤拷锟紻eviceManager锟芥范锟斤拷 ==========
+// 锟斤拷准锟借备锟斤拷锟斤拷
 DeviceResult_t Motor_Init(void* handle);
 DeviceResult_t Motor_Deinit(void* handle);
 DeviceResult_t Motor_Read(void* handle, void* data, uint32_t size);
 DeviceResult_t Motor_Write(void* handle, const void* data, uint32_t size);
 DeviceResult_t Motor_Control(void* handle, DeviceCommandData_t* cmd);
-DeviceResult_t Motor_Update(void* handle);  // 定时轮询
+DeviceResult_t Motor_Update(void* handle);  // 锟斤拷时锟斤拷询
 
-// 特定操作接口
+// 锟截讹拷锟斤拷锟斤拷锟接匡拷
 void Motor_SetSpeed(MotorDevice_t* motor, float duty);
 void Motor_Start(MotorDevice_t* motor, MotorDir_t dir);
 void Motor_Stop(MotorDevice_t* motor);
 void Motor_EmergencyStop(MotorDevice_t* motor);
 
-// 清空允许队列接口（按方向清空 allow 指令，不影响 block）
+// 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷薪涌冢锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 allow 指锟筋，锟斤拷影锟斤拷 block锟斤拷
 void Motor_ClearAllowFwd(MotorDevice_t* motor);
 void Motor_ClearAllowRev(MotorDevice_t* motor);
 
-// 调试接口
+// 锟斤拷锟皆接匡拷
 const MotorDebugInfo_t* Motor_GetDebugInfo(MotorDevice_t* motor);
 
-// ========== EventBus回调函数声明 ==========
+// ========== EventBus锟截碉拷锟斤拷锟斤拷锟斤拷锟斤拷 ==========
 void Motor_OnPowerEvent(void* payload);
 void Motor_OnHardLimit(void* payload);
 void Motor_OnManualIO(void* payload);
 void Motor_OnCANEvent(void* payload);
-void Motor_OnSpeedFeedback(void* payload);  // 速度反馈（预留）
+void Motor_OnSpeedFeedback(void* payload);  // 锟劫度凤拷锟斤拷锟斤拷预锟斤拷锟斤拷
 void Motor_OnOvercurrent(void* payload);
 void Motor_OnVoltageAlarm(void* payload);
-void Motor_OnCurrentAlarm(void* payload);  // 已禁用
-void Motor_OnOvercurrentFwd(void* payload);  // 正转(开窗)过流 → block_fwd
-void Motor_OnOvercurrentRev(void* payload);  // 反转(关窗)过流 → block_rev
-void Motor_OnRTurnLimit(void* payload);  // 旋转限位
-// 获取当前仲裁器期望方向（即当前正在执行的方向）
+void Motor_OnCurrentAlarm(void* payload);  // 锟窖斤拷锟斤拷
+void Motor_OnOvercurrentFwd(void* payload);  // 锟斤拷转(锟斤拷锟斤拷)锟斤拷锟斤拷 锟斤拷 block_fwd
+void Motor_OnOvercurrentRev(void* payload);  // 锟斤拷转(锟截达拷)锟斤拷锟斤拷 锟斤拷 block_rev
+void Motor_OnRTurnLimit(void* payload);  // 锟斤拷转锟斤拷位
+// 锟斤拷取锟斤拷前锟劫诧拷锟斤拷锟斤拷锟斤拷锟斤拷锟津（硷拷锟斤拷前锟斤拷锟斤拷执锟叫的凤拷锟斤拷
 MotorDir_t Motor_GetDesiredDirection(MotorDevice_t* motor);
 
-// ========== 电压报警手动清除接口 ==========
+// ========== 锟斤拷压锟斤拷锟斤拷锟街讹拷锟斤拷锟斤拷涌锟? ==========
 /**
- * @brief 清除电压报警在仲裁器中设置的 block 指令
- * @param motor 电机设备指针
- * @param u8AlarmType 报警类型：VOLTAGE_ALARM_OVERVOLTAGE 或 VOLTAGE_ALARM_UNDERVOLTAGE
- * @note 仅在 VOLTAGE_CLEAR_MODE == VOLTAGE_CLEAR_MANUAL 时使用
- *       在 App_FaultHandler 收到 TOPIC_FAULT_CLEAR 事件时调用
+ * @brief 锟斤拷锟斤拷锟窖癸拷锟斤拷锟斤拷锟斤拷俨锟斤拷锟斤拷锟斤拷锟斤拷玫锟? block 指锟斤拷
+ * @param motor 锟斤拷锟斤拷璞钢革拷锟?
+ * @param u8AlarmType 锟斤拷锟斤拷锟斤拷锟酵ｏ拷VOLTAGE_ALARM_OVERVOLTAGE 锟斤拷 VOLTAGE_ALARM_UNDERVOLTAGE
+ * @note 锟斤拷锟斤拷 VOLTAGE_CLEAR_MODE == VOLTAGE_CLEAR_MANUAL 时使锟斤拷
+ *       锟斤拷 App_FaultHandler 锟秸碉拷 TOPIC_FAULT_CLEAR 锟铰硷拷时锟斤拷锟斤拷
  */
 void Motor_ClearVoltageBlock(MotorDevice_t* motor, uint8_t u8AlarmType);
 
-// ========== 电流报警手动清除接口 ==========
+// ========== 锟斤拷锟斤拷锟斤拷锟斤拷锟街讹拷锟斤拷锟斤拷涌锟? ==========
 /**
- * @brief 清除电流报警在仲裁器中设置的 block 指令
- * @param motor 电机设备指针
- * @note 在 App_FaultHandler 收到 TOPIC_FAULT_CLEAR 事件时调用
- *       清除过流故障后，需要解除仲裁器中的双向阻塞
+ * @brief 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷俨锟斤拷锟斤拷锟斤拷锟斤拷玫锟? block 指锟斤拷
+ * @param motor 锟斤拷锟斤拷璞钢革拷锟?
+ * @note 锟斤拷 App_FaultHandler 锟秸碉拷 TOPIC_FAULT_CLEAR 锟铰硷拷时锟斤拷锟斤拷
+ *       锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷虾锟斤拷锟揭拷锟斤拷锟劫诧拷锟斤拷锟叫碉拷双锟斤拷锟斤拷锟斤拷
  */
 void Motor_ClearOvercurrentBlock(MotorDevice_t* motor);
 
-// ========== Keil Watch 调试全局变量 ==========
-// 在 Watch 窗口中查看 g_pMotorDevWatch 可观察仲裁器内部状态
+// ========== 锟斤拷转锟斤拷锟斤拷锟斤拷锟斤拷 ==========
+#define MOTOR_REVERSE_BLANK_MS     (2000)   // 锟斤拷转锟斤拷锟斤拷时锟戒（ms锟斤拷
+
+// ========== 锟斤拷转锟斤拷锟斤拷锟斤拷锟斤拷锟解部锟斤拷锟斤拷 ==========
+// dev_sensor 使锟矫此憋拷志锟斤拷锟斤拷锟斤拷锟节癸拷锟斤拷锟斤拷锟斤拷
+extern volatile uint8_t g_u8MotorReverseBlankActive;
+
+// ========== Keil Watch 锟斤拷锟斤拷全锟街憋拷锟斤拷 ==========
+// 锟斤拷 Watch 锟斤拷锟斤拷锟叫查看 g_pMotorDevWatch 锟缴观诧拷锟劫诧拷锟斤拷锟节诧拷状态
 extern MotorDevice_t* volatile g_pMotorDevWatch;
 
 #endif /* DEV_MOTOR_H_ */
