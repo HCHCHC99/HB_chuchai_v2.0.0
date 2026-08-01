@@ -38,7 +38,7 @@ typedef struct {
 #define ABS_ANGLE_MAGIC_TAIL   0xBA5ABA5A
 
 /* Default threshold: 0.1 deg */
-#define ABS_THRESH_DEFAULT_X10    1
+#define ABS_THRESH_DEFAULT_X10    6
 #define ABS_THRESH_MIN_X10        0
 #define ABS_THRESH_MAX_X10      200   /* 20.0 deg max */
 

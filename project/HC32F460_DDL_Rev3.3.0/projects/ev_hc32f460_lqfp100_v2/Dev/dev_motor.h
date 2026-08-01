@@ -326,7 +326,7 @@ void Motor_ClearVoltageBlock(MotorDevice_t* motor, uint8_t u8AlarmType);
 void Motor_ClearOvercurrentBlock(MotorDevice_t* motor);
 
 // ========== ��ת�������� ==========
-#define MOTOR_FORWARD_BLANK_MS     (40U)     // 正转消隐时长（ms�?
+#define MOTOR_FORWARD_BLANK_MS     (50U)     // 正转消隝时长（ms�?
 #define MOTOR_REVERSE_BLANK_MS     (0U)   // ��ת����ʱ�䣨ms��
 
 // ========== ��ת���������ⲿ���� ==========

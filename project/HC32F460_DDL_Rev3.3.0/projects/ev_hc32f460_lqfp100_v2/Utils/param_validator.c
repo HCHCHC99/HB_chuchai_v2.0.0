@@ -21,7 +21,7 @@ static const ParamRule_t s_rules[] = {
 
     /* 过流判定时间 (0x271E): 0ms ~ 2000ms, 步进 20ms
      *   单位: 1ms, step=20 */
-    { REG_CURRENT_DETECT_MS,       0,  2000,   5 },
+    { REG_CURRENT_DETECT_MS,       0,  400,   5 },
 
     /* 减速比 (0x3712): 1.0 ~ 6553.5, 步进 0.1
      *   单位: 0.1, 寄存器值/10 = 实际减速比, step=0 不做精度取整 */

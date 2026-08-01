@@ -142,7 +142,7 @@ static void hall_a_irq_callback(void)
 
     if (interval_us >= MIN_PULSE_INTERVAL_US && interval_us <= MAX_PULSE_INTERVAL_US)
     {
-        GPIO_SetPins(GPIO_PORT_H, GPIO_PIN_02);
+
         inst->last_pulse_interval = interval_us;
         inst->last_pulse_time_us = Timer6_Timebase_GetTimestamp();
         inst->pulse_counter++;
@@ -167,7 +167,7 @@ static void hall_b_irq_callback(void)
 
     if (interval_us >= MIN_PULSE_INTERVAL_US && interval_us <= MAX_PULSE_INTERVAL_US)
     {
-        GPIO_ResetPins(GPIO_PORT_H, GPIO_PIN_02);
+
         inst->last_pulse_interval = interval_us;
         inst->last_pulse_time_us = Timer6_Timebase_GetTimestamp();
         inst->pulse_counter++;

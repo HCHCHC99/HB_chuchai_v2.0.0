@@ -154,8 +154,11 @@ def print_cmd(req_data, node, note="", skip_echo=False):
 def menu_read_realtime():
     print("\n====== 读实时数据 =====")
     for i, (addr, name, unit) in enumerate(REALTIME_REGS):
-        u = f" [单位：{unit}]" if unit else ""
-        print(f"  {i+1}. {name}（0x{addr:04X}）{u}")
+        if addr == 0x2731:
+            print(f"  {i+1}. {name}（0x{addr:04X}）[单位：{unit}] ❌ 已禁用")
+        else:
+            u = f" [单位：{unit}]" if unit else ""
+            print(f"  {i+1}. {name}（0x{addr:04X}）{u}")
     print("  0. 返回")
     c = input("选择: ").strip()
     if c == '0': return
@@ -164,6 +167,13 @@ def menu_read_realtime():
         if idx < 0 or idx >= len(REALTIME_REGS): raise
         addr, name, unit = REALTIME_REGS[idx]
     except: print("无效"); return
+
+    # 禁用实时角度 (0x2731)
+    if addr == 0x2731:
+        print("\n  ⚠ 此功能已禁用！")
+        print("  📌 请到菜单 [8. 关窗基准点] → [4. 读绝对角度(RAM)] 查看角度")
+        print("     或 [5. 解读绝对角度RAM] 手动解析回令数据")
+        return
 
     node = ask_node()
     u = f" ({unit})" if unit else ""
