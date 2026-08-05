@@ -37,19 +37,24 @@ static void ADC_Device_OnDataReady(uint16_t u16AdcValue, uint8_t u8Channel)
     for (uint8_t i = 0; i < s_u8CallbackCtxCount; i++) {
         if (s_astcCallbackCtx[i].u8Channel == u8Channel) {
             ADC_Device_t* pstcDev = s_astcCallbackCtx[i].pstcDevice;
-            if (pstcDev && pstcDev->u8Initialized && pstcDev->u8UseRawRing) {
-                
-                ADC_DevRingBuffer_t* pstcRing = &pstcDev->stcRawRing;
-                uint8_t u8Next = (pstcRing->u8WriteIndex + 1) % ADC_DEV_RAW_RING_SIZE;
-                
-                if (u8Next == pstcRing->u8ReadIndex) {
-                    pstcRing->u8Overflow = 1;
+            if (pstcDev && pstcDev->u8Initialized) {
+                /* 数据回调（ISR 上下文）：过流判定等，与环形缓冲解耦 */
+                if (pstcDev->pfnDataCallback != NULL) {
+                    pstcDev->pfnDataCallback(u16AdcValue, u8Channel, pstcDev->pDataCtx);
                 }
-                
-                pstcRing->au16Buffer[pstcRing->u8WriteIndex] = u16AdcValue;
-                pstcRing->u8WriteIndex = u8Next;
-                if (pstcRing->u8Count < ADC_DEV_RAW_RING_SIZE) {
-                    pstcRing->u8Count++;
+                if (pstcDev->u8UseRawRing) {
+                    ADC_DevRingBuffer_t* pstcRing = &pstcDev->stcRawRing;
+                    uint8_t u8Next = (pstcRing->u8WriteIndex + 1) % ADC_DEV_RAW_RING_SIZE;
+
+                    if (u8Next == pstcRing->u8ReadIndex) {
+                        pstcRing->u8Overflow = 1;
+                    }
+
+                    pstcRing->au16Buffer[pstcRing->u8WriteIndex] = u16AdcValue;
+                    pstcRing->u8WriteIndex = u8Next;
+                    if (pstcRing->u8Count < ADC_DEV_RAW_RING_SIZE) {
+                        pstcRing->u8Count++;
+                    }
                 }
             }
             break;
@@ -447,6 +452,17 @@ ADC_Device_t* ADC_Device_Create(const ADC_Config_t* pstcConfig)
     return pstcDev;
 }
 
+/* ========== Data Callback Registration ========== */
+
+void ADC_Device_SetDataCallback(ADC_Device_t* pstcDev, ADC_Device_DataCallback_t pfn, void* pCtx)
+{
+    if (pstcDev == NULL) return;
+    pstcDev->pfnDataCallback = pfn;
+    pstcDev->pDataCtx = pCtx;
+    ADC_DEBUG("Data callback %s for CH%d\r\n",
+              (pfn != NULL) ? "registered" : "cleared",
+              pstcDev->stcConfig.u8Channel);
+}
 /* ========== Filter Configuration Interfaces ========== */
 
 void ADC_Device_SetFilter(ADC_Device_t* pstcDev, ADC_FilterType_t enType, uint8_t u8WindowSize)

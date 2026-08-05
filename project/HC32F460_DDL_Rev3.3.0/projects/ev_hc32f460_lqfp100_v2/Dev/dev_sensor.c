@@ -3,8 +3,26 @@
 #include "rtt_log.h"
 #include <string.h>
 #include <stdlib.h>
+#include "timer6_timebase.h"
+#include "EventBus.h"
 // dev_sensor经过校准和灵敏度修正后的最终电流值(mA)
 volatile int32_t g_dbg_sensor_final_ma = 0;
+// ========== 过流 ISR 检测（方案二）状态与缓存 ==========
+static Sensor_Device_t* s_pSensorOcDev = NULL;          // ISR 回调上下文（Init 时赋值）
+static volatile uint8_t  s_u8IsrOcState = 0;            // 0=正常 1=计时中 2=已触发
+static volatile uint64_t s_u64IsrOcStartUs = 0;         // 窗口起始 μs
+static volatile uint32_t s_u32IsrOcWindowUs = 0;        // 锁存窗口(μs)
+static volatile int32_t  s_s32IsrOcThresholdMa = 0;     // 锁存阈值(mA)
+static volatile uint8_t  s_u8OcFilterType = SENSOR_OC_FILTER_NONE;   // 预留滤波类型
+static volatile uint8_t  g_u8SensorOcPending = 0;       // ISR→主循环 待处理标志
+static volatile Current_AlarmEvent_t g_sensor_oc_cache = {0, 0, 0};
+
+/* ISR 过流调试变量（Keil Watch 可观察） */
+volatile uint8_t  g_dbg_isr_oc_state = 0;
+volatile uint64_t g_dbg_isr_oc_start_us = 0;
+volatile uint32_t g_dbg_isr_oc_elapsed_us = 0;
+volatile uint32_t g_dbg_isr_oc_window_us = 0;
+volatile int32_t  g_dbg_isr_oc_cur_ma = 0;
 // ========== 模拟模式全局变量 ==========
 #ifdef SENSOR_SIMULATION_MODE
     // 模拟的是传感器原始输出电压（mV），不是ADC输入电压
@@ -192,6 +210,7 @@ static void Sensor_CalcCurrent(Sensor_Device_t* pstcDev) {
     g_dbg_sensor_final_ma = (pstcDev->s32CurrentMa >= 0) ? pstcDev->s32CurrentMa : -pstcDev->s32CurrentMa;
 }
 
+#if !SENSOR_OC_ISR_DETECT_ENABLE
 // ========== 过流检测 - 点数模式 ==========
 static void Sensor_CheckOvercurrent_SampleCount(Sensor_Device_t* pstcDev, 
                                                    uint8_t u8IsOvercurrent, 
@@ -368,6 +387,129 @@ static void Sensor_CheckOvercurrent(Sensor_Device_t* pstcDev) {
                                            s32AbsThreshold, s32AbsHysteresis);
     }
 }
+#endif
+
+// ========== 过流 ISR 检测（方案二） ==========
+
+/* 预留：过流判定输入滤波。当前默认直通原始值（SENSOR_OC_FILTER_NONE）。
+ * SENSOR_OC_FILTER_MA4 预留为 4 点滑动平均(≈0.8ms @200μs)，纯压噪、不改“连续 40ms”窗口语义。
+ * TODO(预留)：实现 MA4 时在此处理，并保持 ISR 内纯整数运算。 */
+static uint16_t Sensor_OcFilterSample(Sensor_Device_t* pstcDev, uint16_t u16Raw)
+{
+    (void)pstcDev;
+    if (s_u8OcFilterType == SENSOR_OC_FILTER_MA4) {
+        return u16Raw;   /* 预留：暂未启用，保持直通 */
+    }
+    return u16Raw;
+}
+
+/* ADC 数据回调（ISR 上下文）：逐采样点过流判定，时间戳为 Timer6 μs */
+static void Sensor_OcIsrCallback(uint16_t u16AdcValue, uint8_t u8Channel, void* pCtx)
+{
+    Sensor_Device_t* pstcDev = (Sensor_Device_t*)pCtx;
+    if (pstcDev == NULL) return;
+    (void)u8Channel;
+
+    /* 0) 时间戳：先更新累加器再取 μs（量化 ≤ 一个采样周期） */
+    Timer6_Timebase_UpdateTimestamp();
+    uint64_t u64NowUs = Timer6_Timebase_GetTimestamp();
+
+    /* 1) 消隐期间完全不判定，清空窗口状态 */
+    extern volatile uint8_t g_u8MotorForwardBlankActive;
+    extern volatile uint8_t g_u8MotorReverseBlankActive;
+    if (g_u8MotorForwardBlankActive || g_u8MotorReverseBlankActive) {
+        s_u8IsrOcState = 0;
+        g_dbg_isr_oc_elapsed_us = 0;
+        return;
+    }
+
+    /* 2) 输入滤波（预留接口，当前直通） */
+    uint16_t u16Filtered = Sensor_OcFilterSample(pstcDev, u16AdcValue);
+
+    /* 3) raw -> mV -> mA（纯整数运算，与 Sensor_CalcCurrentInternal 一致） */
+    uint16_t u16AdcVoltageMv = (uint16_t)(((uint32_t)u16Filtered * 3300UL) / 4095UL);
+    int32_t s32ZeroTheory = SENSOR_VOUT_ZERO_MA_INT;
+    int32_t s32Sensitivity = SENSOR_SENSITIVITY_INT;
+    int32_t s32ZeroOffset = pstcDev->stcCalibration.s32ZeroOffsetMv;
+    if (pstcDev->stcCalibration.s32CalibrationValid != 0x5A5A5A5A) {
+        s32ZeroOffset = 0;   /* 未校准：用理论零点 */
+    }
+    int32_t s32Diff = (int32_t)u16AdcVoltageMv - s32ZeroTheory - s32ZeroOffset;
+    int32_t s32CurrentMa = (int32_t)(((int64_t)s32Diff * 1000) / s32Sensitivity);
+    if (pstcDev->stcCalibration.s16SensitivityScale != 0 &&
+        pstcDev->stcCalibration.s16SensitivityScale != 100) {
+        s32CurrentMa = (s32CurrentMa * pstcDev->stcCalibration.s16SensitivityScale) / 100;
+    }
+    g_dbg_isr_oc_cur_ma = (s32CurrentMa >= 0) ? s32CurrentMa : -s32CurrentMa;
+
+    /* 4) 阈值比较：严格连续，无回差、无回落容忍
+     *    状态0 用当前配置判起始并锁存；状态1/2 用锁存值（本过程不受 485 改参影响） */
+    int32_t s32CompareThreshold = (s_u8IsrOcState == 0) ?
+                                  pstcDev->stcConfig.s32OvercurrentThresholdMa :
+                                  s_s32IsrOcThresholdMa;
+    int32_t s32AbsMa = (s32CurrentMa >= 0) ? s32CurrentMa : -s32CurrentMa;
+
+    if (s32AbsMa >= s32CompareThreshold) {
+        if (s_u8IsrOcState == 0) {
+            /* 进入计时：锁存窗口/阈值 */
+            s_u8IsrOcState = 1;
+            s_u64IsrOcStartUs = u64NowUs;
+            s_u32IsrOcWindowUs = (uint32_t)pstcDev->stcConfig.u32TriggerWindowMs * 1000UL;
+            s_s32IsrOcThresholdMa = pstcDev->stcConfig.s32OvercurrentThresholdMa;
+            g_dbg_isr_oc_start_us = u64NowUs;
+            g_dbg_isr_oc_window_us = s_u32IsrOcWindowUs;
+        } else if (s_u8IsrOcState == 1) {
+            /* 计时中：检查窗口是否满足 */
+            uint64_t u64Elapsed = u64NowUs - s_u64IsrOcStartUs;
+            g_dbg_isr_oc_elapsed_us = (uint32_t)u64Elapsed;
+            if (u64Elapsed >= s_u32IsrOcWindowUs) {
+                s_u8IsrOcState = 2;
+                /* 写缓存（仅当 pending==0，避免覆盖主循环未处理的事件） */
+                if (g_u8SensorOcPending == 0) {
+                    g_sensor_oc_cache.s32CurrentMa = s32CurrentMa;
+                    g_sensor_oc_cache.s32ThresholdMa = s_s32IsrOcThresholdMa;
+                    g_sensor_oc_cache.u8IsActive = 1;
+                    g_u8SensorOcPending = 1;
+                }
+            }
+        }
+        /* 状态2：保持，等待主循环处理或电流回落后自动重新武装 */
+    } else {
+        /* 任一采样点低于阈值 → 严格清零（自动重新武装） */
+        s_u8IsrOcState = 0;
+        g_dbg_isr_oc_elapsed_us = 0;
+    }
+
+    g_dbg_isr_oc_state = s_u8IsrOcState;
+}
+
+/* 主循环调用（ESystem_MainLoop 顶部）：发布 ISR 缓存的过流事件，走现有链路 */
+void Sensor_Device_ProcessPendingEvent(void)
+{
+    if (s_pSensorOcDev == NULL) return;
+    if (!EventBus_IsEnabled()) return;   /* 未使能前保持 pending，防止事件被吞 */
+    if (!g_u8SensorOcPending) return;
+
+    Current_AlarmEvent_t stcCopy;
+    stcCopy = g_sensor_oc_cache;         /* 先拷贝 */
+    g_u8SensorOcPending = 0;             /* 后清标志 */
+
+    EventBus_Publish(TOPIC_CURRENT_ALARM, &stcCopy);
+}
+
+/* 预留滤波接口：当前仅 NONE 生效；MA4 记录类型但暂未实现（保持直通） */
+void Sensor_Device_SetOcFilter(uint8_t u8FilterType)
+{
+    if (u8FilterType == SENSOR_OC_FILTER_NONE) {
+        s_u8OcFilterType = u8FilterType;
+        SENSOR_DEBUG("OC filter set to NONE (raw passthrough)\r\n");
+    } else if (u8FilterType == SENSOR_OC_FILTER_MA4) {
+        s_u8OcFilterType = u8FilterType;
+        SENSOR_DEBUG("OC filter set to MA4 (reserved, still passthrough)\r\n");
+    } else {
+        SENSOR_DEBUG("OC filter type invalid: %d\r\n", (int)u8FilterType);
+    }
+}
 
 // ========== 标准设备操作 ==========
 DeviceResult_t Sensor_Device_Init(void* handle) {
@@ -406,6 +548,18 @@ DeviceResult_t Sensor_Device_Init(void* handle) {
     
     pstcDev->u8Initialized = 1;
     pstcDev->u32LastUpdateTime = tickTimer_GetCount();
+    /* 注册 ADC 数据回调（方案二：ISR 过流判定） */
+    {
+        DeviceNode_t* pstcAdcNode = DeviceManager_Get(pstcDev->stcConfig.u8AdcDevId);
+        if (pstcAdcNode && pstcAdcNode->private_data) {
+            ADC_Device_t* pstcAdcDev = (ADC_Device_t*)pstcAdcNode->private_data;
+            ADC_Device_SetDataCallback(pstcAdcDev, Sensor_OcIsrCallback, (void*)pstcDev);
+            s_pSensorOcDev = pstcDev;
+            SENSOR_DEBUG("OC ISR callback registered (ADC dev id=%d)\r\n", pstcDev->stcConfig.u8AdcDevId);
+        } else {
+            SENSOR_DEBUG("Warning: ADC device not found, OC ISR callback NOT registered!\r\n");
+        }
+    }
     
     SENSOR_DEBUG("Init success: ADC mV=%d, Current=%d mA (waiting for calibration)\r\n",
                  pstcDev->u16AdcVoltageMv, (int)pstcDev->s32CurrentMa);
@@ -479,18 +633,20 @@ DeviceResult_t Sensor_Device_Update(void* handle) {
         SENSOR_EMA_DBG("ADC_mV=%d, Current=%d mA, alarm=%d, timerRunning=%d\r\n",
                        pstcDev->u16AdcVoltageMv,
                        (int)pstcDev->s32CurrentMa,
-                       pstcDev->stcAlarmState.u8OvercurrentAlarm,
+                       (s_u8IsrOcState == 2) ? 1 : 0,
                        pstcDev->stcAlarmState.u8TimerRunning);
     }
     
+#if !SENSOR_OC_ISR_DETECT_ENABLE
     Sensor_CheckOvercurrent(pstcDev);
+#endif
     
 #ifdef DEBUG_SENSOR_WINDOW_BUFFER
     Sensor_Debug_AddToWindow(pstcDev->u16AdcVoltageMv);
     g_dbg_sensor_cur_ma = pstcDev->s32CurrentMa;
     g_dbg_sensor_cur_ax100 = pstcDev->s16CurrentAx100;
     g_dbg_sensor_adc_mv = pstcDev->u16AdcVoltageMv;
-    g_dbg_sensor_alarm = pstcDev->stcAlarmState.u8OvercurrentAlarm;
+    g_dbg_sensor_alarm = (uint8_t)((s_u8IsrOcState == 2) ? 1 : 0);
 #endif
     
 #ifdef DEBUG_SENSOR_SLOW
@@ -505,7 +661,7 @@ DeviceResult_t Sensor_Device_Update(void* handle) {
             (int)(s16AbsAx100 % 100),
             pstcDev->u16AdcRawValue,
             pstcDev->u16AdcVoltageMv,
-            pstcDev->stcAlarmState.u8OvercurrentAlarm ? " [OVERCURRENT]" : "");
+            (s_u8IsrOcState == 2) ? " [OVERCURRENT]" : "");
     }
 #endif
     
@@ -563,7 +719,7 @@ DeviceResult_t Sensor_Device_Control(void* handle, DeviceCommandData_t* pstcCmd)
             return RESULT_PARAM_ERR;
         case CMD_SENSOR_GET_ALARM_STATUS:
             if (pstcCmd->response && pstcCmd->response_size >= sizeof(uint8_t)) {
-                *(uint8_t*)pstcCmd->response = pstcDev->stcAlarmState.u8OvercurrentAlarm;
+                *(uint8_t*)pstcCmd->response = (uint8_t)(((s_u8IsrOcState == 2) || (g_u8SensorOcPending == 1)) ? 1 : 0);
                 return RESULT_OK;
             }
             return RESULT_PARAM_ERR;
@@ -648,14 +804,19 @@ uint16_t Sensor_GetSimulationSensorRawMv(void) {
 // ========== 过流告警手动清除接口 ==========
 void Sensor_Device_ClearAlarm(Sensor_Device_t* pstcDev) {
     if (!pstcDev || !pstcDev->u8Initialized) return;
-    if (!pstcDev->stcAlarmState.u8OvercurrentAlarm) return;
-    
+
+    /* 方案二：无条件复位 ISR 过流状态机（锁存 + 丢弃陈旧 pending），保证清除后能再次触发 */
+    s_u8IsrOcState = 0;
+    g_u8SensorOcPending = 0;
+    g_dbg_isr_oc_state = 0;
+    g_dbg_isr_oc_elapsed_us = 0;
+
     pstcDev->stcAlarmState.u8OvercurrentAlarm = 0;
     pstcDev->stcAlarmState.u16ConsecutiveCount = 0;
     pstcDev->stcAlarmState.u8TimerRunning = 0;
     nbDelay_Stop(&pstcDev->stcAlarmState.stcTriggerTimer);
     nbDelay_Stop(&pstcDev->stcAlarmState.stcReleaseTimer);
-    
+
     Current_AlarmEvent_t stcEvent;
     stcEvent.s32CurrentMa = pstcDev->s32CurrentMa;
     stcEvent.s32ThresholdMa = pstcDev->stcConfig.s32OvercurrentThresholdMa;

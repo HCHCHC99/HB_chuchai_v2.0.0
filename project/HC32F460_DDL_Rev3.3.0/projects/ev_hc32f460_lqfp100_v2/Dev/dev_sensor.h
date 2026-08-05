@@ -80,6 +80,13 @@
 #define OVERCURRENT_MODE_SAMPLE_COUNT    0
 #define OVERCURRENT_MODE_TIME_WINDOW     1
 
+// ========== ¹ýÁ÷¼ì²â·½°¸Ñ¡Ôñ£¨·½°¸¶þ£ºISR ÅÐ¶¨ + Ö÷Ñ­»··¢²¼£© ==========
+#define SENSOR_OC_ISR_DETECT_ENABLE      1   // 1=ISR ¹ýÁ÷¼ì²â£¨µ±Ç°·½°¸£©£»0=¾ÉÖ÷Ñ­»·¼ì²â£¨ÒÑ·ÏÆú£©
+
+// ========== ¹ýÁ÷ÅÐ¶¨ÊäÈëÂË²¨£¨Ô¤Áô½Ó¿Ú£¬µ±Ç°Ä¬ÈÏÖ±Í¨Ô­Ê¼Öµ£© ==========
+#define SENSOR_OC_FILTER_NONE            0   // Ô­Ê¼ÖµÖ±Í¨£¨µ±Ç°Ä¬ÈÏ£©
+#define SENSOR_OC_FILTER_MA4             1   // Ô¤Áô£º4µã»¬¶¯Æ½¾ù(¡Ö0.8ms @200¦Ìs)£¬ÔÝÎ´ÆôÓÃ
+
 // ========== ¹ýÁ÷¸æ¾¯Çå³ýÄ£Ê½Ñ¡Ôñ ==========
 #define OVERCURRENT_CLEAR_AUTO      0
 #define OVERCURRENT_CLEAR_MANUAL    1
@@ -214,6 +221,10 @@ uint16_t Sensor_GetSimulationSensorRawMv(void);             // ¶ÁÈ¡µ±Ç°Ä£Äâ´«¸ÐÆ
 
 // ========== ¹ýÁ÷¸æ¾¯ÊÖ¶¯Çå³ý½Ó¿Ú ==========
 void Sensor_Device_ClearAlarm(Sensor_Device_t* pstcDev);
+
+// ========== ¹ýÁ÷ ISR ¼ì²â£¨·½°¸¶þ£©½Ó¿Ú ==========
+void Sensor_Device_ProcessPendingEvent(void);   // Ö÷Ñ­»·µ÷ÓÃ£º·¢²¼ ISR »º´æµÄ¹ýÁ÷ÊÂ¼þ
+void Sensor_Device_SetOcFilter(uint8_t u8FilterType);  // Ô¤ÁôÂË²¨½Ó¿Ú£ºSENSOR_OC_FILTER_NONE / MA4
 
 // ========== È«¾Ö²Ù×÷º¯Êý±í ==========
 extern const DeviceOps_t g_sensor_ops;

@@ -735,6 +735,8 @@ void ESystem_MainLoop(void) {
 
     if (now - last_loop_time < 1) return;
     last_loop_time = now;
+    /* 过流事件处理（方案二）：ISR 置标志 → 主循环顶部立即发布，先于 RS485/Modbus */
+    Sensor_Device_ProcessPendingEvent();
 
 #if ENABLE_SIMULATION_MODE
     Sim_ProcessInput();

@@ -567,7 +567,6 @@ void motor_hall_update(motor_hall_handle_t handle)
     motor_hall_instance_t* inst = (motor_hall_instance_t*)handle;
     if (!inst->valid) return;
 
-    Timer6_Timebase_UpdateTimestamp();
 
     if (nbDelay_IsComplete(&inst->rpm_timer)) {
         calculate_rpm(inst);
