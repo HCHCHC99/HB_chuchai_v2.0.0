@@ -73,11 +73,13 @@ Pin initialization in `Adp/Hardware.c:267-268` — both initialized LOW.
 
 | Action | Normal Direction (`motor_dir=0`) | Inverted Direction (`motor_dir!=0`) |
 |---|---|---|
-| **Stop** | PHU=0, PHV=0 | PHU=0, PHV=0 |
+| **Stop** | PHU=1, PHV=1（GPIO_SET 双高，代码实际） | PHU=1, PHV=1 |
 | **Forward (Fwd)** | PHU=1, PHV=0 | PHU=0, PHV=1 |
 | **Reverse (Rev)** | PHU=0, PHV=1 | PHU=1, PHV=0 |
 
-- A 100ms delay (`tickTimer_DelayMs(100)`) is inserted before direction changes as dead-time protection.
+> ⚠ 上电初始化（`Hardware.c`）两脚输出 LOW（`GPIO_INIT_LOW`）；停止时代码将两脚均置高（`GPIO_SET`），与早期文档“停止=0,0”不同，已按代码修正。
+
+- The old 100ms dead-time delay (`tickTimer_DelayMs(100)`) is **commented out** in current code; direction-change protection now relies on the 50ms forward blank timer (`MOTOR_FORWARD_BLANK_MS`), which suppresses overcurrent detection during motor start.
 - The `g_AppParam.motor_dir` flag can globally invert the motor direction mapping.
 - **No soft-start/soft-stop** — the motor switches on/off immediately via GPIO level change.
 
@@ -123,25 +125,27 @@ PWM updates happen in the main loop (`template/source/main.c:123-129`):
 
 **File:** `Dev/dev_voltage.h:36-45`
 
-Controls the high-side resistor value of the voltage divider used for bus voltage measurement. The low-side resistor is fixed at 10kΩ.
+Controls the high-side resistor value of the voltage divider used for bus voltage measurement. The low-side resistor is fixed at 3.3kΩ in current code.
 
 ```c
 #include "main.h"
 #if BOARD_VERSION == 0
-    #define VOLTAGE_DIVIDER_TOP_OHM        (110000UL)   // 110kΩ
+    #define VOLTAGE_DIVIDER_TOP_OHM        (100000UL)   // 100kΩ（代码实际值）
 #else
     #define VOLTAGE_DIVIDER_TOP_OHM        (150000UL)   // 150kΩ
 #endif
-#define VOLTAGE_DIVIDER_BOTTOM_OHM     (10000UL)        // 10kΩ (fixed)
+#define VOLTAGE_DIVIDER_BOTTOM_OHM     (3300UL)         // 3.3kΩ（代码实际值）
 #define VOLTAGE_DIVIDER_RATIO          ((VOLTAGE_DIVIDER_TOP_OHM + VOLTAGE_DIVIDER_BOTTOM_OHM) / VOLTAGE_DIVIDER_BOTTOM_OHM)
 ```
 
 | Item | chu_chai (`0`) | HandB (`1`) |
 |---|---|---|
-| High-side resistor | **110kΩ** | **150kΩ** |
-| Low-side resistor | 10kΩ | 10kΩ |
-| Divider ratio | (110+10)/10 = **12** | (150+10)/10 = **16** |
+| High-side resistor | **100kΩ**（代码实际值） | **150kΩ** |
+| Low-side resistor | **3.3kΩ**（代码实际值） | **3.3kΩ** |
+| Divider ratio（整数除法） | (100k+3.3k)/3.3k = **31** | (150k+3.3k)/3.3k = **46** |
 | Compensation | +400mV | +400mV |
+
+> ⚠ 注意：`dev_voltage.c` 的注释仍写“110k+10k / 12”，与 `dev_voltage.h` 实际宏定义不符，本文已按代码宏定义修正。
 
 **Bus voltage calculation:**
 ```
@@ -281,7 +285,7 @@ Controls which GPIO pin is used to toggle the RS485 transceiver between transmit
 |---|---|---|---|
 | **Bus voltage ADC pin** | PA04 / CH4 | PA06 / CH6 | `App_Motor_Project.h` |
 | **Motor control** | GPIO (PB8/PB9) direct on/off | 4-ch PWM (PB6/PB7) with soft ramp | `dev_motor.h` / `dev_motor.c` / `main.c` |
-| **Bus voltage divider** | 110kΩ + 10kΩ (ratio=12) | 150kΩ + 10kΩ (ratio=16) | `dev_voltage.h` |
+| **Bus voltage divider** | 100kΩ + 3.3kΩ (ratio≈31) | 150kΩ + 3.3kΩ (ratio≈46) | `dev_voltage.h` |
 | **Current sensor type** | Hall sensor (1650mV zero, 264mV/A) | Diff-amp LM358 (0mV zero, 100mV/A) | `dev_sensor.h` / `dev_sensor.c` |
 | **RS485 DIR pin** | PB14 | PA3 | `rs485.c` |
 

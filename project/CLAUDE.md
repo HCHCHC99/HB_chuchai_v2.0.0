@@ -20,7 +20,7 @@ HB_chuchai — 基于 HC32F460 (Cortex-M4) 的直流电机推窗控制系统，R
 该宏控制以下所有差异（无需单独修改各模块）：
 - 电机控制: GPIO(0) / PWM(1)
 - 电流传感器: 霍尔(0) / 差分运放(1)
-- 分压电阻: 110k(0) / 150k(1)，下分压电阻固定 10k，分压比 = (top+bottom)/bottom
+- 分压电阻: 上分压 100k(0) / 150k(1)，下分压固定 3.3k(3300Ω)，分压比 = (top+bottom)/bottom（板0=(100k+3.3k)/3.3k≈31）
 - 电压ADC: PA04(0) / PA06(1)
 - RS485 DIR: PB14(0) / PA3(1)
 
@@ -222,10 +222,10 @@ ESystem_Init() 内部:
 
 | 宏 | 控制的模块 |
 |----|-----------|
-| DEV_SENSOR | 电流传感器（高频） |
-| DEV_SENSOR_REAL | 电流传感器真实模式 |
-| DEV_SENSOR_SLOW | 电流传感器（低频） |
-| DEBUG_SENSOR_SLOW | 电流传感器低频详细调试 |
+| DEV_SENSOR_TIMER_DEBUG | 传感器过流计时器（rtt_manager.h 当前唯一开启的 DEV 开关） |
+| APP_PARAMS_REALTIME_DBG | 实时数据调试打印（App_Params.h） |
+| APP_PARAMS_SIM_DBG | 模拟实时数据调试打印（App_Params.h） |
+| APP_PARAMS_USE_DEV_RTURN | 实时数据来自 dev_rturn/dev_voltage/dev_sensor（App_Params.h） |
 
 ### 所有可用调试开关
 
@@ -264,18 +264,18 @@ ESystem_Init() 内部:
 - `电流控制逻辑说明.md` — 过流检测三层处理详细时序
 - `电机霍尔方案.md` — 角度计算方案分析（含 ABC 方案对比、Pulse-Direct 实现总结）
 - `电机霍尔脉冲.md` — 双链路（Path 1 角度 + Path 2 脉冲）架构说明
-- `绝对角度.md` — 绝对角度功能完整说明（数据模型、寄存器、操作指南、回零逻辑）
+- `关窗基准点.md` — 绝对角度（关窗基准点）功能完整说明（数据模型、寄存器、操作指南、回零逻辑）
 - `chuchai vs HandB.md` — BOARD_VERSION 0/1 硬件差异详细对比（ADC引脚、电机控制、分压电阻、电流传感器、RS485 DIR）
 
 ## 已知问题/注意事项
 
-1. **文件编码混杂** — `dev_motor.c/h`, `dev_rturn.c/h`, `dev_voltage.c/h`, `App_Modbus.c` 为 UTF-16LE 编码；`param_validator.c` 为 UTF-8；部分 Adp 文件为 GB2312/GBK。编辑前务必确认编码，建议用支持 BOM 检测的编辑器。
+1. **文件编码混杂（2026-08-05 实测）** — `App_Modbus.c/h`、`dev_rturn.h`、`dev_voltage.h`、`dev_power.c/h`、`dev_pwm.c`、`EventBus.c`、`App_Params.c`、`msg_queue.c`、`lock.h`、`Adapter.c`、`main.h` 等为 UTF-16LE；`dev_motor.c`、`dev_rturn.c`、`dev_voltage.c` 为 UTF-8（无 BOM）；`dev_motor.h`、`param_validator.c`、`Hardware.c` 等为 GBK/UTF-8 混合（部分中文注释乱码）。编辑前务必按文件实际编码处理。
 2. 新增 Flash 字段后需 `Modbus_Init` 检测并强制保存默认值
 3. PWM 停止使用 98% 交替极性，预驱芯片 SDH21263 需确认刹车效果
 4. 减速比改为 0.1 精度后，已有设备 Flash 中的旧值需重新写入
 5. `Motor_Pwm_Init()` 在 main.c 中被注释，PWM 更新由 `MOTOR_CONTROL_MODE` 宏守卫
 6. 当前 `BOARD_VERSION = 0`（原板），如需切换到整合板改为 1
-7. 心跳包功能尚未实现
+7. 心跳包已实现：`REG_HEARTBEAT(0x271F)` 读回 node_id，并支持广播心跳（addr=0x00 + 0x03 读 0x271F，全部从机回复），详见 `心跳包.md`
 
 ## /init 自动阅读清单
 

@@ -4,20 +4,20 @@
 
 | 枚举值 | Topic 名称 | 发布者 | 订阅者 | 说明 |
 |--------|-----------|--------|--------|------|
-| 0 | TOPIC_POWER | dev_power | Motor_OnPowerEvent | 电源状态变化 |
-| 1 | TOPIC_LIMIT_HARD | dev_hall(?) | Motor_OnHardLimit | 硬件限位开关 |
+| 0 | TOPIC_POWER | dev_power / Sim（仿真） | Motor_OnPowerEvent | 电源状态变化 |
+| 1 | TOPIC_LIMIT_HARD | Sim（仿真；dev_hall 未注册） | Motor_OnHardLimit | 硬件限位开关（预留） |
 | 2 | TOPIC_LIMIT_SOFT | — | — | 软件限位（预留） |
 | 3 | TOPIC_CAN_EVENT | CAN模块 | Motor_OnCANEvent | CAN总线事件（预留） |
-| 4 | TOPIC_MOTOR_CMD | Modbus | Motor_OnManualIO | Modbus电机控制命令 |
+| 4 | TOPIC_MOTOR_CMD | —（预留） | — | Modbus电机控制命令（预留，未订阅） |
 | 5 | TOPIC_MOTOR_SPEED_FEEDBACK | dev_motor_hall | Motor_OnSpeedFeedback | 转速反馈 |
 | 6 | TOPIC_MOTOR_DRIVE_EXEC | — | — | 驱动执行（预留） |
-| 7 | TOPIC_MANUAL_IO | IO/Modbus | Motor_OnManualIO | 手动IO控制事件 |
+| 7 | TOPIC_MANUAL_IO | Sim（仿真） | Motor_OnManualIO | 手动IO控制事件 |
 | 8 | TOPIC_ALARM | dev_sensor | Motor_OnOvercurrent | 通用报警（已废弃） |
 | 9 | TOPIC_VOLTAGE_ALARM | dev_voltage | Motor_OnVoltageAlarm, FaultHandler_OnVoltageAlarm | 电压报警 |
 | 10 | TOPIC_CURRENT_ALARM | dev_sensor | RTurn_OnCurrentAlarm, FaultHandler_OnCurrentAlarm | 电流报警（过流检测） |
 | 11 | TOPIC_RTURN_LIMIT | dev_rturn | Motor_OnRTurnLimit | 旋转限位事件 |
-| 12 | TOPIC_FAULT_CLEAR | App_Modbus | FaultHandler_ClearFault | 故障清除命令 |
-| 13 | TOPIC_MANUAL_RS485 | App_Modbus | Motor_OnManualIO | RS485手动控制 |
+| 12 | TOPIC_FAULT_CLEAR | —（未使用） | — | 故障清除命令（预留；实际清除走 App_Params → FaultHandler_ClearFault 直调） |
+| 13 | TOPIC_MANUAL_RS485 | App_Params(REG_CTRL_CMD) / App_RunAngle（回基准/回目标/点动） | Motor_OnManualIO | RS485手动控制 |
 | 14 | **TOPIC_OVERCURRENT_FWD** | dev_rturn | **Motor_OnOvercurrentFwd** | **正转(开窗)过流 → block_fwd** |
 | 15 | **TOPIC_OVERCURRENT_REV** | dev_rturn | **Motor_OnOvercurrentRev** | **反转(关窗)过流 → block_rev** |
 
@@ -34,32 +34,35 @@ dev_sensor 检测电流超阈值
   │
   └─ TOPIC_CURRENT_ALARM (u8IsActive=1)
        │
-       ├─→ RTurn_OnCurrentAlarm (优先级1, 先执行)
-       │     └─ RTurn_HandleOvercurrent
-       │          ├─ 方向=FWD(开窗)
-       │          │   ├─ SetFault(FAULT_BIT_OVERCURRENT_FWD)
-       │          │   ├─ TOPIC_OVERCURRENT_FWD(u8IsActive=1)  ──→ Motor_OnOvercurrentFwd → block_fwd += OVERCUR_FWD
-       │          │   ├─ TOPIC_OVERCURRENT_REV(u8IsActive=1)  ──→ Motor_OnOvercurrentRev → block_rev += OVERCUR_REV
-       │          │   └─ TOPIC_RTURN_LIMIT(FWD, u8IsActive=1) ──→ Motor_OnRTurnLimit    → block_fwd += RTURN_FWD
-       │          │
-       │          └─ 方向=REV(关窗)
-       │               ├─ RunAngle_TryCalibrate()
-       │               │   ├─ TRUE  → 校准，不报故障
-       │               │   └─ FALSE → SetFault(FAULT_BIT_OVERCURRENT_REV)
-       │               │              + 双向发布(同FWD)
-       │               └─ TOPIC_RTURN_LIMIT(REV, u8IsActive=1) ──→ Motor_OnRTurnLimit → block_rev += RTURN_REV
+       ├─→ FaultHandler_OnCurrentAlarm (优先级0, 先执行)
+       │     ├─ 方向=FWD → SetFault(FAULT_BIT_OVERCURRENT_FWD)
+       │     └─ 方向=REV/STOP → 仅日志（反转堵转属预期工况，不报故障码）
        │
-       └─→ FaultHandler_OnCurrentAlarm (优先级0, 后执行)
-             ├─ FWD → SetFault(FAULT_BIT_OVERCURRENT_FWD)  (冗余记录)
-             └─ REV → 仅日志（RTurn 已处理）
+       └─→ RTurn_OnCurrentAlarm (优先级1, 后执行)
+             └─ RTurn_HandleOvercurrent
+                  ├─ 方向=FWD(开窗)
+                  │   ├─ SetFault(FAULT_BIT_OVERCURRENT_FWD)
+                  │   ├─ TOPIC_OVERCURRENT_FWD(u8IsActive=1)  ──→ Motor_OnOvercurrentFwd → block_fwd += OVERCUR_FWD
+                  │   ├─ TOPIC_OVERCURRENT_REV(u8IsActive=1)  ──→ Motor_OnOvercurrentRev → block_rev += OVERCUR_REV
+                  │   └─ TOPIC_RTURN_LIMIT(FWD, u8IsActive=1) ──→ Motor_OnRTurnLimit    → block_fwd += RTURN_FWD
+                  │
+                  └─ 方向=REV(关窗)
+                       ├─ RunAngle_TryCalibrate()
+                       │   ├─ TRUE  → 校准，不报故障
+                       │   └─ FALSE → SetFault(FAULT_BIT_OVERCURRENT_REV)
+                       │              + 双向发布(同FWD)
+                       └─ TOPIC_RTURN_LIMIT(REV, u8IsActive=1) ──→ Motor_OnRTurnLimit → block_rev += RTURN_REV
+
+> 快速路径：`SENSOR_OC_ISR_DETECT_ENABLE=1` 时，过流在 ADC/定时器 ISR 中判定（Timer6 微秒时间戳），
+> 置 pending 标志后由主循环顶部 `Sensor_Device_ProcessPendingEvent()` 立即发布，先于 RS485/Modbus 处理。
 ```
 
 ### 2.2 故障清除流
 
 ```
-485 写 0x2740 bit2=1
+485 写 0x2740（置 FAULT_BIT_OVERCURRENT_FWD/REV 或写 0x0000）
   │
-  └─ App_Modbus → FaultHandler_ClearFault(FAULT_TYPE_OVERCURRENT)
+  └─ App_Params.Param_WriteByReg() → FaultHandler_ClearFault(FAULT_TYPE_OVERCURRENT)
        │
        ├─ Sensor_Device_ClearAlarm()
        │    └─ 清除传感器报警状态
@@ -116,12 +119,13 @@ dev_voltage 检测电压异常
 
 | Topic | 订阅者 | 优先级 |
 |-------|--------|:--:|
-| TOPIC_CURRENT_ALARM | RTurn_OnCurrentAlarm | 1 (先) |
-| TOPIC_CURRENT_ALARM | FaultHandler_OnCurrentAlarm | 0 (后) |
-| TOPIC_VOLTAGE_ALARM | Motor_OnVoltageAlarm | 0 |
-| TOPIC_VOLTAGE_ALARM | FaultHandler_OnVoltageAlarm | 1 |
+| TOPIC_CURRENT_ALARM | FaultHandler_OnCurrentAlarm | 0 (先) |
+| TOPIC_CURRENT_ALARM | RTurn_OnCurrentAlarm | 1 (后) |
+| TOPIC_VOLTAGE_ALARM | Motor_OnVoltageAlarm | 0 (先) |
+| TOPIC_VOLTAGE_ALARM | FaultHandler_OnVoltageAlarm | 1 (后) |
 
-**设计原则**：RTurn 先于 FaultHandler，确保方向锁定和校准在故障记录之前完成。
+> **当前代码实际顺序（2026-08-05 核对）**：优先级值越小越先执行，因此 `FaultHandler_OnCurrentAlarm`（0）先于 `RTurn_OnCurrentAlarm`（1）。
+> 早期设计“RTurn 先于 FaultHandler”与代码不符，已按代码修正；FaultHandler 只负责故障位记录，不影响 RTurn 的方向锁定与校准。
 
 ---
 
@@ -241,7 +245,9 @@ VOLTAGE_FWD/REV
 ```
 T+0ms:   传感器检测到过流
 T+~1ms:  dev_sensor 发布 TOPIC_CURRENT_ALARM
-T+~2ms:  RTurn_OnCurrentAlarm 执行
+T+~2ms:  FaultHandler_OnCurrentAlarm 执行（优先级0）
+         → FWD 置故障位 / REV 仅日志
+         RTurn_OnCurrentAlarm 执行（优先级1）
          → 方向判断、校准或报故障
          → 发布 TOPIC_OVERCURRENT_FWD/REV (如报故障)
          → 发布 TOPIC_RTURN_LIMIT
