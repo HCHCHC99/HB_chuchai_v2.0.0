@@ -88,11 +88,11 @@
 #define SENSOR_OC_FILTER_MA4             1   // 预留：4点滑动平均(≈0.8ms @200μs)，暂未启用
 
 // ========== 过流回落容忍（时间回落，宏可配） ==========
-#define SENSOR_OC_DROP_TOLERANCE_US       (2000U)   // 回落容忍：电流低于阈值 ≤2ms 不清零（free-run）
+#define SENSOR_OC_DROP_TOLERANCE_US       (0U)      // 回落容忍：0=关闭（严格连续，任一低于阈值采样点立即清零）
 #ifndef ADC_SAMPLE_INTERVAL_US
 #define ADC_SAMPLE_INTERVAL_US            (200U)
 #endif
-#define SENSOR_OC_DROP_TOLERANCE_SAMPLES  (((SENSOR_OC_DROP_TOLERANCE_US) + (ADC_SAMPLE_INTERVAL_US) - 1U) / (ADC_SAMPLE_INTERVAL_US))   // 2ms@200μs = 10 点
+#define SENSOR_OC_DROP_TOLERANCE_SAMPLES  (((SENSOR_OC_DROP_TOLERANCE_US) + (ADC_SAMPLE_INTERVAL_US) - 1U) / (ADC_SAMPLE_INTERVAL_US))   // 由 SENSOR_OC_DROP_TOLERANCE_US 换算；0=严格连续
 
 // ========== 过流告警清除模式选择 ==========
 #define OVERCURRENT_CLEAR_AUTO      0

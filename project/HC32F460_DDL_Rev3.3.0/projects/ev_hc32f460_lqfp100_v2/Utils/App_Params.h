@@ -121,7 +121,7 @@
 #define PARAM_DEFAULT_VOLTAGE_UPPER_LIMIT       (270U)      /* 过压阈值 0.1V (26.0V) */
 #define PARAM_DEFAULT_VOLTAGE_LOWER_LIMIT       (210U)      /* 欠压阈值 0.1V (21.0V) */
 #define PARAM_DEFAULT_CURRENT_UPPER_LIMIT       (1100)      /* 过流阈值 1mA (5A) */
-#define PARAM_DEFAULT_CURRENT_DETECT_MS         (40)        /* 过流判定时间 1ms */
+#define PARAM_DEFAULT_CURRENT_DETECT_MS         (10)        /* 过流判定时间 1ms */
 #define PARAM_DEFAULT_MOTOR_HALL_DIR            (0)         /* 霍尔方向 0=正常, 1=反转 */
 #define PARAM_DEFAULT_MOTOR_DIR                 (1)         /* 电机方向 0=正常, 1=反转 */
 #define PARAM_DEFAULT_RTURN_REDUCTION_RATIO     (11830)     /* 减速比 x0.1 */

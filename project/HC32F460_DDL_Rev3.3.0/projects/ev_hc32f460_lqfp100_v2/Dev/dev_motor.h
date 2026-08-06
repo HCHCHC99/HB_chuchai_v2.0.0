@@ -327,7 +327,7 @@ void Motor_ClearOvercurrentBlock(MotorDevice_t* motor);
 
 // ========== ��ת�������� ==========
 #define MOTOR_FORWARD_BLANK_MS     (50U)     // 正转消隝时长（ms�?
-#define MOTOR_REVERSE_BLANK_MS     (0U)   // ��ת����ʱ�䣨ms��
+#define MOTOR_REVERSE_BLANK_MS     (50U)   // ��ת����ʱ�䣨ms��
 
 // ========== ��ת���������ⲿ���� ==========
 // dev_sensor ʹ�ô˱�־�������ڹ�������
