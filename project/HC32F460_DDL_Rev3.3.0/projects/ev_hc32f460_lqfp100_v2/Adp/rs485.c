@@ -4,7 +4,17 @@
 #include "Gpio_io.h"
 #include "lock.h"
 #include "ring_buf.h"
+#include "EventRecorder.h"
 #include <string.h>
+
+/* Keil Logic Analyzer: RS485 RX ISR busy flag (1=ISR running, 0=idle) */
+#define RS485_RX_ISR_DBG_VAR_ENABLE
+volatile uint32_t g_dbg_rs485_rx_isr_busy = 0;
+volatile uint32_t g_dbg_rs485_rx_isr_count = 0;       /* RS485 RX ISR 执行次数(递增斜坡) */
+volatile uint32_t g_dbg_rs485_rx_isr_last_cycles = 0; /* RS485 RX ISR 最近一次执行耗时(DWT周期, /200MHz=秒) */
+
+/* Event Recorder: RS485 RX ISR 执行时间（Start/Stop 成对） */
+#define RS485_EVENTREC_ENABLE
 
 /*=============================================================================
  * USART4 ���Ŷ���
@@ -121,9 +131,24 @@ static void RS485_OnSendComplete(void);
  *============================================================================*/
 static void USART_RxFull_IrqCallback(void)
 {
+#ifdef RS485_RX_ISR_DBG_VAR_ENABLE
+    uint32_t u32DbgStart = DWT->CYCCNT;
+    g_dbg_rs485_rx_isr_busy = 1;
+    g_dbg_rs485_rx_isr_count++;
+#endif
+#ifdef RS485_EVENTREC_ENABLE
+    EventStartA(1);
+#endif
     uint8_t ch = (uint8_t)USART_ReadData(USART_UNIT);
     BUF_Write(&m_stcRxRingBuf, &ch, 1U);
     m_u32LastRxTime = tickTimer_GetCount();
+#ifdef RS485_RX_ISR_DBG_VAR_ENABLE
+    g_dbg_rs485_rx_isr_last_cycles = DWT->CYCCNT - u32DbgStart;
+    g_dbg_rs485_rx_isr_busy = 0;
+#endif
+#ifdef RS485_EVENTREC_ENABLE
+    EventStopA(1);
+#endif
 }
 
 /*=============================================================================
@@ -131,10 +156,25 @@ static void USART_RxFull_IrqCallback(void)
  *============================================================================*/
 static void USART_RxError_IrqCallback(void)
 {
+#ifdef RS485_RX_ISR_DBG_VAR_ENABLE
+    uint32_t u32DbgStart = DWT->CYCCNT;
+    g_dbg_rs485_rx_isr_busy = 1;
+    g_dbg_rs485_rx_isr_count++;
+#endif
+#ifdef RS485_EVENTREC_ENABLE
+    EventStartA(2);
+#endif
     uint32_t errFlag = USART_FLAG_OVERRUN | USART_FLAG_FRAME_ERR | USART_FLAG_PARITY_ERR;
     USART_ClearStatus(USART_UNIT, errFlag);
     (void)USART_ReadData(USART_UNIT);
     RS485_DEBUG("USART err");
+#ifdef RS485_RX_ISR_DBG_VAR_ENABLE
+    g_dbg_rs485_rx_isr_last_cycles = DWT->CYCCNT - u32DbgStart;
+    g_dbg_rs485_rx_isr_busy = 0;
+#endif
+#ifdef RS485_EVENTREC_ENABLE
+    EventStopA(2);
+#endif
 }
 
 /*=============================================================================
@@ -302,6 +342,13 @@ void RS485_Init(void)
 {
     stc_usart_uart_init_t uartCfg;
     stc_irq_signin_config_t irqCfg;
+
+#ifdef RS485_RX_ISR_DBG_VAR_ENABLE
+    /* Enable DWT cycle counter for debug (Logic Analyzer / Watch) */
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0U;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+#endif
 
     /* ��ʼ�������� */
     Lock_Init(&m_stcRs485Mutex, LOCK_TYPE_MUTEX, "RS485_Mutex");

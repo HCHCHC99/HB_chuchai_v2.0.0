@@ -16,6 +16,7 @@
 #include "Pwm.h"
 #include "Template_Pwm.h"
 #include "hc32_ll_utility.h"
+#include "EventRecorder.h"
 
 /*=============================================================================
  * 全局变量定义
@@ -87,6 +88,9 @@ static void Motor_Pwm_Init(void)
 
 int main(void)
 {
+    /* Event Recorder 初始化（须在 ADC/485 中断之前） */
+    EventRecorderInitialize(EventRecordAll, 1U);
+
     Hardware_Init();
 
     /* RS485 初始化 - 配置 USART 和 GPIO，等待中断处理 */

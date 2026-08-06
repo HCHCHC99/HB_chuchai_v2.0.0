@@ -8,6 +8,7 @@
 #include "Adc.h"
 #include "Dma.h"
 #include "Gpio_io.h"
+#include "EventRecorder.h"
 #include "rtt_log.h"
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +22,19 @@ static uint8_t s_u8AdcInstanceCount = 0;
 static bool s_bAdcInitialized = false;
 static bool s_bHasDmaInstance = false;
 static int8_t s_a8AdcIdToDmaId[ADC_MAX_INSTANCES];
+
+/* Keil Logic Analyzer: ADC ISR busy flag (1=ISR running, 0=idle) */
+#define ADC_ISR_DBG_VAR_ENABLE
+volatile uint32_t g_dbg_adc_isr_busy = 0;
+volatile uint32_t g_dbg_adc_isr_count = 0;       /* ADC ISR 执行次数(递增斜坡) */
+volatile uint32_t g_dbg_adc_isr_last_cycles = 0; /* ADC ISR 最近一次执行耗时(DWT周期, /200MHz=秒) */
+
+/* Event Recorder: ADC ISR 执行时间（Start/Stop 成对） */
+#define ADC_EVENTREC_ENABLE
+#define ADC_EVENTREC_DIV    (10U)   /* 每 N 次 ADC ISR 记录一次，避免刷爆 2048 缓冲 */
+#ifdef ADC_EVENTREC_ENABLE
+static uint32_t s_u32AdcErDiv = 0U;
+#endif
 
 /*******************************************************************************
  * Local function prototypes ('static')
@@ -91,6 +105,13 @@ static void Adc_SetPinAnalogMode(uint8_t u8Port, uint8_t u8Pin)
 static void Adc_InitConfig(void)
 {
     stc_adc_init_t stcAdcInit;
+
+#ifdef ADC_ISR_DBG_VAR_ENABLE
+    /* Enable DWT cycle counter for debug (Logic Analyzer / Watch) */
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0U;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+#endif
 
 #ifdef ADC_DEBUG_TOGGLE_ENABLE
     LL_PERIPH_WE(LL_PERIPH_GPIO);
@@ -227,14 +248,29 @@ static void Adc_ProcessInterruptChannels(void)
 
 static void ADC1_SeqA_IrqCallback(void)
 {
-#ifdef ADC_DEBUG_TOGGLE_ENABLE
-    LL_PERIPH_WE(LL_PERIPH_GPIO);
-    GPIO_TOGGLE(ADC_DEBUG_TOGGLE_PORT, ADC_DEBUG_TOGGLE_PIN);
-    LL_PERIPH_WP(LL_PERIPH_GPIO);
+#ifdef ADC_ISR_DBG_VAR_ENABLE
+    uint32_t u32DbgStart = DWT->CYCCNT;
+    g_dbg_adc_isr_busy = 1;
+    g_dbg_adc_isr_count++;
+#endif
+#ifdef ADC_EVENTREC_ENABLE
+    if ((++s_u32AdcErDiv % ADC_EVENTREC_DIV) == 0U) {
+        EventStartA(0);
+    }
 #endif
 
     ADC_ClearStatus(ADC_UNIT, ADC_FLAG_EOCA);
     Adc_ProcessInterruptChannels();
+
+#ifdef ADC_ISR_DBG_VAR_ENABLE
+    g_dbg_adc_isr_last_cycles = DWT->CYCCNT - u32DbgStart;
+    g_dbg_adc_isr_busy = 0;
+#endif
+#ifdef ADC_EVENTREC_ENABLE
+    if ((s_u32AdcErDiv % ADC_EVENTREC_DIV) == 0U) {
+        EventStopA(0);
+    }
+#endif
 }
 
 static void Adc_HardTriggerStart(void)
