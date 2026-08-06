@@ -65,7 +65,7 @@ extern "C" {
 #define ADC_SEQA_INT_SRC                (INT_SRC_ADC1_EOCA)
 #define ADC_SEQA_INT_IRQn               (INT116_IRQn)
 
-/* 调试开关：关闭 ADC 采样中断（排查 485 是否受 ADC 中断影响；置 0 后过流/电压检测停止，测试完改回 1） */
+/* 调试开关：关闭 ADC 采样中断（排�? 485 是否�? ADC 中断影响；置 0 后过�?/电压检测停止，测试完改�? 1�? */
 #define ADC_SAMPLE_IRQ_ENABLE        1
 
 /* ADC debug toggle pin - comment to disable */
