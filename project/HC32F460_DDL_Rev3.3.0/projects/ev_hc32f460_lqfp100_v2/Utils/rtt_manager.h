@@ -51,6 +51,7 @@
 // #define APP_MODBUS_RX_DBG           /* Modbus 原始帧接收 */
 // #define APP_MODBUS_PARSE_DBG        /* Modbus 帧解析 */
 // #define APP_MODBUS_CRC_DBG          /* Modbus CRC 校验（日志量大，调试时按需开启） */
+#define APP_MODBUS_FRAME_DUMP        /* Modbus 整帧打印（调试用：一次性打印收到的原始字节，调试完请注释） */
 // #define APP_MODBUS_AUTO_DBG         /* Modbus 自动发送（从机模式默认关闭） */
 
 /*=============================================================================
@@ -124,4 +125,3 @@ void RTT_ClearSkippedCount(RTT_IntervalPrinter_t* printer);
 
 
 #endif /* __RTT_MANAGER_H__ */
-

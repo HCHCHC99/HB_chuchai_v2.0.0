@@ -213,9 +213,9 @@ static void RS485_FrameParser(void)
         uint8_t discardBuf[32];
         while (discardLen > 0) {
             uint16_t chunk = (discardLen > sizeof(discardBuf)) ? sizeof(discardBuf) : discardLen;
-            // __disable_irq();
+            __disable_irq();
             BUF_Read(&m_stcRxRingBuf, discardBuf, chunk);
-            // __enable_irq();
+            __enable_irq();
             discardLen -= chunk;
         }
         available = BUF_UsedSize(&m_stcRxRingBuf);
@@ -236,9 +236,9 @@ static void RS485_FrameParser(void)
             frameLen = 256;
         }
 
-        // __disable_irq();
+        __disable_irq();
         BUF_Read(&m_stcRxRingBuf, frameBuf, frameLen);
-        // __enable_irq();
+        __enable_irq();
 
         FRAME_DEBUG("Frame done, size=%d", frameLen);
 
