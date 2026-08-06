@@ -145,7 +145,7 @@ static void Modbus_SendResponse(uint8_t *pBuf, uint16_t len)
     bRet = RS485_Send(pBuf, len + 2U);
     if (!bRet)
     {
-        MAIN_D("[MODBUS_ERR] RS485_Send FAILED! len=%d", (int)(len + 2U));
+//         MAIN_D("[MODBUS_ERR] RS485_Send FAILED! len=%d", (int)(len + 2U));
     }
 }
 
@@ -409,7 +409,7 @@ static void Modbus_HandleWriteSingle(uint8_t addr, uint16_t regAddr, uint16_t re
         /* 检查 bit3（FAULT_BIT_RESET）是否被设置，如果是则触发复位 */
         if (regValue & FAULT_BIT_RESET)
         {
-            MAIN_D("[MODBUS] REG_CTRL_CMD reset bit set, start reset delay %dms", (int)RESET_DELAY_MS);
+//             MAIN_D("[MODBUS] REG_CTRL_CMD reset bit set, start reset delay %dms", (int)RESET_DELAY_MS);
             m_bResetPending = true;
             nbDelay_Start(&m_stcResetDelay);
         }
@@ -428,7 +428,7 @@ static void Modbus_HandleWriteSingle(uint8_t addr, uint16_t regAddr, uint16_t re
     MODBUS_PARSE_DBG("write single OK, saved to Flash");
 
     /* 参数配置完成，启动复位延时 */
-    MAIN_D("[MODBUS] Param saved, hot-reload config %dms", (int)RESET_DELAY_MS);
+//     MAIN_D("[MODBUS] Param saved, hot-reload config %dms", (int)RESET_DELAY_MS);
         App_ReloadConfig();
         // nbDelay_Start(&m_stcResetDelay);  // no reset, using hot-reload
 }
@@ -451,7 +451,7 @@ static void Modbus_HandleWriteMulti(uint8_t addr, uint16_t startReg, uint16_t re
     bool     bIsCtrlCmd = false;      /* 是否包含 REG_CTRL_CMD */
     bool     bResetRequested = false; /* 是否触发了复位请求 */
 
-    MAIN_D("[GTGT] 0x10 enter: start=0x%04X count=%d", startReg, (int)regCount);
+//     MAIN_D("[GTGT] 0x10 enter: start=0x%04X count=%d", startReg, (int)regCount);
         MODBUS_PARSE_DBG("write multi: start=0x%04X, count=%d", startReg, (int)regCount);
 
     /* 限制写入数量 */
@@ -484,18 +484,18 @@ static void Modbus_HandleWriteMulti(uint8_t addr, uint16_t startReg, uint16_t re
         }
     }
 
-    MAIN_D("[GTGT] pre-check: cover=%d", (int)(startReg <= REG_ABS_TARGET_LO && (startReg + regCount) > REG_ABS_TARGET_LO));
+//     MAIN_D("[GTGT] pre-check: cover=%d", (int)(startReg <= REG_ABS_TARGET_LO && (startReg + regCount) > REG_ABS_TARGET_LO));
     if (startReg <= REG_ABS_TARGET_LO && (startReg + regCount) > REG_ABS_TARGET_LO)
     {
         if (!Param_IsCtrlUnlocked())
         {
-            MAIN_D("[GTGT] blocked: ctrl locked");
+//             MAIN_D("[GTGT] blocked: ctrl locked");
             Modbus_SendException(addr, MODBUS_FUNC_WRITE_MULTI, MODBUS_EXCEPTION_SLAVE_DEVICE_FAIL);
             return;
         }
         if (!Param_IsMotorStopped())
         {
-            MAIN_D("[GTGT] blocked: motor running");
+//             MAIN_D("[GTGT] blocked: motor running");
             Modbus_SendException(addr, MODBUS_FUNC_WRITE_MULTI, MODBUS_EXCEPTION_SLAVE_DEVICE_FAIL);
             return;
         }
@@ -549,7 +549,7 @@ static void Modbus_HandleWriteMulti(uint8_t addr, uint16_t startReg, uint16_t re
         }
     }
 
-    MAIN_D("[GTGT] write done, triggering GotoTarget");
+//     MAIN_D("[GTGT] write done, triggering GotoTarget");
     if (startReg <= REG_ABS_TARGET_LO && (startReg + regCount) > REG_ABS_TARGET_LO)
     {
         RunAngle_GotoTarget();
@@ -587,7 +587,7 @@ static void Modbus_HandleWriteMulti(uint8_t addr, uint16_t startReg, uint16_t re
         /* 如果触发了复位请求，启动复位延时 */
         if (bResetRequested)
         {
-            MAIN_D("[MODBUS] REG_CTRL_CMD reset bit set in multi write, start reset delay %dms", (int)RESET_DELAY_MS);
+//             MAIN_D("[MODBUS] REG_CTRL_CMD reset bit set in multi write, start reset delay %dms", (int)RESET_DELAY_MS);
             m_bResetPending = true;
             nbDelay_Start(&m_stcResetDelay);
         }
@@ -606,7 +606,7 @@ static void Modbus_HandleWriteMulti(uint8_t addr, uint16_t startReg, uint16_t re
     MODBUS_PARSE_DBG("write multi done, all saved to Flash");
 
     /* 参数配置完成，启动复位延时 */
-    MAIN_D("[MODBUS] Param saved, hot-reload config %dms", (int)RESET_DELAY_MS);
+//     MAIN_D("[MODBUS] Param saved, hot-reload config %dms", (int)RESET_DELAY_MS);
         App_ReloadConfig();
         // nbDelay_Start(&m_stcResetDelay);  // no reset, using hot-reload
 }
@@ -692,7 +692,7 @@ static void Modbus_ProcessFrame(uint8_t *buf, uint16_t len)
     MODBUS_CRC_DBG("CRC match OK, addr=0x%02X, func=0x%02X", addr, func);
 
     /* === 无条件打印：确认 CRC 校验通过并进入 switch === */
-    MAIN_D("[MODBUS_ENTRY] CRC OK! addr=0x%02X, func=0x%02X, entering switch", addr, func);
+//     MAIN_D("[MODBUS_ENTRY] CRC OK! addr=0x%02X, func=0x%02X, entering switch", addr, func);
 
     /* 根据功能码分发处理 */
     switch (func)
@@ -959,7 +959,7 @@ void Modbus_Init(void)
     // /* 初始化故障处理器（订阅电压/电流事件，更新故障码） */
     // FaultHandler_Init();
 
-    MAIN_D("System ready - modify g_SimRealtimeData in Keil Watch");
+//     MAIN_D("System ready - modify g_SimRealtimeData in Keil Watch");
 }
 
 /*=============================================================================
@@ -987,7 +987,7 @@ void Modbus_Poll(void)
     /* 4. 检查复位延时是否完成，完成则执行软件复位 */
     if (m_bResetPending && nbDelay_IsComplete(&m_stcResetDelay))
     {
-        MAIN_D("[MODBUS] Reset delay done, system reset now!");
+//         MAIN_D("[MODBUS] Reset delay done, system reset now!");
         m_bResetPending = false;
         __NVIC_SystemReset();
     }

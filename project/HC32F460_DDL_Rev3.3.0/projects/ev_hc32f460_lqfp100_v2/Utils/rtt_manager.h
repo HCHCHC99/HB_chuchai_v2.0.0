@@ -51,7 +51,7 @@
 // #define APP_MODBUS_RX_DBG           /* Modbus 原始帧接收 */
 // #define APP_MODBUS_PARSE_DBG        /* Modbus 帧解析 */
 // #define APP_MODBUS_CRC_DBG          /* Modbus CRC 校验（日志量大，调试时按需开启） */
-#define APP_MODBUS_FRAME_DUMP        /* Modbus 整帧打印（调试用：一次性打印收到的原始字节，调试完请注释） */
+// #define APP_MODBUS_FRAME_DUMP        /* Modbus 整帧打印（调试用，默认关闭） */
 // #define APP_MODBUS_AUTO_DBG         /* Modbus 自动发送（从机模式默认关闭） */
 
 /*=============================================================================
@@ -71,7 +71,7 @@
 // #define DEBUG_SENSOR_SLOW
 // #define DEV_MOTOR_HALL              /* 电机霍尔 */
 // #define DEV_MOTOR_HALL_OUTPUT       /* 电机霍尔输出 */
-#define DEV_SENSOR_TIMER_DEBUG          // 启用定时器调试日志
+// #define DEV_SENSOR_TIMER_DEBUG          // 启用定时器调试日志（默认关闭）
 // #define DEV_SENSOR_EMA_DEBUG           // 启用 EMA 值打印
 /*=============================================================================
  * [UTILS] 工具层调试开关

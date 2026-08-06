@@ -657,7 +657,7 @@ void ESystem_Init(void) {
  */
 void App_ReloadConfig(void)
 {
-    MAIN_D("[RELOAD] Reloading config from g_AppParam...\r\n");
+//     MAIN_D("[RELOAD] Reloading config from g_AppParam...\r\n");
 
     /* --- 电压设备：重载阈值和参数 --- */
     if (g_voltage_bus_dev != NULL)
@@ -675,9 +675,9 @@ void App_ReloadConfig(void)
         g_voltage_bus_dev->stcConfig.u8UndervoltageTriggerCount =
             g_AppParam.undervoltage_trigger_count;
 
-        MAIN_D("[RELOAD] Voltage: over=%lu mV, under=%lu mV\r\n",
-               g_voltage_bus_dev->stcConfig.u32OvervoltageThresholdMv,
-               g_voltage_bus_dev->stcConfig.u32UndervoltageThresholdMv);
+//         MAIN_D("[RELOAD] Voltage: over=%lu mV, under=%lu mV\r\n",
+//                g_voltage_bus_dev->stcConfig.u32OvervoltageThresholdMv,
+//                g_voltage_bus_dev->stcConfig.u32UndervoltageThresholdMv);
     }
 
     /* --- 电流传感器：重载阈值和参数 --- */
@@ -692,10 +692,10 @@ void App_ReloadConfig(void)
         g_sensor_current_dev->stcConfig.s32OvercurrentHysteresisMa =
             (int32_t)g_AppParam.current_hysteresis_ma;
 
-        MAIN_D("[RELOAD] Current: threshold=%ld mA, trigger=%lu ms, release=%lu ms\r\n",
-               (long)g_sensor_current_dev->stcConfig.s32OvercurrentThresholdMa,
-               (unsigned long)g_sensor_current_dev->stcConfig.u32TriggerWindowMs,
-               (unsigned long)g_sensor_current_dev->stcConfig.u32ReleaseWindowMs);
+//         MAIN_D("[RELOAD] Current: threshold=%ld mA, trigger=%lu ms, release=%lu ms\r\n",
+//                (long)g_sensor_current_dev->stcConfig.s32OvercurrentThresholdMa,
+//                (unsigned long)g_sensor_current_dev->stcConfig.u32TriggerWindowMs,
+//                (unsigned long)g_sensor_current_dev->stcConfig.u32ReleaseWindowMs);
     }
 
     /* 设备地址 (node_id) 由 Flash 存储，在 Param_Init 时已加载 */
@@ -709,10 +709,10 @@ void App_ReloadConfig(void)
             (float)g_AppParam.open_limit_angle / 10.0f;
         g_rturn_dev->stcConfig.fMinAngle =
             (float)g_AppParam.close_limit_angle / 10.0f;
-        MAIN_D("[RELOAD] Reduction ratio: %.1f, MaxAngle: %.1f, MinAngle: %.1f\r\n",
-               (double)g_rturn_dev->stcConfig.fReductionRatio,
-               (double)g_rturn_dev->stcConfig.fMaxAngle,
-               (double)g_rturn_dev->stcConfig.fMinAngle);
+//         MAIN_D("[RELOAD] Reduction ratio: %.1f, MaxAngle: %.1f, MinAngle: %.1f\r\n",
+//                (double)g_rturn_dev->stcConfig.fReductionRatio,
+//                (double)g_rturn_dev->stcConfig.fMaxAngle,
+//                (double)g_rturn_dev->stcConfig.fMinAngle);
     }
 
     /* --- 电机霍尔：重载极对数 --- */
@@ -722,11 +722,11 @@ void App_ReloadConfig(void)
                                   (uint8_t)g_AppParam.motor_hall_pole_pairs);
         g_motor_hall_dev->config.pole_pairs =
             (uint8_t)g_AppParam.motor_hall_pole_pairs;
-        MAIN_D("[RELOAD] Pole pairs: %d\r\n",
-               (int)g_AppParam.motor_hall_pole_pairs);
+//         MAIN_D("[RELOAD] Pole pairs: %d\r\n",
+//                (int)g_AppParam.motor_hall_pole_pairs);
     }
 
-    MAIN_D("[RELOAD] Config reload complete.\r\n");
+//     MAIN_D("[RELOAD] Config reload complete.\r\n");
 }
 
 void ESystem_MainLoop(void) {

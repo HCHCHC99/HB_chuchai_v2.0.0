@@ -369,14 +369,14 @@ __weak void Motor_OnArbitrationStop(MotorDevice_t* motor) {
         uint64_t u64NowUs = Timer6_Timebase_GetTimestamp();
         uint64_t u64ElapsedUs = u64NowUs - g_u64OcTriggerUs;
         if (u64ElapsedUs < 200000UL) {   /* 200ms 内视为过流链路导致的停车 */
-            MAIN_D("[OC] trigger_us=%lu estop_us=%lu elapsed=%lu us reset_cnt=%u\r\n",
-                   (unsigned long)g_u64OcTriggerUs,
-                   (unsigned long)u64NowUs,
-                   (unsigned long)u64ElapsedUs,
-                   (unsigned int)g_dbg_isr_oc_reset_cnt);
+//             MAIN_D("[OC] trigger_us=%lu estop_us=%lu elapsed=%lu us reset_cnt=%u\r\n",
+//                    (unsigned long)g_u64OcTriggerUs,
+//                    (unsigned long)u64NowUs,
+//                    (unsigned long)u64ElapsedUs,
+//                    (unsigned int)g_dbg_isr_oc_reset_cnt);
         } else {
-            MAIN_D("[OC] estop without OC trigger (elapsed=%lu us)\r\n",
-                   (unsigned long)u64ElapsedUs);
+//             MAIN_D("[OC] estop without OC trigger (elapsed=%lu us)\r\n",
+//                    (unsigned long)u64ElapsedUs);
         }
     }
 }
@@ -482,13 +482,13 @@ static const MotorDeviceGene_t* Motor_GetGene(MotorDeviceId_t id) {
 
 static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id) {
     if (id == DEV_ID_RTURN_FWD || id == DEV_ID_RTURN_REV) {
-        MAIN_D("[REMOVE_DEBUG] Trying to remove id=%d from queue at 0x%p, current count=%d\r\n",
-               id, q, q->count);
+//         MAIN_D("[REMOVE_DEBUG] Trying to remove id=%d from queue at 0x%p, current count=%d\r\n",
+//                id, q, q->count);
         // 打印当前队列位置
     }
     for (int i = 0; i < q->count; i++) {
         if (q->commands[i].device_id == id) {
-            MAIN_D("[REMOVE_DEBUG] FOUND and REMOVED id=%d from queue at 0x%p\r\n", id, q);
+//             MAIN_D("[REMOVE_DEBUG] FOUND and REMOVED id=%d from queue at 0x%p\r\n", id, q);
             for (int j = i; j < q->count - 1; j++) {
                 q->commands[j] = q->commands[j + 1];
             }
@@ -519,7 +519,7 @@ static void Motor_CmdList_Remove(MotorCommandList_t* q, MotorDeviceId_t id) {
 static void Motor_CmdList_SetAllow(MotorCommandList_t* q, MotorCommandList_t* block_q, MotorControlCommand_t cmd) {
     // 安全检�?: block非空则拒绝allow写入
     if (block_q != NULL && block_q->count > 0) {
-        MAIN_D("[SET_ALLOW] rejected: block_q count=%d, dev_id=%d\r\n", block_q->count, cmd.device_id);
+//         MAIN_D("[SET_ALLOW] rejected: block_q count=%d, dev_id=%d\r\n", block_q->count, cmd.device_id);
         return;
     }
     Motor_CmdList_Remove(q, cmd.device_id);
@@ -734,15 +734,15 @@ static void Motor_ArbitrationDecision(MotorDevice_t* motor) {
 
 void Motor_OnOvercurrent(void* payload) {
     MotorOvercurrentEvent_t* ev = (MotorOvercurrentEvent_t*)payload;
-    MAIN_D("Motor: Overcurrent event! ADC=%d, Current=%d mA, Threshold=%d mA, Duration=%lu ms\r\n",
-           ev->adc_id, ev->current_ma, ev->threshold_ma, ev->duration_ms);
+//     MAIN_D("Motor: Overcurrent event! ADC=%d, Current=%d mA, Threshold=%d mA, Duration=%lu ms\r\n",
+//            ev->adc_id, ev->current_ma, ev->threshold_ma, ev->duration_ms);
 
     // 执行紧急停�?
     DeviceNode_t* node = DeviceManager_Get(DEV_MOTOR_ID);
     if (node && node->private_data) {
         MotorDevice_t* motor = (MotorDevice_t*)node->private_data;
         Motor_EmergencyStop(motor);
-        MAIN_D("Motor: Emergency stop due to overcurrent!\r\n");
+//         MAIN_D("Motor: Emergency stop due to overcurrent!\r\n");
     }
 }
 
@@ -787,8 +787,8 @@ void Motor_OnVoltageAlarm(void* payload) {
         };
         Motor_CmdList_SetBlock(&motor->block_rev, block_rev_cmd);
 
-        MAIN_D("Motor: %s alarm! Bus=%lu mV, Threshold=%lu mV - Block both directions!\r\n",
-               alarm_name, ev->u32BusVoltageMv, ev->u32ThresholdMv);
+//         MAIN_D("Motor: %s alarm! Bus=%lu mV, Threshold=%lu mV - Block both directions!\r\n",
+//                alarm_name, ev->u32BusVoltageMv, ev->u32ThresholdMv);
     } else {
         // 报警解除 - 根据报警类型使用对应的设备ID�? block_fwd/block_rev 移除阻塞指令
         MotorDeviceId_t dev_id_fwd, dev_id_rev;
@@ -807,8 +807,8 @@ void Motor_OnVoltageAlarm(void* payload) {
         Motor_CmdList_Remove(&motor->block_fwd, dev_id_fwd);
         Motor_CmdList_Remove(&motor->block_rev, dev_id_rev);
 
-        MAIN_D("Motor: %s released! Bus=%lu mV - Unblock both directions\r\n",
-               alarm_name, ev->u32BusVoltageMv);
+//         MAIN_D("Motor: %s released! Bus=%lu mV - Unblock both directions\r\n",
+//                alarm_name, ev->u32BusVoltageMv);
     }
 
     Motor_ArbitrationDecision(motor);
@@ -835,23 +835,23 @@ void Motor_OnRTurnLimit(void* payload) {
             Motor_CmdList_SetBlock(&motor->block_fwd, cmd);
             // 同时清空 allow_fwd，确保即�? block 被移除也不会立即恢复正转
             Motor_ClearAllowFwd(motor);
-            MAIN_D("Motor: RTurn forward limit triggered, block forward + clear allow_fwd\r\n");
+//             MAIN_D("Motor: RTurn forward limit triggered, block forward + clear allow_fwd\r\n");
         } else {
             cmd.type = CMD_TYPE_BLOCK_REV;
             Motor_CmdList_SetBlock(&motor->block_rev, cmd);
             // 同时清空 allow_rev，确保即�? block 被移除也不会立即恢复反转
             Motor_ClearAllowRev(motor);
-            MAIN_D("Motor: RTurn reverse limit triggered, block reverse + clear allow_rev\r\n");
+//             MAIN_D("Motor: RTurn reverse limit triggered, block reverse + clear allow_rev\r\n");
         }
     } else {
         // 限位解除：移�? BLOCK 指令（使�? RTurn 专用设备ID�?
         MotorDeviceId_t id = (ev->u8Direction == RTURN_LIMIT_FORWARD) ? DEV_ID_RTURN_FWD : DEV_ID_RTURN_REV;
         if (ev->u8Direction == RTURN_LIMIT_FORWARD) {
             Motor_CmdList_Remove(&motor->block_fwd, id);
-            MAIN_D("Motor: RTurn forward limit released\r\n");
+//             MAIN_D("Motor: RTurn forward limit released\r\n");
         } else if (ev->u8Direction == RTURN_LIMIT_REVERSE) {
             Motor_CmdList_Remove(&motor->block_rev, id);
-            MAIN_D("Motor: RTurn reverse limit released\r\n");
+//             MAIN_D("Motor: RTurn reverse limit released\r\n");
         } else {
             // 方向�?0时，移除两个方向
             Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_RTURN_FWD);
@@ -887,21 +887,21 @@ void Motor_OnCurrentAlarm(void* payload) {
             };
             Motor_CmdList_SetBlock(&motor->block_fwd, block_fwd_cmd);
 
-            MAIN_D("Motor: OVERCURRENT alarm (FWD)! Current=%ld mA, Threshold=%ld mA - Block forward!\r\n",
-                   (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
+//             MAIN_D("Motor: OVERCURRENT alarm (FWD)! Current=%ld mA, Threshold=%ld mA - Block forward!\r\n",
+//                    (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
         }
         else
         {
             // 反转或停止时过流 -> 不阻塞，这是预期的到位堵�?
-            MAIN_D("Motor: OVERCURRENT alarm (dir=%d, REV/STOP is normal stall)! Current=%ld mA, Threshold=%ld mA - Skip block forward\r\n",
-                   (int)eDesiredDir, (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
+//             MAIN_D("Motor: OVERCURRENT alarm (dir=%d, REV/STOP is normal stall)! Current=%ld mA, Threshold=%ld mA - Skip block forward\r\n",
+//                    (int)eDesiredDir, (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
         }
     } else {
         // 电流报警解除 - �? block_fwd 移除 DEV_ID_OVERCUR_FWD
         Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_OVERCUR_FWD);
 
-        MAIN_D("Motor: OVERCURRENT released! Current=%ld mA - Unblock forward\r\n",
-               (long)ev->s32CurrentMa);
+//         MAIN_D("Motor: OVERCURRENT released! Current=%ld mA - Unblock forward\r\n",
+//                (long)ev->s32CurrentMa);
     }
 
     Motor_ArbitrationDecision(motor);
@@ -924,12 +924,12 @@ void Motor_OnOvercurrentFwd(void* payload) {
             .timestamp = tickTimer_GetCount()
         };
         Motor_CmdList_SetBlock(&motor->block_fwd, block_cmd);
-        MAIN_D("Motor: OVERCURRENT FWD alarm! Current=%ld mA, Threshold=%ld mA - Block forward!\r\n",
-               (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
+//         MAIN_D("Motor: OVERCURRENT FWD alarm! Current=%ld mA, Threshold=%ld mA - Block forward!\r\n",
+//                (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
     } else {
         Motor_CmdList_Remove(&motor->block_fwd, DEV_ID_OVERCUR_FWD);
-        MAIN_D("Motor: OVERCURRENT FWD released! Current=%ld mA - Unblock forward\r\n",
-               (long)ev->s32CurrentMa);
+//         MAIN_D("Motor: OVERCURRENT FWD released! Current=%ld mA - Unblock forward\r\n",
+//                (long)ev->s32CurrentMa);
     }
 
     Motor_ArbitrationDecision(motor);
@@ -952,12 +952,12 @@ void Motor_OnOvercurrentRev(void* payload) {
             .timestamp = tickTimer_GetCount()
         };
         Motor_CmdList_SetBlock(&motor->block_rev, block_cmd);
-        MAIN_D("Motor: OVERCURRENT REV alarm! Current=%ld mA, Threshold=%ld mA - Block reverse!\r\n",
-               (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
+//         MAIN_D("Motor: OVERCURRENT REV alarm! Current=%ld mA, Threshold=%ld mA - Block reverse!\r\n",
+//                (long)ev->s32CurrentMa, (long)ev->s32ThresholdMa);
     } else {
         Motor_CmdList_Remove(&motor->block_rev, DEV_ID_OVERCUR_REV);
-        MAIN_D("Motor: OVERCURRENT REV released! Current=%ld mA - Unblock reverse\r\n",
-               (long)ev->s32CurrentMa);
+//         MAIN_D("Motor: OVERCURRENT REV released! Current=%ld mA - Unblock reverse\r\n",
+//                (long)ev->s32CurrentMa);
     }
 
     Motor_ArbitrationDecision(motor);
@@ -998,7 +998,7 @@ void Motor_OnHardLimit(void* payload) {
 
 void Motor_OnPowerEvent(void* payload) {
     MotorPowerEvent_t* ev = (MotorPowerEvent_t*)payload;
-    MAIN_D("[MOTOR] OnPowerEvent: power_id=%d, is_on=%d\r\n", ev->power_id, ev->is_on);
+//     MAIN_D("[MOTOR] OnPowerEvent: power_id=%d, is_on=%d\r\n", ev->power_id, ev->is_on);
 
     DeviceNode_t* node = DeviceManager_Get(DEV_MOTOR_ID);
     if (!node || !node->private_data) return;
@@ -1023,27 +1023,27 @@ void Motor_OnPowerEvent(void* payload) {
         if (id == DEV_ID_POWER_POS) {
             cmd.type = CMD_TYPE_RUN_FWD;
             Motor_CmdList_SetAllow(&motor->allow_fwd, &motor->block_fwd, cmd);
-            MAIN_D("[MOTOR] Bipolar: POWER_POS ON, added allow_fwd\r\n");
+//             MAIN_D("[MOTOR] Bipolar: POWER_POS ON, added allow_fwd\r\n");
         } else {
             cmd.type = CMD_TYPE_RUN_REV;
             Motor_CmdList_SetAllow(&motor->allow_rev, &motor->block_rev, cmd);
-            MAIN_D("[MOTOR] Bipolar: POWER_NEG ON, added allow_rev\r\n");
+//             MAIN_D("[MOTOR] Bipolar: POWER_NEG ON, added allow_rev\r\n");
         }
     } else {
         if (id == DEV_ID_POWER_POS) {
             Motor_CmdList_Remove(&motor->allow_fwd, id);
-            MAIN_D("[MOTOR] Bipolar: POWER_POS OFF, removed allow_fwd\r\n");
+//             MAIN_D("[MOTOR] Bipolar: POWER_POS OFF, removed allow_fwd\r\n");
         } else {
             Motor_CmdList_Remove(&motor->allow_rev, id);
-            MAIN_D("[MOTOR] Bipolar: POWER_NEG OFF, removed allow_rev\r\n");
+//             MAIN_D("[MOTOR] Bipolar: POWER_NEG OFF, removed allow_rev\r\n");
         }
     }
 #else
     // ========== 单极性模�? ==========
     // 单极性模式下电源设备不参与仲裁，不产生任何操�?
     // 由其他设备（如手动IO）提供某方向的ALLOW正转
-    MAIN_D("[MOTOR] Unipolar mode: power_id=%d, is_on=%d - power device not involved in arbitration\r\n",
-           ev->power_id, ev->is_on);
+//     MAIN_D("[MOTOR] Unipolar mode: power_id=%d, is_on=%d - power device not involved in arbitration\r\n",
+//            ev->power_id, ev->is_on);
 #endif
 
     Motor_ArbitrationDecision(motor);
@@ -1054,18 +1054,18 @@ void Motor_OnManualIO(void* payload) {
 
     // 先检查接收数据是否有�?
     if (ev == NULL) {
-        MAIN_D("[MOTOR] OnManualIO: NULL payload!\r\n");
+//         MAIN_D("[MOTOR] OnManualIO: NULL payload!\r\n");
         return;
     }
 
     // 打印原始事件数据，使用十六进制打印便于分�?
     uint32_t speed_raw = *(uint32_t*)&ev->speed;
-    MAIN_D("[MOTOR] OnManualIO RAW: dir=%d, type=%d, speed_raw=0x%08X\r\n",
-           ev->dir, ev->type, speed_raw);
+//     MAIN_D("[MOTOR] OnManualIO RAW: dir=%d, type=%d, speed_raw=0x%08X\r\n",
+//            ev->dir, ev->type, speed_raw);
 
     DeviceNode_t* node = DeviceManager_Get(DEV_MOTOR_ID);
     if (!node || !node->private_data) {
-        MAIN_D("[MOTOR] OnManualIO: Device not found!\r\n");
+//         MAIN_D("[MOTOR] OnManualIO: Device not found!\r\n");
         return;
     }
 
@@ -1082,7 +1082,7 @@ void Motor_OnManualIO(void* payload) {
         io_dev_id = DEV_ID_NONE;
     } else {
         // 无效�? dir �?
-        MAIN_D("[MOTOR] OnManualIO: Invalid dir=%d, expected 0,1,2\r\n", ev->dir);
+//         MAIN_D("[MOTOR] OnManualIO: Invalid dir=%d, expected 0,1,2\r\n", ev->dir);
         return;
     }
 
@@ -1090,23 +1090,23 @@ void Motor_OnManualIO(void* payload) {
     if (io_dev_id != DEV_ID_NONE) {
         gene = Motor_GetGene(io_dev_id);
         if (!gene) {
-            MAIN_D("[MOTOR] OnManualIO: gene not found for dev_id=%d!\r\n", io_dev_id);
+//             MAIN_D("[MOTOR] OnManualIO: gene not found for dev_id=%d!\r\n", io_dev_id);
             return;
         }
     }
 
     // 打印关键信息 - 将浮点数转换为整数打�?
     int32_t speed_int = (int32_t)(ev->speed * 10);
-    MAIN_D("[MOTOR] OnManualIO: dir=%d, type=%d, speed=%ld.%ld%%, io_dev_id=%d\r\n",
-           ev->dir, ev->type, (long)(speed_int / 10), (long)(speed_int % 10), io_dev_id);
-    MAIN_D("[MOTOR] OnManualIO: Before - allow_fwd.count=%d, allow_rev.count=%d, block_fwd.count=%d, block_rev.count=%d\r\n",
-           motor->allow_fwd.count, motor->allow_rev.count, motor->block_fwd.count, motor->block_rev.count);
+//     MAIN_D("[MOTOR] OnManualIO: dir=%d, type=%d, speed=%ld.%ld%%, io_dev_id=%d\r\n",
+//            ev->dir, ev->type, (long)(speed_int / 10), (long)(speed_int % 10), io_dev_id);
+//     MAIN_D("[MOTOR] OnManualIO: Before - allow_fwd.count=%d, allow_rev.count=%d, block_fwd.count=%d, block_rev.count=%d\r\n",
+//            motor->allow_fwd.count, motor->allow_rev.count, motor->block_fwd.count, motor->block_rev.count);
 
     // 处理具体指令
     if (ev->type == CMD_TYPE_RUN_FWD || ev->type == CMD_TYPE_RAMP_FWD) {
         // 检�? io_dev_id 是否正确
         if (io_dev_id != DEV_ID_IO_FWD) {
-            MAIN_D("[MOTOR] ERROR: RUN_FWD but io_dev_id=%d (expected %d)\r\n", io_dev_id, DEV_ID_IO_FWD);
+//             MAIN_D("[MOTOR] ERROR: RUN_FWD but io_dev_id=%d (expected %d)\r\n", io_dev_id, DEV_ID_IO_FWD);
             return;
         }
 
@@ -1122,12 +1122,12 @@ void Motor_OnManualIO(void* payload) {
         Motor_CmdList_Remove(&motor->block_fwd, io_dev_id);
         Motor_CmdList_SetAllow(&motor->allow_fwd, &motor->block_fwd, cmd);
 
-        MAIN_D("[MOTOR] IO_FWD: RUN, removed block_fwd, added allow_fwd\r\n");
+//         MAIN_D("[MOTOR] IO_FWD: RUN, removed block_fwd, added allow_fwd\r\n");
     }
     else if (ev->type == CMD_TYPE_RUN_REV || ev->type == CMD_TYPE_RAMP_REV) {
         // 检�? io_dev_id 是否正确
         if (io_dev_id != DEV_ID_IO_REV) {
-            MAIN_D("[MOTOR] ERROR: RUN_REV but io_dev_id=%d (expected %d)\r\n", io_dev_id, DEV_ID_IO_REV);
+//             MAIN_D("[MOTOR] ERROR: RUN_REV but io_dev_id=%d (expected %d)\r\n", io_dev_id, DEV_ID_IO_REV);
             return;
         }
 
@@ -1143,7 +1143,7 @@ void Motor_OnManualIO(void* payload) {
         Motor_CmdList_Remove(&motor->block_rev, io_dev_id);
         Motor_CmdList_SetAllow(&motor->allow_rev, &motor->block_rev, cmd);
 
-        MAIN_D("[MOTOR] IO_REV: RUN, removed block_rev, added allow_rev\r\n");
+//         MAIN_D("[MOTOR] IO_REV: RUN, removed block_rev, added allow_rev\r\n");
     }
     else if (ev->type == CMD_TYPE_STOP) {
         if (ev->dir == DIR_FWD) {
@@ -1151,7 +1151,7 @@ void Motor_OnManualIO(void* payload) {
             if (gene == NULL) {
                 gene = Motor_GetGene(DEV_ID_IO_FWD);
                 if (!gene) {
-                    MAIN_D("[MOTOR] OnManualIO: gene not found for IO_FWD!\r\n");
+//                     MAIN_D("[MOTOR] OnManualIO: gene not found for IO_FWD!\r\n");
                     return;
                 }
             }
@@ -1166,14 +1166,14 @@ void Motor_OnManualIO(void* payload) {
             };
             // Motor_CmdList_SetBlock(&motor->block_fwd, block_cmd);
 
-            MAIN_D("[MOTOR] IO_FWD: STOP, removed allow_fwd, added block_fwd\r\n");
+//             MAIN_D("[MOTOR] IO_FWD: STOP, removed allow_fwd, added block_fwd\r\n");
         }
         else if (ev->dir == DIR_REV) {
             // IO_REV停止：移除自己的ALLOW，添加自己的BLOCK
             if (gene == NULL) {
                 gene = Motor_GetGene(DEV_ID_IO_REV);
                 if (!gene) {
-                    MAIN_D("[MOTOR] OnManualIO: gene not found for IO_REV!\r\n");
+//                     MAIN_D("[MOTOR] OnManualIO: gene not found for IO_REV!\r\n");
                     return;
                 }
             }
@@ -1188,7 +1188,7 @@ void Motor_OnManualIO(void* payload) {
             };
             // Motor_CmdList_SetBlock(&motor->block_rev, block_cmd);
 
-            MAIN_D("[MOTOR] IO_REV: STOP, removed allow_rev, added block_rev\r\n");
+//             MAIN_D("[MOTOR] IO_REV: STOP, removed allow_rev, added block_rev\r\n");
         }
         else {
             // 停止所有IO设备：移除各自的ALLOW，添加各自的BLOCK
@@ -1218,11 +1218,11 @@ void Motor_OnManualIO(void* payload) {
                 // Motor_CmdList_SetBlock(&motor->block_rev, block_rev_cmd);
             }
 
-            MAIN_D("[MOTOR] All IO: STOP, removed all allow, added all block\r\n");
+//             MAIN_D("[MOTOR] All IO: STOP, removed all allow, added all block\r\n");
         }
     }
     else {
-        MAIN_D("[MOTOR] OnManualIO: Unknown type=%d\r\n", ev->type);
+//         MAIN_D("[MOTOR] OnManualIO: Unknown type=%d\r\n", ev->type);
         return;
     }
 

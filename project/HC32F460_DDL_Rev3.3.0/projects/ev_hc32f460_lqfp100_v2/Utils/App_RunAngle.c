@@ -102,8 +102,8 @@ void RunAngle_Init(void)
     /* Reset fractional accumulator on init */
     s_angle_accumulator = 0.0f;
 
-    MAIN_D("[ABSA] Init: ram=%ld (0.1deg), flash=%ld, accum_base=%ld\r\n",
-           (long)s_abs_offset_x10, (long)g_AbsAngle.abs_offset_x10, (long)s_last_accum);
+//     MAIN_D("[ABSA] Init: ram=%ld (0.1deg), flash=%ld, accum_base=%ld\r\n",
+//            (long)s_abs_offset_x10, (long)g_AbsAngle.abs_offset_x10, (long)s_last_accum);
 }
 
 void RunAngle_Update(void)
@@ -146,8 +146,8 @@ void RunAngle_Update(void)
             ev.dir  = DIR_NONE;
             EventBus_Publish(TOPIC_MANUAL_RS485, &ev);
             s_goto_zero_active = false;
-            MAIN_D("[ABSA] Goto-ref complete: offset=%ld, ref=%ld, dist=%ld\r\n",
-                   (long)s_abs_offset_x10, (long)ref, (long)dist);
+//             MAIN_D("[ABSA] Goto-ref complete: offset=%ld, ref=%ld, dist=%ld\r\n",
+//                    (long)s_abs_offset_x10, (long)ref, (long)dist);
         }
     }
 
@@ -162,8 +162,8 @@ void RunAngle_Update(void)
             ev.dir  = DIR_NONE;
             EventBus_Publish(TOPIC_MANUAL_RS485, &ev);
             s_goto_target_active = false;
-            MAIN_D("[ABSA] Goto-target complete: offset=%ld, target=%ld, dist=%ld\r\n",
-                   (long)s_abs_offset_x10, (long)s_target_x10, (long)dist);
+//             MAIN_D("[ABSA] Goto-target complete: offset=%ld, target=%ld, dist=%ld\r\n",
+//                    (long)s_abs_offset_x10, (long)s_target_x10, (long)dist);
         }
     }
 }
@@ -189,15 +189,15 @@ void RunAngle_Cmd(uint16_t cmd)
         s_angle_accumulator = 0.0f;
         Param_Save(&s_Config, &s_Runtime);
 
-        MAIN_D("[ABSA] Reference set: RAM=%ld, Flash=%ld (0x271C=%ld)\r\n",
-               (long)ref, (long)ref, (long)g_AppParam.close_limit_angle);
+//         MAIN_D("[ABSA] Reference set: RAM=%ld, Flash=%ld (0x271C=%ld)\r\n",
+//                (long)ref, (long)ref, (long)g_AppParam.close_limit_angle);
     } else if (cmd == ABS_CMD_SAVE) {
         /* Persist current RAM value to Flash */
         g_AbsAngle.abs_offset_x10 = s_abs_offset_x10;
         Param_Save(&s_Config, &s_Runtime);
 
-        MAIN_D("[ABSA] Saved: ram=%ld -> flash=%ld\r\n",
-               (long)s_abs_offset_x10, (long)g_AbsAngle.abs_offset_x10);
+//         MAIN_D("[ABSA] Saved: ram=%ld -> flash=%ld\r\n",
+//                (long)s_abs_offset_x10, (long)g_AbsAngle.abs_offset_x10);
     } else if (cmd == ABS_CMD_GOTO_ZERO) {
         RunAngle_GotoZero();
     }
@@ -209,13 +209,13 @@ void RunAngle_GotoZero(void)
 
     /* Gate 1: control must be unlocked (same lock as REG_CTRL_CMD bit3~bit5) */
     if (!Param_IsCtrlUnlocked()) {
-        MAIN_D("[ABSA] Goto-ref rejected: RS485 control locked\r\n");
+//         MAIN_D("[ABSA] Goto-ref rejected: RS485 control locked\r\n");
         return;
     }
 
     /* Gate 2: motor must be stopped before accepting goto-ref */
     if (!Param_IsMotorStopped()) {
-        MAIN_D("[ABSA] Goto-ref rejected: motor is running\r\n");
+//         MAIN_D("[ABSA] Goto-ref rejected: motor is running\r\n");
         return;
     }
 
@@ -230,20 +230,20 @@ void RunAngle_GotoZero(void)
         ev.type = CMD_TYPE_RUN_REV;
         s_goto_zero_active = true;
         s_goto_zero_initial_sign = true;   /* positive dist → expect sign flip to false */
-        MAIN_D("[ABSA] Goto-ref: cur=%ld, ref=%ld, dist=%ld (>0), REV\r\n",
-               (long)s_abs_offset_x10, (long)ref, (long)dist);
+//         MAIN_D("[ABSA] Goto-ref: cur=%ld, ref=%ld, dist=%ld (>0), REV\r\n",
+//                (long)s_abs_offset_x10, (long)ref, (long)dist);
     } else if (dist < -g_AbsAngle.goto_zero_thresh_x10) {
         /* Before reference → FWD to go forward */
         ev.dir  = DIR_FWD;
         ev.type = CMD_TYPE_RUN_FWD;
         s_goto_zero_active = true;
         s_goto_zero_initial_sign = false;  /* negative dist → expect sign flip to true */
-        MAIN_D("[ABSA] Goto-ref: cur=%ld, ref=%ld, dist=%ld (<0), FWD\r\n",
-               (long)s_abs_offset_x10, (long)ref, (long)dist);
+//         MAIN_D("[ABSA] Goto-ref: cur=%ld, ref=%ld, dist=%ld (<0), FWD\r\n",
+//                (long)s_abs_offset_x10, (long)ref, (long)dist);
     } else {
         /* Already at reference — nothing to do */
-        MAIN_D("[ABSA] Goto-ref: cur=%ld, ref=%ld, already at reference\r\n",
-               (long)s_abs_offset_x10, (long)ref);
+//         MAIN_D("[ABSA] Goto-ref: cur=%ld, ref=%ld, already at reference\r\n",
+//                (long)s_abs_offset_x10, (long)ref);
         return;
     }
 
@@ -254,13 +254,13 @@ void RunAngle_GotoTarget(void)
 {
     /* Gate 1: control must be unlocked */
     if (!Param_IsCtrlUnlocked()) {
-        MAIN_D("[ABSA] Goto-target rejected: RS485 control locked\r\n");
+//         MAIN_D("[ABSA] Goto-target rejected: RS485 control locked\r\n");
         return;
     }
 
     /* Gate 2: motor must be stopped */
     if (!Param_IsMotorStopped()) {
-        MAIN_D("[ABSA] Goto-target rejected: motor is running\r\n");
+//         MAIN_D("[ABSA] Goto-target rejected: motor is running\r\n");
         return;
     }
 
@@ -275,20 +275,20 @@ void RunAngle_GotoTarget(void)
         ev.type = CMD_TYPE_RUN_REV;
         s_goto_target_active = true;
         s_goto_zero_initial_sign = true;    /* positive dist → expect sign flip to false */
-        MAIN_D("[ABSA] Goto-target: cur=%ld, target=%ld, dist=%ld (>0), REV to target\r\n",
-               (long)s_abs_offset_x10, (long)s_target_x10, (long)dist);
+//         MAIN_D("[ABSA] Goto-target: cur=%ld, target=%ld, dist=%ld (>0), REV to target\r\n",
+//                (long)s_abs_offset_x10, (long)s_target_x10, (long)dist);
     } else if (dist < -g_AbsAngle.goto_zero_thresh_x10) {
         /* Current offset < target → FWD to go forward */
         ev.dir  = DIR_FWD;
         ev.type = CMD_TYPE_RUN_FWD;
         s_goto_target_active = true;
         s_goto_zero_initial_sign = false;   /* negative dist → expect sign flip to true */
-        MAIN_D("[ABSA] Goto-target: cur=%ld, target=%ld, dist=%ld (<0), FWD to target\r\n",
-               (long)s_abs_offset_x10, (long)s_target_x10, (long)dist);
+//         MAIN_D("[ABSA] Goto-target: cur=%ld, target=%ld, dist=%ld (<0), FWD to target\r\n",
+//                (long)s_abs_offset_x10, (long)s_target_x10, (long)dist);
     } else {
         /* Already at target */
-        MAIN_D("[ABSA] Goto-target: cur=%ld, target=%ld, already at target\r\n",
-               (long)s_abs_offset_x10, (long)s_target_x10);
+//         MAIN_D("[ABSA] Goto-target: cur=%ld, target=%ld, already at target\r\n",
+//                (long)s_abs_offset_x10, (long)s_target_x10);
         return;
     }
 
@@ -303,7 +303,7 @@ int32_t RunAngle_GetTarget_x10(void)
 void RunAngle_SetTarget_x10(int32_t target_x10)
 {
     s_target_x10 = target_x10;
-    MAIN_D("[ABSA] Target set: %ld (0.1 deg)\r\n", (long)target_x10);
+//     MAIN_D("[ABSA] Target set: %ld (0.1 deg)\r\n", (long)target_x10);
 }
 
 void RunAngle_SetThreshold(uint16_t thresh_x10)
@@ -318,7 +318,7 @@ void RunAngle_SetThreshold(uint16_t thresh_x10)
     g_AbsAngle.goto_zero_thresh_x10 = thresh_x10;
     Param_Save(&s_Config, &s_Runtime);
 
-    MAIN_D("[ABSA] Threshold set: %u (0.1 deg)\r\n", (unsigned int)thresh_x10);
+//     MAIN_D("[ABSA] Threshold set: %u (0.1 deg)\r\n", (unsigned int)thresh_x10);
 }
 
 void RunAngle_OnCalibration(void)
@@ -335,8 +335,8 @@ void RunAngle_OnCalibration(void)
     g_AbsAngle.abs_offset_x10 = ref;
     Param_Save(&s_Config, &s_Runtime);    /* persist to Flash sector 55 */
 
-    MAIN_D("[ABSA] Calibration: RAM=%ld, Flash=%ld (0x271C=%ld)\r\n",
-           (long)ref, (long)ref, (long)g_AppParam.close_limit_angle);
+//     MAIN_D("[ABSA] Calibration: RAM=%ld, Flash=%ld (0x271C=%ld)\r\n",
+//            (long)ref, (long)ref, (long)g_AppParam.close_limit_angle);
 }
 
 /** @brief Check if current absolute angle is within calibration range.
@@ -348,28 +348,28 @@ bool RunAngle_TryCalibrate(void)
     int32_t upper = (int32_t)g_AppParam.calib_upper_x10;
 
     if (s_abs_offset_x10 >= lower && s_abs_offset_x10 <= upper) {
-        MAIN_D("[ABSA] TryCalibrate: angle=%ld in [%ld,%ld], OK\r\n",
-               (long)s_abs_offset_x10, (long)lower, (long)upper);
+//         MAIN_D("[ABSA] TryCalibrate: angle=%ld in [%ld,%ld], OK\r\n",
+//                (long)s_abs_offset_x10, (long)lower, (long)upper);
         return true;
     }
-    MAIN_D("[ABSA] TryCalibrate: angle=%ld OUT of [%ld,%ld], rejected\r\n",
-           (long)s_abs_offset_x10, (long)lower, (long)upper);
+//     MAIN_D("[ABSA] TryCalibrate: angle=%ld OUT of [%ld,%ld], rejected\r\n",
+//            (long)s_abs_offset_x10, (long)lower, (long)upper);
     return false;
 }
 
 void RunAngle_JogFwd(uint16_t offset_x10)
 {
     s_target_x10 = s_abs_offset_x10 + (int32_t)offset_x10;
-    MAIN_D("[ABSA] JogFwd: offset=%u, target=%ld (0.1 deg)\r\n",
-           (unsigned int)offset_x10, (long)s_target_x10);
+//     MAIN_D("[ABSA] JogFwd: offset=%u, target=%ld (0.1 deg)\r\n",
+//            (unsigned int)offset_x10, (long)s_target_x10);
     RunAngle_GotoTarget();
 }
 
 void RunAngle_JogRev(uint16_t offset_x10)
 {
     s_target_x10 = s_abs_offset_x10 - (int32_t)offset_x10;
-    MAIN_D("[ABSA] JogRev: offset=%u, target=%ld (0.1 deg)\r\n",
-           (unsigned int)offset_x10, (long)s_target_x10);
+//     MAIN_D("[ABSA] JogRev: offset=%u, target=%ld (0.1 deg)\r\n",
+//            (unsigned int)offset_x10, (long)s_target_x10);
     RunAngle_GotoTarget();
 }
 
