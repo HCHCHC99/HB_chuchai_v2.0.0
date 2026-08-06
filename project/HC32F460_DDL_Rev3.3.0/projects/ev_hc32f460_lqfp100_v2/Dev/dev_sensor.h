@@ -149,6 +149,10 @@ typedef struct {
     NonBlockingDelay_t stcTriggerTimer;
     NonBlockingDelay_t stcReleaseTimer;
     uint8_t  u8TimerRunning;
+    volatile uint8_t u8OcTriggerPending;   /* ISR置位: 过流触发待主循环发布 */
+    volatile uint8_t u8OcReleasePending;   /* ISR置位: 过流恢复待主循环发布 */
+    int32_t  s32PendingCurrentMa;          /* 触发时刻电流(mA) */
+    int32_t  s32PendingThresholdMa;        /* 触发时刻阈值(mA) */
 } Sensor_AlarmState_t;
 
 // ========== 过流告警事件结构体 ==========
@@ -194,6 +198,7 @@ DeviceResult_t Sensor_Device_Read(void* handle, void* data, uint32_t size);
 DeviceResult_t Sensor_Device_Write(void* handle, const void* data, uint32_t size);
 DeviceResult_t Sensor_Device_Control(void* handle, DeviceCommandData_t* cmd);
 DeviceResult_t Sensor_Device_Update(void* handle);
+void Sensor_Device_UpdateIsr(Sensor_Device_t* pstcDev);   /* 1ms ISR快速路径：已校准后由中断调用 */
 
 // ========== 传感器取值接口 ==========
 int32_t Sensor_Device_GetCurrentMA(Sensor_Device_t* pstcDev);

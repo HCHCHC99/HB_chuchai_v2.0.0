@@ -70,7 +70,7 @@
 // #define DEBUG_SENSOR_SLOW
 // #define DEV_MOTOR_HALL              /* 电机霍尔 */
 // #define DEV_MOTOR_HALL_OUTPUT       /* 电机霍尔输出 */
-#define DEV_SENSOR_TIMER_DEBUG          // 启用定时器调试日志
+// #define DEV_SENSOR_TIMER_DEBUG          // 启用定时器调试日志
 // #define DEV_SENSOR_EMA_DEBUG           // 启用 EMA 值打印
 /*=============================================================================
  * [UTILS] 工具层调试开关

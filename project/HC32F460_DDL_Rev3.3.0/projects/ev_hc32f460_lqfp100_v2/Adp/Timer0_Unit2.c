@@ -8,6 +8,9 @@
 #include "Timer0_Unit2.h"
 #include "TickTimer.h"
 
+/* 1ms 心跳任务钩子：默认空实现，App 层可覆盖 */
+__attribute__((weak)) void TMR0_Unit2_1msTask(void) { }
+
 /*==============================================================================
  * 静态变量
  *============================================================================*/
@@ -178,6 +181,7 @@ static void TMR0_Unit2_IRQHandler(void)
     if (TMR0_GetStatus(TMR0_UNIT2, TMR0_FLAG_CMP_A) == SET) {
         TMR0_ClearStatus(TMR0_UNIT2, TMR0_FLAG_CMP_A);
         tickTimer_Update();  /* 假设通道A用于系统心跳 */
+        TMR0_Unit2_1msTask();      /* 1ms心跳任务钩子：ADC均值+电流检测 */
         
 
         

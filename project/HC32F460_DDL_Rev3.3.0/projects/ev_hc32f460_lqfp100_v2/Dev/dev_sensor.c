@@ -210,13 +210,11 @@ static void Sensor_CheckOvercurrent_SampleCount(Sensor_Device_t* pstcDev,
                 pstcAlarm->u8OvercurrentAlarm = 1;
                 pstcAlarm->u16ConsecutiveCount = 0;
                 
-                Current_AlarmEvent_t stcEvent;
-                stcEvent.s32CurrentMa = s32CurrentMa;
-                stcEvent.s32ThresholdMa = pstcCfg->s32OvercurrentThresholdMa;
-                stcEvent.u8IsActive = 1;
+                pstcAlarm->u8OcTriggerPending = 1;
+                pstcAlarm->s32PendingCurrentMa = s32CurrentMa;
+                pstcAlarm->s32PendingThresholdMa = pstcCfg->s32OvercurrentThresholdMa;
                 
                 GPIO_RESET(GPIO_LED_PORT, GPIO_LED_PIN);
-                EventBus_Publish(TOPIC_CURRENT_ALARM, &stcEvent);
             }
         } else {
             pstcAlarm->u16ConsecutiveCount = 0;
@@ -229,11 +227,9 @@ static void Sensor_CheckOvercurrent_SampleCount(Sensor_Device_t* pstcDev,
                 pstcAlarm->u16ConsecutiveCount = 0;
                 
 #if OVERCURRENT_CLEAR_MODE == OVERCURRENT_CLEAR_AUTO
-                Current_AlarmEvent_t stcEvent;
-                stcEvent.s32CurrentMa = s32CurrentMa;
-                stcEvent.s32ThresholdMa = pstcCfg->s32OvercurrentThresholdMa;
-                stcEvent.u8IsActive = 0;
-                EventBus_Publish(TOPIC_CURRENT_ALARM, &stcEvent);
+                pstcAlarm->u8OcReleasePending = 1;
+                pstcAlarm->s32PendingCurrentMa = s32CurrentMa;
+                pstcAlarm->s32PendingThresholdMa = pstcCfg->s32OvercurrentThresholdMa;
 #endif
             }
         } else if (u8IsOvercurrent) {
@@ -278,11 +274,9 @@ static void Sensor_CheckOvercurrent_TimeWindow(Sensor_Device_t* pstcDev,
                     pstcAlarm->u8OvercurrentAlarm = 1;
                     pstcAlarm->u8TimerRunning = 0;
                     
-                    Current_AlarmEvent_t stcEvent;
-                    stcEvent.s32CurrentMa = s32CurrentMa;
-                    stcEvent.s32ThresholdMa = pstcCfg->s32OvercurrentThresholdMa;
-                    stcEvent.u8IsActive = 1;
-                    EventBus_Publish(TOPIC_CURRENT_ALARM, &stcEvent);
+                    pstcAlarm->u8OcTriggerPending = 1;
+                    pstcAlarm->s32PendingCurrentMa = s32CurrentMa;
+                    pstcAlarm->s32PendingThresholdMa = pstcCfg->s32OvercurrentThresholdMa;
                 }
             }
         } else {
@@ -307,11 +301,9 @@ static void Sensor_CheckOvercurrent_TimeWindow(Sensor_Device_t* pstcDev,
                     pstcAlarm->u8TimerRunning = 0;
                     
 #if OVERCURRENT_CLEAR_MODE == OVERCURRENT_CLEAR_AUTO
-                    Current_AlarmEvent_t stcEvent;
-                    stcEvent.s32CurrentMa = s32CurrentMa;
-                    stcEvent.s32ThresholdMa = pstcCfg->s32OvercurrentThresholdMa;
-                    stcEvent.u8IsActive = 0;
-                    EventBus_Publish(TOPIC_CURRENT_ALARM, &stcEvent);
+                    pstcAlarm->u8OcReleasePending = 1;
+                    pstcAlarm->s32PendingCurrentMa = s32CurrentMa;
+                    pstcAlarm->s32PendingThresholdMa = pstcCfg->s32OvercurrentThresholdMa;
 #endif
                 }
             }
@@ -369,6 +361,24 @@ static void Sensor_CheckOvercurrent(Sensor_Device_t* pstcDev) {
     }
 }
 
+// ========== 1ms ISR 快速路径（已校准） ==========
+void Sensor_Device_UpdateIsr(Sensor_Device_t* pstcDev)
+{
+    if (!pstcDev || !pstcDev->u8Initialized || !pstcDev->u8Calibrated) return;
+    
+    /* 直接从 ADC 设备缓存读取均值结果（避免 DeviceManager 锁，锁非 ISR 安全） */
+    DeviceNode_t* pstcNode = DeviceManager_Get(pstcDev->stcConfig.u8AdcDevId);
+    if (pstcNode == NULL || pstcNode->private_data == NULL) return;
+    
+    ADC_Device_t* pstcAdc = (ADC_Device_t*)pstcNode->private_data;
+    pstcDev->u16AdcRawValue = pstcAdc->u16RawValue;
+    pstcDev->u16AdcVoltageMv = pstcAdc->u16VoltageMv;
+    
+    Sensor_CalcCurrent(pstcDev);
+    Sensor_CheckOvercurrent(pstcDev);
+    pstcDev->u32LastUpdateTime = tickTimer_GetCount();
+}
+
 // ========== 标准设备操作 ==========
 DeviceResult_t Sensor_Device_Init(void* handle) {
     Sensor_Device_t* pstcDev = (Sensor_Device_t*)handle;
@@ -416,6 +426,11 @@ DeviceResult_t Sensor_Device_Init(void* handle) {
 DeviceResult_t Sensor_Device_Update(void* handle) {
     Sensor_Device_t* pstcDev = (Sensor_Device_t*)handle;
     if (!pstcDev || !pstcDev->u8Initialized) return RESULT_ERROR;
+    
+    if (pstcDev->u8Calibrated) {
+        /* 已校准：快速路径由 1ms ISR(Sensor_Device_UpdateIsr)执行，主循环不再处理 */
+        return RESULT_OK;
+    }
     
     if (!pstcDev->u8Calibrated) {
         
@@ -653,6 +668,8 @@ void Sensor_Device_ClearAlarm(Sensor_Device_t* pstcDev) {
     pstcDev->stcAlarmState.u8OvercurrentAlarm = 0;
     pstcDev->stcAlarmState.u16ConsecutiveCount = 0;
     pstcDev->stcAlarmState.u8TimerRunning = 0;
+    pstcDev->stcAlarmState.u8OcTriggerPending = 0;
+    pstcDev->stcAlarmState.u8OcReleasePending = 0;
     nbDelay_Stop(&pstcDev->stcAlarmState.stcTriggerTimer);
     nbDelay_Stop(&pstcDev->stcAlarmState.stcReleaseTimer);
     
