@@ -345,12 +345,12 @@ void RS485_Init(void)
     irqCfg.enIRQn = USART_RX_ERR_IRQn;
     irqCfg.enIntSrc = USART_RX_ERR_INT_SRC;
     irqCfg.pfnCallback = USART_RxError_IrqCallback;
-    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_12);
+    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_04);
 
     irqCfg.enIRQn = USART_RX_FULL_IRQn;
     irqCfg.enIntSrc = USART_RX_FULL_INT_SRC;
     irqCfg.pfnCallback = USART_RxFull_IrqCallback;
-    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_12);
+    INTC_IrqInstalHandler(&irqCfg, DDL_IRQ_PRIO_04);
 
     irqCfg.enIRQn = USART_TX_EMPTY_IRQn;
     irqCfg.enIntSrc = USART_TX_EMPTY_INT_SRC;

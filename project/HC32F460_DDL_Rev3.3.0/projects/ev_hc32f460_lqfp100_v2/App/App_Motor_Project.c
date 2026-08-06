@@ -696,6 +696,7 @@ void App_ReloadConfig(void)
 //                (long)g_sensor_current_dev->stcConfig.s32OvercurrentThresholdMa,
 //                (unsigned long)g_sensor_current_dev->stcConfig.u32TriggerWindowMs,
 //                (unsigned long)g_sensor_current_dev->stcConfig.u32ReleaseWindowMs);
+        Sensor_OcRefreshThresholdRaw(g_sensor_current_dev);
     }
 
     /* 设备地址 (node_id) 由 Flash 存储，在 Param_Init 时已加载 */
