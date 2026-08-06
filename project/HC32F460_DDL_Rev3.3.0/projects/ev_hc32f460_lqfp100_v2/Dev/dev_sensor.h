@@ -87,6 +87,13 @@
 #define SENSOR_OC_FILTER_NONE            0   // 原始值直通（当前默认）
 #define SENSOR_OC_FILTER_MA4             1   // 预留：4点滑动平均(≈0.8ms @200μs)，暂未启用
 
+// ========== 过流回落容忍（时间回落，宏可配） ==========
+#define SENSOR_OC_DROP_TOLERANCE_US       (2000U)   // 回落容忍：电流低于阈值 ≤2ms 不清零（free-run）
+#ifndef ADC_SAMPLE_INTERVAL_US
+#define ADC_SAMPLE_INTERVAL_US            (200U)
+#endif
+#define SENSOR_OC_DROP_TOLERANCE_SAMPLES  (((SENSOR_OC_DROP_TOLERANCE_US) + (ADC_SAMPLE_INTERVAL_US) - 1U) / (ADC_SAMPLE_INTERVAL_US))   // 2ms@200μs = 10 点
+
 // ========== 过流告警清除模式选择 ==========
 #define OVERCURRENT_CLEAR_AUTO      0
 #define OVERCURRENT_CLEAR_MANUAL    1
@@ -225,6 +232,9 @@ void Sensor_Device_ClearAlarm(Sensor_Device_t* pstcDev);
 // ========== 过流 ISR 检测（方案二）接口 ==========
 void Sensor_Device_ProcessPendingEvent(void);   // 主循环调用：发布 ISR 缓存的过流事件
 void Sensor_Device_SetOcFilter(uint8_t u8FilterType);  // 预留滤波接口：SENSOR_OC_FILTER_NONE / MA4
+extern volatile uint64_t g_u64OcTriggerUs;        // 过流触发时刻（Timer6 μs，调试用）
+extern volatile uint8_t  g_u8OcStopMeasureActive; // 1=正在测量过流急停耗时（调试用）
+extern volatile uint16_t g_dbg_isr_oc_reset_cnt;       // 本轮过流被回落清零重启的次数（调试用）
 
 // ========== 全局操作函数表 ==========
 extern const DeviceOps_t g_sensor_ops;

@@ -7,6 +7,7 @@
 #include "TickTimer.h"
 #include <string.h>
 #include "rtt_log.h"
+#include "timer6_timebase.h"
 #include "dev_rturn.h"          // 旋转限位，包�? RTurn_LimitEvent_t
 #include "Template_Pwm.h"       // PWM配置：TMRA_4, PB6/PB7�?
 #include "hc32_ll_tmra.h"      // TMRA寄存器操作头文件
@@ -362,6 +363,22 @@ __weak void Motor_OnArbitrationStop(MotorDevice_t* motor) {
 
     motor_state = 0;
 #endif
+    /* 调试：测量 过流触发 → 急停生效 耗时（µs，仅过流链路触发时打印） */
+    if (g_u8OcStopMeasureActive) {
+        g_u8OcStopMeasureActive = 0;
+        uint64_t u64NowUs = Timer6_Timebase_GetTimestamp();
+        uint64_t u64ElapsedUs = u64NowUs - g_u64OcTriggerUs;
+        if (u64ElapsedUs < 200000UL) {   /* 200ms 内视为过流链路导致的停车 */
+            MAIN_D("[OC] trigger_us=%lu estop_us=%lu elapsed=%lu us reset_cnt=%u\r\n",
+                   (unsigned long)g_u64OcTriggerUs,
+                   (unsigned long)u64NowUs,
+                   (unsigned long)u64ElapsedUs,
+                   (unsigned int)g_dbg_isr_oc_reset_cnt);
+        } else {
+            MAIN_D("[OC] estop without OC trigger (elapsed=%lu us)\r\n",
+                   (unsigned long)u64ElapsedUs);
+        }
+    }
 }
 
 __weak void Motor_OnArbitrationFwd(MotorDevice_t* motor, float duty) {

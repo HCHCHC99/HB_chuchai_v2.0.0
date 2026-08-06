@@ -23,6 +23,11 @@ volatile uint64_t g_dbg_isr_oc_start_us = 0;
 volatile uint32_t g_dbg_isr_oc_elapsed_us = 0;
 volatile uint32_t g_dbg_isr_oc_window_us = 0;
 volatile int32_t  g_dbg_isr_oc_cur_ma = 0;
+volatile uint64_t g_u64OcTriggerUs = 0;       // 过流触发时刻（Timer6 μs，调试用）
+static volatile uint16_t s_u16IsrOcBelowCount = 0;  // 连续低于阈值采样计数（回落容忍）
+static volatile uint8_t  s_u8OcAttemptDone = 0;     // 1=本轮过流尝试已结束（触发/清除）
+volatile uint16_t g_dbg_isr_oc_reset_cnt = 0;       // 本轮过流被回落清零重启的次数（调试）
+volatile uint8_t  g_u8OcStopMeasureActive = 0; // 1=正在测量过流急停耗时（调试用）
 // ========== 模拟模式全局变量 ==========
 #ifdef SENSOR_SIMULATION_MODE
     // 模拟的是传感器原始输出电压（mV），不是ADC输入电压
@@ -419,6 +424,7 @@ static void Sensor_OcIsrCallback(uint16_t u16AdcValue, uint8_t u8Channel, void* 
     extern volatile uint8_t g_u8MotorReverseBlankActive;
     if (g_u8MotorForwardBlankActive || g_u8MotorReverseBlankActive) {
         s_u8IsrOcState = 0;
+        s_u16IsrOcBelowCount = 0;
         g_dbg_isr_oc_elapsed_us = 0;
         return;
     }
@@ -442,42 +448,61 @@ static void Sensor_OcIsrCallback(uint16_t u16AdcValue, uint8_t u8Channel, void* 
     }
     g_dbg_isr_oc_cur_ma = (s32CurrentMa >= 0) ? s32CurrentMa : -s32CurrentMa;
 
-    /* 4) 阈值比较：严格连续，无回差、无回落容忍
-     *    状态0 用当前配置判起始并锁存；状态1/2 用锁存值（本过程不受 485 改参影响） */
+    /* 4) 阈值比较 + 过流状态机：严格连续 + 时间回落容忍（free-run）
+     *    状态0 用当前配置判起始并锁存；状态1/2 用锁存值（本过程不受 485 改参影响）
+     *    回落容忍：连续低于阈值 < SENSOR_OC_DROP_TOLERANCE_SAMPLES 不清零，窗口继续走 */
     int32_t s32CompareThreshold = (s_u8IsrOcState == 0) ?
                                   pstcDev->stcConfig.s32OvercurrentThresholdMa :
                                   s_s32IsrOcThresholdMa;
     int32_t s32AbsMa = (s32CurrentMa >= 0) ? s32CurrentMa : -s32CurrentMa;
 
     if (s32AbsMa >= s32CompareThreshold) {
+        /* 超阈值：回落计数清零 */
+        s_u16IsrOcBelowCount = 0;
+
         if (s_u8IsrOcState == 0) {
-            /* 进入计时：锁存窗口/阈值 */
+            /* 进入计时：锁存窗口/阈值；新一轮过流尝试则清 reset_cnt */
             s_u8IsrOcState = 1;
             s_u64IsrOcStartUs = u64NowUs;
             s_u32IsrOcWindowUs = (uint32_t)pstcDev->stcConfig.u32TriggerWindowMs * 1000UL;
             s_s32IsrOcThresholdMa = pstcDev->stcConfig.s32OvercurrentThresholdMa;
             g_dbg_isr_oc_start_us = u64NowUs;
             g_dbg_isr_oc_window_us = s_u32IsrOcWindowUs;
+            if (s_u8OcAttemptDone) {
+                s_u8OcAttemptDone = 0;
+                g_dbg_isr_oc_reset_cnt = 0;   /* 新一轮过流尝试：清零重启计数 */
+            }
         } else if (s_u8IsrOcState == 1) {
-            /* 计时中：检查窗口是否满足 */
+            /* 计时中：检查窗口是否满足（free-run：容忍回落期间墙钟继续走） */
             uint64_t u64Elapsed = u64NowUs - s_u64IsrOcStartUs;
             g_dbg_isr_oc_elapsed_us = (uint32_t)u64Elapsed;
             if (u64Elapsed >= s_u32IsrOcWindowUs) {
                 s_u8IsrOcState = 2;
+                s_u8OcAttemptDone = 1;      /* 本轮尝试已触发 */
                 /* 写缓存（仅当 pending==0，避免覆盖主循环未处理的事件） */
                 if (g_u8SensorOcPending == 0) {
                     g_sensor_oc_cache.s32CurrentMa = s32CurrentMa;
                     g_sensor_oc_cache.s32ThresholdMa = s_s32IsrOcThresholdMa;
                     g_sensor_oc_cache.u8IsActive = 1;
+                    g_u64OcTriggerUs = u64NowUs;        /* T0：过流触发时刻 */
+                    g_u8OcStopMeasureActive = 1;        /* 标记开始测量急停耗时 */
                     g_u8SensorOcPending = 1;
                 }
             }
         }
         /* 状态2：保持，等待主循环处理或电流回落后自动重新武装 */
     } else {
-        /* 任一采样点低于阈值 → 严格清零（自动重新武装） */
-        s_u8IsrOcState = 0;
-        g_dbg_isr_oc_elapsed_us = 0;
+        /* 低于阈值：回落容忍，连续低于 DROP_SAMPLES 才作废窗口 */
+        s_u16IsrOcBelowCount++;
+        if (s_u16IsrOcBelowCount >= SENSOR_OC_DROP_TOLERANCE_SAMPLES) {
+            uint8_t u8WasTiming = (s_u8IsrOcState == 1);
+            s_u8IsrOcState = 0;
+            s_u16IsrOcBelowCount = 0;
+            g_dbg_isr_oc_elapsed_us = 0;
+            if (u8WasTiming) {
+                g_dbg_isr_oc_reset_cnt++;   /* 计时中被回落清零重启（诊断） */
+            }
+        }
     }
 
     g_dbg_isr_oc_state = s_u8IsrOcState;
@@ -807,6 +832,9 @@ void Sensor_Device_ClearAlarm(Sensor_Device_t* pstcDev) {
 
     /* 方案二：无条件复位 ISR 过流状态机（锁存 + 丢弃陈旧 pending），保证清除后能再次触发 */
     s_u8IsrOcState = 0;
+    s_u16IsrOcBelowCount = 0;
+    s_u8OcAttemptDone = 0;
+    g_dbg_isr_oc_reset_cnt = 0;
     g_u8SensorOcPending = 0;
     g_dbg_isr_oc_state = 0;
     g_dbg_isr_oc_elapsed_us = 0;
