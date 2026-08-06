@@ -7,9 +7,9 @@
 static uint8_t s_bAdpAdcInitialized = 0U;
 
 volatile int32_t g_dbg_current_raw_ma = 0;        // 原始ADC值换算的电流(mA)
-volatile int32_t g_dbg_current_filtered_ma = 0;   // EMA滤波后的电流(mA)
+volatile int32_t g_dbg_current_filtered_ma = 0;   // 均值滤波后的电流(mA)
 volatile uint16_t g_dbg_current_raw_adc = 0;      // 原始ADC值
-volatile uint16_t g_dbg_current_filtered_adc = 0; // EMA滤波后的ADC值
+volatile uint16_t g_dbg_current_filtered_adc = 0; // 均值滤波后的ADC值
 
 /* Callback context for ADC interrupt */
 typedef struct {
@@ -107,19 +107,6 @@ static uint16_t ADC_Filter_Median(uint16_t* pu16Data, uint8_t u8Count)
     return au16Sorted[u8Count / 2];
 }
 
-/**
- * @brief First order low-pass filter (EMA)
- *        filtered = prev + alpha * (new - prev)
- *        alpha = 0.2 means new data contributes 20%
- */
-static uint16_t ADC_Filter_FirstOrder(ADC_Device_t* pstcDev, uint16_t u16NewValue)
-{
-    float fPrev = (float)pstcDev->stcFilter.u16FilteredValue;
-    float fNew = (float)u16NewValue;
-    float fAlpha = pstcDev->stcFilter.fAlpha;
-    
-    return (uint16_t)(fPrev + fAlpha * (fNew - fPrev));
-}
 
 static void ADC_Device_UpdateFilter(ADC_Device_t* pstcDev)
 {
@@ -140,15 +127,10 @@ static void ADC_Device_UpdateFilter(ADC_Device_t* pstcDev)
             u16Filtered = au16RawData[u16Count - 1];
             break;
             
-        case ADC_FILTER_MEAN: {
-            uint8_t u8UseCount = (u16Count > u8WindowSize) ? u8WindowSize : u16Count;
-            uint16_t au16Window[ADC_FILTER_WINDOW_MAX];
-            for (uint8_t i = 0; i < u8UseCount; i++) {
-                au16Window[i] = au16RawData[u16Count - u8UseCount + i];
-            }
-            u16Filtered = ADC_Filter_Mean(au16Window, u8UseCount);
+        case ADC_FILTER_MEAN:
+            /* 使用环形缓冲里全部累计样本做平均，不浪费采样点 */
+            u16Filtered = ADC_Filter_Mean(au16RawData, (uint8_t)u16Count);
             break;
-        }
         
         case ADC_FILTER_MEDIAN: {
             uint8_t u8UseCount = (u16Count > u8WindowSize) ? u8WindowSize : u16Count;
@@ -160,10 +142,7 @@ static void ADC_Device_UpdateFilter(ADC_Device_t* pstcDev)
             break;
         }
         
-        case ADC_FILTER_FIRST_ORDER: {
-            u16Filtered = ADC_Filter_FirstOrder(pstcDev, au16RawData[u16Count - 1]);
-            break;
-        }
+
         
         default:
             u16Filtered = au16RawData[u16Count - 1];
@@ -284,7 +263,6 @@ DeviceResult_t ADC_Device_Init(void* handle)
     pstcDev->stcFilter.u16FilteredValue = 0;
     pstcDev->stcFilter.u32LastUpdateTime = tickTimer_GetCount();
     pstcDev->stcFilter.u16UpdateIntervalMs = ADC_DEFAULT_FILTER_INTERVAL;
-    pstcDev->stcFilter.fAlpha = ADC_DEFAULT_FILTER_ALPHA;
 
     pstcDev->u16RawValue = 0;
     pstcDev->u16VoltageMv = 0;
@@ -302,8 +280,7 @@ DeviceResult_t ADC_Device_Init(void* handle)
     pstcDev->u8Initialized = 1;
     pstcDev->u32LastUpdateTime = tickTimer_GetCount();
 
-    ADC_DEBUG("Init success: ADC_ID=%d, Filter=EMA(alpha=%.1f)\r\n", 
-              pstcDev->stcConfig.u8AdcId, pstcDev->stcFilter.fAlpha);
+    ADC_DEBUG("Init success: ADC_ID=%d, Filter=MEAN\r\n", pstcDev->stcConfig.u8AdcId);
     return RESULT_OK;
 }
 
@@ -464,15 +441,6 @@ void ADC_Device_SetFilterInterval(ADC_Device_t* pstcDev, uint16_t u16IntervalMs)
     if (pstcDev == NULL) return;
     pstcDev->stcFilter.u16UpdateIntervalMs = u16IntervalMs;
     ADC_DEBUG("Filter interval set: %d ms\r\n", u16IntervalMs);
-}
-
-void ADC_Device_SetFirstOrderAlpha(ADC_Device_t* pstcDev, float fAlpha)
-{
-    if (pstcDev == NULL) return;
-    if (fAlpha > 0.0f && fAlpha <= 1.0f) {
-        pstcDev->stcFilter.fAlpha = fAlpha;
-        ADC_DEBUG("First order alpha set: %.3f\r\n", fAlpha);
-    }
 }
 
 /* ========== Ring Buffer Operations ========== */

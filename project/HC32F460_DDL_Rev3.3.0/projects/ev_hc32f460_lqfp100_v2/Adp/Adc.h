@@ -58,7 +58,7 @@ extern "C" {
 #define TMR0_CH                         (TMR0_CH_B)
 #define TMR0_PERIPH_CLK                 (FCG2_PERIPH_TMR0_1)
 #define TMR0_CLK_DIV                    (TMR0_CLK_DIV256)
-#define ADC_SAMPLE_INTERVAL_US          (1000U)
+#define ADC_SAMPLE_INTERVAL_US          (100U)
 
 /* ADC interrupt configuration */
 #define ADC_SEQA_INT_PRIO               (DDL_IRQ_PRIO_06)
@@ -66,7 +66,7 @@ extern "C" {
 #define ADC_SEQA_INT_IRQn               (INT116_IRQn)
 
 /* ADC debug toggle pin - comment to disable */
-#define ADC_DEBUG_TOGGLE_ENABLE
+// #define ADC_DEBUG_TOGGLE_ENABLE
 
 #ifdef ADC_DEBUG_TOGGLE_ENABLE
 #define ADC_DEBUG_TOGGLE_PORT           (GPIO_PORT_A)
