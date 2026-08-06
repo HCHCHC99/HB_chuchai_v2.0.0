@@ -469,16 +469,9 @@ static void Sensor_OcIsrCallback(uint16_t u16AdcValue, uint8_t u8Channel, void* 
     /* 2) 输入滤波（预留接口，当前直通） */
     uint16_t u16Filtered = Sensor_OcFilterSample(pstcDev, u16AdcValue);
 
-    /* 3) 预计算原始码阈值比较（int32，零除法）+ 电流 mA（调试/事件用，硬件除法） */
+    /* 3) 预计算原始码阈值比较（int32，零除法；mA 只在触发时换算一次） */
     int32_t s32Diff = (int32_t)u16Filtered - s_s32OcZeroRaw;
     int32_t s32AbsDiff = (s32Diff >= 0) ? s32Diff : -s32Diff;
-
-    uint32_t u32Mv = ((uint32_t)s32AbsDiff * 3300UL) / 4095UL;
-    int32_t s32CurrentMa = (int32_t)((u32Mv * 1000U) / (uint32_t)s_s32OcSensitivity);
-    if (s_s32OcScale != 100) {
-        s32CurrentMa = (s32CurrentMa * s_s32OcScale) / 100;
-    }
-    g_dbg_isr_oc_cur_ma = (s32CurrentMa >= 0) ? s32CurrentMa : -s32CurrentMa;
 
     /* 4) 阈值比较 + 过流状态机：严格连续 + 时间回落容忍（free-run）
      *    状态0 用预计算原始阈值判起始并锁存；状态1/2 用锁存值（本过程不受 485 改参影响） */
@@ -512,6 +505,13 @@ static void Sensor_OcIsrCallback(uint16_t u16AdcValue, uint8_t u8Channel, void* 
                 s_u8OcAttemptDone = 1;      /* 本轮尝试已触发 */
                 /* 写缓存（仅当 pending==0，避免覆盖主循环未处理的事件） */
                 if (g_u8SensorOcPending == 0) {
+                    /* 触发时才换算电流（事件缓存/调试用），平时不做 */
+                    uint32_t u32Mv = ((uint32_t)s32AbsDiff * 3300UL) / 4095UL;
+                    int32_t s32CurrentMa = (int32_t)((u32Mv * 1000U) / (uint32_t)s_s32OcSensitivity);
+                    if (s_s32OcScale != 100) {
+                        s32CurrentMa = (s32CurrentMa * s_s32OcScale) / 100;
+                    }
+                    g_dbg_isr_oc_cur_ma = (s32CurrentMa >= 0) ? s32CurrentMa : -s32CurrentMa;
                     g_sensor_oc_cache.s32CurrentMa = s32CurrentMa;
                     g_sensor_oc_cache.s32ThresholdMa = s_s32IsrOcThresholdMa;
                     g_sensor_oc_cache.u8IsActive = 1;

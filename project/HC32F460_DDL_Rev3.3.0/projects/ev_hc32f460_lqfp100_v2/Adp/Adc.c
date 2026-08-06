@@ -178,7 +178,11 @@ static void Adc_IrqConfig(void)
         LL_PERIPH_WP(LL_PERIPH_INTC);
         NVIC_ClearPendingIRQ(stcIrq.enIRQn);
         NVIC_SetPriority(stcIrq.enIRQn, ADC_SEQA_INT_PRIO);
+#if ADC_SAMPLE_IRQ_ENABLE
         NVIC_EnableIRQ(stcIrq.enIRQn);
+#else
+        NVIC_DisableIRQ(stcIrq.enIRQn);   /* 调试：关闭 ADC 采样中断 */
+#endif
         u8AdcIntEn |= ADC_INT_EOCA;
         ADC_Adp_DEBUG("SEQ_A interrupt enabled for interrupt-mode channels\r\n");
     } else {
@@ -186,9 +190,13 @@ static void Adc_IrqConfig(void)
         ADC_Adp_DEBUG("SEQ_A interrupt disabled (no interrupt-mode channels)\r\n");
     }
     
+#if ADC_SAMPLE_IRQ_ENABLE
     if (u8AdcIntEn != 0U) {
         ADC_IntCmd(ADC_UNIT, u8AdcIntEn, ENABLE);
     }
+#else
+    ADC_IntCmd(ADC_UNIT, ADC_INT_EOCA, DISABLE);   /* 调试：关闭 ADC 采样中断 */
+#endif
 }
 
 /**
@@ -508,9 +516,15 @@ void Adc_EnableInterrupt(void)
 
     NVIC_ClearPendingIRQ(stcIrq.enIRQn);
     NVIC_SetPriority(stcIrq.enIRQn, ADC_SEQA_INT_PRIO);
+#if ADC_SAMPLE_IRQ_ENABLE
     NVIC_EnableIRQ(stcIrq.enIRQn);
 
     ADC_IntCmd(ADC_UNIT, ADC_INT_EOCA, ENABLE);
+#else
+    NVIC_DisableIRQ(stcIrq.enIRQn);   /* 调试：关闭 ADC 采样中断 */
+
+    ADC_IntCmd(ADC_UNIT, ADC_INT_EOCA, DISABLE);
+#endif
 
     ADC_Adp_DEBUG("ADC interrupt re-enabled (EOCA)\r\n");
 }
