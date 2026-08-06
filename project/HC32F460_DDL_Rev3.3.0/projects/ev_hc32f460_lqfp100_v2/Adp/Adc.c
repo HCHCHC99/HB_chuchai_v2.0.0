@@ -9,6 +9,7 @@
 #include "Dma.h"
 #include "Gpio_io.h"
 #include "rtt_log.h"
+#include "EventRecorder.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -21,6 +22,9 @@ static uint8_t s_u8AdcInstanceCount = 0;
 static bool s_bAdcInitialized = false;
 static bool s_bHasDmaInstance = false;
 static int8_t s_a8AdcIdToDmaId[ADC_MAX_INSTANCES];
+
+/* ISR CPU 观测变量 (Logic Analyzer / Performance Analyzer 用) */
+volatile uint32_t g_isr_flag = 0U;
 
 /*******************************************************************************
  * Local function prototypes ('static')
@@ -219,6 +223,11 @@ static void Adc_ProcessInterruptChannels(void)
 
 static void ADC1_SeqA_IrqCallback(void)
 {
+    uint32_t u32IsrStart = DWT->CYCCNT;   /* ISR CPU 观测：记录进入时刻(cycles) */
+
+    g_isr_flag = 1U;   /* ISR CPU 观测：进入 ISR，Logic Analyzer 里高电平宽度=ISR 执行时间 */
+    EventRecord2(EventID(EventLevelAPI, 1U, 1U), u32IsrStart, 0U);   /* Event Recorder: ISR 进入 */
+
 #ifdef ADC_DEBUG_TOGGLE_ENABLE
     LL_PERIPH_WE(LL_PERIPH_GPIO);
     GPIO_TOGGLE(ADC_DEBUG_TOGGLE_PORT, ADC_DEBUG_TOGGLE_PIN);
@@ -227,6 +236,9 @@ static void ADC1_SeqA_IrqCallback(void)
 
     ADC_ClearStatus(ADC_UNIT, ADC_FLAG_EOCA);
     Adc_ProcessInterruptChannels();
+
+    g_isr_flag = 0U;   /* ISR CPU 观测：退出 ISR */
+    EventRecord2(EventID(EventLevelAPI, 1U, 2U), DWT->CYCCNT - u32IsrStart, 0U);   /* Event Recorder: ISR 退出，val1=耗时(cycles) */
 }
 
 static void Adc_HardTriggerStart(void)
