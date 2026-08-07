@@ -34,7 +34,7 @@
 #define ADC_DEFAULT_FILTER_INTERVAL (0U)                     /* 滤波更新间隔(ms)，0=每次Update都执行 */
 
 /* 固定滑动平均窗口：50us采样，2ms电流纹波周期=40点，取1个完整周期=40点（整数倍精确抵消纹波） */
-#define ADC_MEAN_WINDOW_SAMPLES     (40U)
+#define ADC_MEAN_WINDOW_SAMPLES     (120U)
 
 /* Ring buffer structure for raw ADC data */
 typedef struct {
