@@ -29,9 +29,12 @@
 #define ADC_FILTER_WINDOW_MAX       (16U)
 
 /* ========== 滤波默认配置（可在此修改） ========== */
-#define ADC_DEFAULT_FILTER_TYPE     ADC_FILTER_MEAN          /* 默认滤波类型：平均值（用满环形缓冲全部样本） */
+#define ADC_DEFAULT_FILTER_TYPE     ADC_FILTER_MEAN          /* 默认滤波类型：平均值（固定N点滑动窗口，2个纹波周期） */
 #define ADC_DEFAULT_FILTER_WINDOW   (4U)                     /* 窗口滤波大小 */
 #define ADC_DEFAULT_FILTER_INTERVAL (0U)                     /* 滤波更新间隔(ms)，0=每次Update都执行 */
+
+/* 固定滑动平均窗口：50us采样，2ms电流纹波周期=40点，取1个完整周期=40点（整数倍精确抵消纹波） */
+#define ADC_MEAN_WINDOW_SAMPLES     (40U)
 
 /* Ring buffer structure for raw ADC data */
 typedef struct {
@@ -52,7 +55,7 @@ typedef enum {
  */
 typedef enum {
     ADC_FILTER_NONE = 0,          /* No filter, use latest value */
-    ADC_FILTER_MEAN,              /* 平均值（满环形缓冲全部样本） */    ADC_FILTER_MEDIAN,            /* Median filter */
+    ADC_FILTER_MEAN,              /* 平均值（固定N点滑动窗口） */    ADC_FILTER_MEDIAN,            /* Median filter */
 } ADC_FilterType_t;
 
 typedef struct {
@@ -92,6 +95,12 @@ typedef struct {
         uint32_t u32LastUpdateTime;
         uint16_t u16UpdateIntervalMs;
     } stcFilter;
+
+    /* 固定滑动平均窗口（EOCA中断逐样本更新，窗口=2个电流纹波周期） */
+    uint16_t            au16MeanWindow[ADC_MEAN_WINDOW_SAMPLES];
+    uint16_t            u16MeanIndex;      /* 下一个写入位置 */
+    uint32_t            u32MeanSum;        /* 窗口内样本累加和 */
+    uint16_t            u16MeanCount;      /* 已填充样本数（未满N时为部分窗口） */
     
     uint8_t             u8UseRawRing;
     uint8_t             u8ValueUpdated;

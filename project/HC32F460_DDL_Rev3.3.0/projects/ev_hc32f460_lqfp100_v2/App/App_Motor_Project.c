@@ -681,11 +681,11 @@ void ESystem_Init(void) {
         Device_Init(i);
     }
 
-    // 6. 设置各设备的更新间隔
-    SetDeviceUpdateIntervals();
-
-    // 7. 启用所有设备的自动更新
+    // 6. 启用所有设备的自动更新
     DeviceManager_EnableAllUpdate();
+
+    // 7. 设置各设备的更新间隔（须在EnableAllUpdate之后，确保ADC主循环轮询保持禁用）
+    SetDeviceUpdateIntervals();
 
     // 8. 初始化绝对角度模块（在 param_manager 就绪后）
     RunAngle_Init();
