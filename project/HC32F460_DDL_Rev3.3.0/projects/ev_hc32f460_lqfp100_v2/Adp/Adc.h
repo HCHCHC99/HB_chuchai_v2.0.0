@@ -140,9 +140,6 @@ typedef struct {
     uint8_t u8ValueUpdated;
 } stc_adc_instance_t;
 
-/* ISR CPU 观测变量（Logic Analyzer / Performance Analyzer 用）：ADC ISR 进入置 1，退出清 0 */
-extern volatile uint32_t g_isr_flag;
-
 /*******************************************************************************
  * Global function prototypes
  ******************************************************************************/

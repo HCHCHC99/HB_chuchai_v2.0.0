@@ -16,14 +16,10 @@
 #include "Pwm.h"
 #include "Template_Pwm.h"
 #include "hc32_ll_utility.h"
-#include "EventRecorder.h"
 
 /*=============================================================================
  * 全局变量定义
  *============================================================================*/
-
-/* ISR CPU 观测变量（Logic Analyzer / Performance Analyzer 用）：主循环每转一圈 +1 */
-volatile uint32_t g_loop_heartbeat = 0U;
 
 /*=============================================================================
  * 全局PWM实例（供dev_motor使用）
@@ -91,9 +87,6 @@ static void Motor_Pwm_Init(void)
 
 int main(void)
 {
-    /* Event Recorder 初始化（DAP 变体，J-Link 调试器可读取事件） */
-    EventRecorderInitialize(EventRecordAll, 1U);
-
     Hardware_Init();
 
     /* RS485 初始化 - 配置 USART 和 GPIO，等待中断处理 */
@@ -125,14 +118,6 @@ int main(void)
 
     while (1)
     {
-
-        g_loop_heartbeat++;   /* ISR CPU 观测：主循环心跳，每转一圈 +1 */
-        {
-            static uint32_t s_mainEvtCnt = 0U;
-            if ((++s_mainEvtCnt & 0x3FFu) == 0U) {   /* 每 1024 圈记一次事件，避免刷爆缓冲区 */
-                EventRecord2(EventID(EventLevelAPI, 2U, 1U), g_loop_heartbeat, 0U);
-            }
-        }
 
          ESystem_MainLoop();
 
