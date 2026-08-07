@@ -80,6 +80,12 @@
 #define OVERCURRENT_MODE_SAMPLE_COUNT    0
 #define OVERCURRENT_MODE_TIME_WINDOW     1
 
+// ========== 窗口占比判据（泛化的平均值判据） ==========
+// 原判据：窗口平均值（约50%样本线）>= 阈值 即该点过流。
+// 新判据：窗口内 >= 阈值的样本占比 >= OVERCURRENT_WINDOW_PERCENT(%) 即该点过流。
+//         P=50 时约等于原均值判据；P=20 表示窗口内两成样本过线即判定（实测效果良好）。
+#define OVERCURRENT_WINDOW_PERCENT        (20U)
+
 // ========== 过流告警清除模式选择 ==========
 #define OVERCURRENT_CLEAR_AUTO      0
 #define OVERCURRENT_CLEAR_MANUAL    1

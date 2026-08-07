@@ -5,6 +5,9 @@
 #include <stdlib.h>
 // dev_sensor经过校准和灵敏度修正后的最终电流值(mA)
 volatile int32_t g_dbg_sensor_final_ma = 0;
+// 窗口占比判据调试变量：窗口内超过阈值的样本数与占比(%)
+volatile uint16_t g_dbg_sensor_win_over_cnt = 0;
+volatile uint8_t  g_dbg_sensor_win_over_pct = 0;
 // ========== 模拟模式全局变量 ==========
 #ifdef SENSOR_SIMULATION_MODE
     // 模拟的是传感器原始输出电压（mV），不是ADC输入电压
@@ -324,6 +327,41 @@ static void Sensor_CheckOvercurrent_TimeWindow(Sensor_Device_t* pstcDev,
     }
 }
 
+// ========== 窗口占比判据：窗口内 >= 阈值的样本占比达标即该点过流 ==========
+// 平均值约等于窗口样本的50%线；本函数把该百分比泛化，由 OVERCURRENT_WINDOW_PERCENT 决定。
+static uint8_t Sensor_IsOvercurrentByWindowPercent(Sensor_Device_t* pstcDev, int32_t s32ThresholdMa) {
+    if (!pstcDev) return 0;
+
+    DeviceNode_t* pstcNode = DeviceManager_Get(pstcDev->stcConfig.u8AdcDevId);
+    if (pstcNode == NULL || pstcNode->private_data == NULL) return 0;
+
+    ADC_Device_t* pstcAdc = (ADC_Device_t*)pstcNode->private_data;
+    uint16_t u16Count = pstcAdc->u16MeanCount;      /* 窗口实际样本数（未满时按实际算） */
+    if (u16Count == 0) return 0;
+
+    /* 阈值(mA) -> 原始ADC阈值（与 Sensor_CalcCurrentInternal 的换算互逆） */
+    int32_t s32Scale = pstcDev->stcCalibration.s16SensitivityScale;
+    if (s32Scale <= 0) s32Scale = 100;
+    int32_t s32ZeroTotal = SENSOR_VOUT_ZERO_MA_INT + pstcDev->stcCalibration.s32ZeroOffsetMv;
+    int64_t s64ThrMv = (int64_t)s32ZeroTotal
+                     + (int64_t)s32ThresholdMa * SENSOR_SENSITIVITY_INT * 100 / 1000 / s32Scale;
+    if (s64ThrMv < 0) s64ThrMv = 0;
+    if (s64ThrMv > 3300) s64ThrMv = 3300;
+    uint16_t u16ThrRaw = (uint16_t)(((uint32_t)s64ThrMv * 4095UL) / 3300UL);
+
+    uint16_t u16Over = 0;
+    for (uint16_t i = 0; i < u16Count; i++) {
+        if (pstcAdc->au16MeanWindow[i] >= u16ThrRaw) {
+            u16Over++;
+        }
+    }
+
+    g_dbg_sensor_win_over_cnt = u16Over;
+    g_dbg_sensor_win_over_pct = (uint8_t)(((uint32_t)u16Over * 100U) / u16Count);
+
+    return (u16Over * 100U >= u16Count * OVERCURRENT_WINDOW_PERCENT) ? 1 : 0;
+}
+
 // ========== 过流检测统一入口 ==========
 static void Sensor_CheckOvercurrent(Sensor_Device_t* pstcDev) {
     if (!pstcDev) return;
@@ -347,7 +385,9 @@ static void Sensor_CheckOvercurrent(Sensor_Device_t* pstcDev) {
     int32_t s32ReleaseThreshold = s32AbsThreshold - s32AbsHysteresis;
     if (s32ReleaseThreshold < 0) s32ReleaseThreshold = 0;
     
-    uint8_t u8IsOvercurrent = (s32AbsCurrent >= s32TriggerThreshold) ? 1 : 0;
+    /* 窗口占比判据（泛化的平均值判据）：窗口内 >= 阈值的样本占比 >= OVERCURRENT_WINDOW_PERCENT(%) 即该点过流
+     * 原均值判据（约50%样本线）为：u8IsOvercurrent = (s32AbsCurrent >= s32TriggerThreshold) ? 1 : 0; */
+    uint8_t u8IsOvercurrent = Sensor_IsOvercurrentByWindowPercent(pstcDev, s32TriggerThreshold);
     uint8_t u8IsNormal = (s32AbsCurrent <= s32ReleaseThreshold) ? 1 : 0;
     
     if (pstcCfg->u8OvercurrentMode == OVERCURRENT_MODE_SAMPLE_COUNT) {
