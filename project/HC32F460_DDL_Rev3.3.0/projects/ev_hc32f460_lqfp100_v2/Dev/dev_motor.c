@@ -10,6 +10,7 @@
 #include "dev_rturn.h"          // 旋转限位，包�? RTurn_LimitEvent_t
 #include "Template_Pwm.h"       // PWM配置：TMRA_4, PB6/PB7�?
 #include "hc32_ll_tmra.h"      // TMRA寄存器操作头文件
+#include "event_recorder.h"
 
 #if MOTOR_CONTROL_MODE == 1
 #include "Pwm.h"                // PWM 斜坡控制头文�?
@@ -351,6 +352,7 @@ __weak void Motor_OnArbitrationStop(MotorDevice_t* motor) {
     GPIO_SET(PHV_PORT, PHV_PIN);
 
     motor_state = 0;
+    EvtRec_EventStopBGated(0);   /* 过流→GPIO停转：EventB 结束 */
 
 #elif MOTOR_CONTROL_MODE == 1
     // === PWM 模式：停止时切换到停止极�? ===

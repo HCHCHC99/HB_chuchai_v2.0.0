@@ -16,6 +16,7 @@
 #include "Pwm.h"
 #include "Template_Pwm.h"
 #include "hc32_ll_utility.h"
+#include "event_recorder.h"
 
 /*=============================================================================
  * 全局变量定义
@@ -89,6 +90,9 @@ int main(void)
 {
     Hardware_Init();
 
+    /* Event Recorder 初始化（RTE 未加载组件时为空操作） */
+    EvtRec_Init();
+
     /* RS485 初始化 - 配置 USART 和 GPIO，等待中断处理 */
     RS485_Init();
 
@@ -118,6 +122,7 @@ int main(void)
 
     while (1)
     {
+        EvtRec_EventStartA(0);   /* 主循环耗时测试：start（slot 0） */
 
          ESystem_MainLoop();
 
@@ -141,5 +146,6 @@ int main(void)
         //     Motor_OnArbitrationRev(motor, 0.0f);
         // }
 
+        EvtRec_EventStopA(0);    /* 主循环耗时测试：stop（slot 0） */
     }
 }

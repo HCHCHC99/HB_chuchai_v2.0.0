@@ -3,6 +3,7 @@
 #include "rtt_log.h"
 #include <string.h>
 #include <stdlib.h>
+#include "event_recorder.h"
 // dev_sensor经过校准和灵敏度修正后的最终电流值(mA)
 volatile int32_t g_dbg_sensor_final_ma = 0;
 // 窗口占比判据调试变量：窗口内超过阈值的样本数与占比(%)
@@ -214,6 +215,7 @@ static void Sensor_CheckOvercurrent_SampleCount(Sensor_Device_t* pstcDev,
                 pstcAlarm->u16ConsecutiveCount = 0;
                 
                 pstcAlarm->u8OcTriggerPending = 1;
+                EvtRec_EventStartBGated(0);   /* 过流判断成功：EventB 启动 */
                 pstcAlarm->s32PendingCurrentMa = s32CurrentMa;
                 pstcAlarm->s32PendingThresholdMa = pstcCfg->s32OvercurrentThresholdMa;
                 
@@ -278,6 +280,7 @@ static void Sensor_CheckOvercurrent_TimeWindow(Sensor_Device_t* pstcDev,
                     pstcAlarm->u8TimerRunning = 0;
                     
                     pstcAlarm->u8OcTriggerPending = 1;
+                    EvtRec_EventStartBGated(0);   /* 过流判断成功：EventB 启动 */
                     pstcAlarm->s32PendingCurrentMa = s32CurrentMa;
                     pstcAlarm->s32PendingThresholdMa = pstcCfg->s32OvercurrentThresholdMa;
                 }
