@@ -196,6 +196,38 @@ static void Sensor_CalcCurrent(Sensor_Device_t* pstcDev) {
     g_dbg_sensor_final_ma = (pstcDev->s32CurrentMa >= 0) ? pstcDev->s32CurrentMa : -pstcDev->s32CurrentMa;
 }
 
+// ========== 100ms 绝对值滑动平均（仅 1ms ISR 调用，与过流检测无关） ==========
+static void Sensor_UpdateAvg100ms(Sensor_Device_t* pstcDev, int32_t s32CurrentMa)
+{
+    if (!pstcDev) return;
+
+    /* 推入前取绝对值（条件表达式，避免 INT32_MIN 未定义行为） */
+    uint32_t u32AbsMa = (s32CurrentMa >= 0) ? (uint32_t)s32CurrentMa
+                                            : (uint32_t)(-(s32CurrentMa + 1)) + 1U;
+
+    if (pstcDev->u16Avg100msCount < SENSOR_AVG_100MS_WINDOW)
+    {
+        /* 预热期：只加不删，按已填点数平均（如已填 64 点则取 64 点平均） */
+        pstcDev->u32Avg100msSum += u32AbsMa;
+        pstcDev->au32Avg100msBuf[pstcDev->u16Avg100msIndex] = u32AbsMa;
+        pstcDev->u16Avg100msIndex = (pstcDev->u16Avg100msIndex + 1U) % SENSOR_AVG_100MS_WINDOW;
+        pstcDev->u16Avg100msCount++;
+    }
+    else
+    {
+        /* 满窗：减最旧点，加新点 */
+        pstcDev->u32Avg100msSum -= pstcDev->au32Avg100msBuf[pstcDev->u16Avg100msIndex];
+        pstcDev->u32Avg100msSum += u32AbsMa;
+        pstcDev->au32Avg100msBuf[pstcDev->u16Avg100msIndex] = u32AbsMa;
+        pstcDev->u16Avg100msIndex = (pstcDev->u16Avg100msIndex + 1U) % SENSOR_AVG_100MS_WINDOW;
+    }
+
+    if (pstcDev->u16Avg100msCount > 0U)
+    {
+        pstcDev->s32Avg100msMa = (int32_t)(pstcDev->u32Avg100msSum / pstcDev->u16Avg100msCount);
+    }
+}
+
 // ========== 过流检测 - 点数模式 ==========
 static void Sensor_CheckOvercurrent_SampleCount(Sensor_Device_t* pstcDev, 
                                                    uint8_t u8IsOvercurrent, 
@@ -418,6 +450,7 @@ void Sensor_Device_UpdateIsr(Sensor_Device_t* pstcDev)
     pstcDev->u16AdcVoltageMv = pstcAdc->u16VoltageMv;
     
     Sensor_CalcCurrent(pstcDev);
+    Sensor_UpdateAvg100ms(pstcDev, pstcDev->s32CurrentMa);   /* 100ms 绝对值平均（仅供 0x2733） */
     Sensor_CheckOvercurrent(pstcDev);
     pstcDev->u32LastUpdateTime = tickTimer_GetCount();
 }
@@ -447,6 +480,11 @@ DeviceResult_t Sensor_Device_Init(void* handle) {
     pstcDev->u16AdcVoltageMv = 0;
     pstcDev->s32CurrentMa = 0;
     pstcDev->s16CurrentAx100 = 0;
+    /* 100ms 绝对值平均清零 */
+    pstcDev->s32Avg100msMa = 0;
+    pstcDev->u32Avg100msSum = 0;
+    pstcDev->u16Avg100msCount = 0;
+    pstcDev->u16Avg100msIndex = 0;
     
     pstcDev->stcAlarmState.u8OvercurrentAlarm = 0;
     pstcDev->stcAlarmState.u16ConsecutiveCount = 0;
@@ -616,6 +654,12 @@ DeviceResult_t Sensor_Device_Control(void* handle, DeviceCommandData_t* pstcCmd)
         case CMD_SENSOR_GET_CURRENT_AX100:
             if (pstcCmd->response && pstcCmd->response_size >= sizeof(int16_t)) {
                 *(int16_t*)pstcCmd->response = pstcDev->s16CurrentAx100;
+                return RESULT_OK;
+            }
+            return RESULT_PARAM_ERR;
+        case CMD_SENSOR_GET_CURRENT_AVG100_MA:
+            if (pstcCmd->response && pstcCmd->response_size >= sizeof(int32_t)) {
+                *(int32_t*)pstcCmd->response = pstcDev->s32Avg100msMa;
                 return RESULT_OK;
             }
             return RESULT_PARAM_ERR;

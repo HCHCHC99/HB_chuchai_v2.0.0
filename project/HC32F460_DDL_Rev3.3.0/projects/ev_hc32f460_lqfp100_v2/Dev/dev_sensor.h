@@ -128,6 +128,10 @@
 #define CMD_SENSOR_SET_SIM_VALUE       (CMD_BASE_ADC + 0x22)
 #define CMD_SENSOR_GET_ALARM_STATUS    (CMD_BASE_ADC + 0x23)
 #define CMD_SENSOR_GET_CALIBRATION     (CMD_BASE_ADC + 0x24)
+#define CMD_SENSOR_GET_CURRENT_AVG100_MA (CMD_BASE_ADC + 0x25)  /* 100ms 绝对值平均电流（仅供 Modbus 0x2733 读取） */
+
+// ========== 100ms 绝对值平均窗口（1ms 一个点，100 点 = 100ms） ==========
+#define SENSOR_AVG_100MS_WINDOW          (100U)
 
 // ========== 校准参数结构体 ==========
 typedef struct {
@@ -177,6 +181,13 @@ typedef struct {
     uint16_t            u16AdcVoltageMv;
     int32_t             s32CurrentMa;
     int16_t             s16CurrentAx100;
+    /* ===== 100ms 绝对值平均电流（独立于过流检测，仅供 Modbus 0x2733 读取） ===== */
+    volatile int32_t    s32Avg100msMa;                             /* 100ms 平均电流 (mA)，恒 >= 0 */
+    uint32_t            au32Avg100msBuf[SENSOR_AVG_100MS_WINDOW];  /* 绝对值样本环形缓冲 */
+    uint32_t            u32Avg100msSum;                            /* 窗口和 */
+    uint16_t            u16Avg100msCount;                          /* 已填点数（预热期用实际点数平均） */
+    uint16_t            u16Avg100msIndex;                          /* 写指针 */
+    /* ===== 新增结束 ===== */
     Sensor_AlarmState_t stcAlarmState;
     uint32_t            u32LastUpdateTime;
     uint8_t             u8Calibrated;
